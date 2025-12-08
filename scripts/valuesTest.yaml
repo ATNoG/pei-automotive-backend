@@ -1,0 +1,44 @@
+ditto:
+  global:
+    basicAuthUsers:
+    - user: ditto
+      password: ditto
+  gateway:
+    config:
+      authentication:
+        devops:
+          devopsPassword: foobar
+          statusPassword: foobar
+  nginx:
+    service:
+      type: LoadBalancer
+  mongodb:
+    readinessProbe:
+      enabled: false
+      initialDelaySeconds: 30
+      periodSeconds: 35
+      timeoutSeconds: 30
+    livenessProbe:
+      enabled: false
+      initialDelaySeconds: 120
+      periodSeconds: 180
+      timeoutSeconds: 120
+  swaggerui:
+    enabled: false
+
+hono:
+  useLoadBalancer: true
+  amqp:
+    adapter:
+      service:
+        type: LoadBalancer
+    network:
+      service:
+        type: LoadBalancer
+  messagingNetworkTypes:
+    - amqp
+  kafkaMessagingClusterExample:
+    enabled: false
+  amqpMessagingNetworkExample:
+    enabled: true
+  useLegacyAmqpTraceContextFormat: false
