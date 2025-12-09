@@ -14,35 +14,46 @@ This system provides real-time vehicle monitoring capabilities:
 
 ## Prerequisites
 
-- **Kubernetes**
-- **Helm**
-- **Docker****
+- **Kubernetes**, like [K3s](https://k3s.io/)
+- [**Helm**](https://helm.sh/)
+- **Docker**
 - **Python**
-- **mosquitto_pub/sub**
-- **curl**
 
 ## Installation
 
-### 1. Install Eclipse Ditto and Hono
+After verifying you have all the prerequisites, you can start the installation process.
 
-Deploy Eclipse Ditto and Eclipse Hono using the Helm Chart:
+### 1. Clone this repo
 
 ```bash
-# Clone the Helm chart repository
+git clone https://github.com/ATNoG/pei-automotive-backend.git
+cd pei-automotive-backend
+```
+
+### 2. Install Eclipse Ditto and Hono
+
+Clone Eclipse Ditto and Eclipse Hono using the Helm Chart repo:
+
+```bash
 git clone --recurse-submodules -j8 git@github.com:ATNoG/ditto-helm-chart.git
 ```
 
 For detailed installation instructions, refer to the [Helm Chart documentation](https://github.com/ATNoG/ditto-helm-chart).
 
-### 2. Run scripts to setup Ditto and Hono
+### 2. Run script to deploy Ditto and Hono
+
 ```bash
 source scripts/run.sh
 ```
 
+If you want to stop the containers running, you can run the `scripts/stop.sh` script.
+
 ### 3. Setup Environment Variables
 
-Create a `.env` file in the project root with some variables
+Create a `.env` file in the project root with some variables.
+
 You can check them with:
+
 ```bash
 kubectl get pods -n cloud2edge
 kubectl get svc -n cloud2edge
@@ -64,9 +75,6 @@ HONO_TENANT=org.eclipse.packages.c2e
 # MQTT Adapter Configuration
 MQTT_ADAPTER_IP=<your-mqtt-adapter-host>
 MQTT_ADAPTER_PORT_MQTTS=8883
-
-# CA Certificate (for TLS)
-CERT=/path/to/ca-cert.pem
 ```
 
 **Note:** Replace placeholder values with your actual deployment endpoints.
