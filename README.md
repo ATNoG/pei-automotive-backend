@@ -14,12 +14,12 @@ This system provides real-time vehicle monitoring capabilities:
 
 ## Prerequisites
 
-- **Kubernetes cluster** (for Ditto and Hono deployment)
-- **Helm 3.x**
-- **Docker** and **Docker Compose**
-- **Python 3.8+**
-- **mosquitto_pub/sub** tools (for testing)
-- **curl** (for API testing)
+- **Kubernetes**
+- **Helm**
+- **Docker****
+- **Python**
+- **mosquitto_pub/sub**
+- **curl**
 
 ## Installation
 
@@ -80,11 +80,6 @@ SPEED_LIMIT=120
 cd backend
 pip install -r requirements.txt
 
-# For running simulations
-cd ../simulations
-pip install -r requirements.txt  # If exists, otherwise use backend requirements
-```
-
 ## Running the System
 
 ### Start All Services with Docker Compose
@@ -102,18 +97,6 @@ This will start:
 - **Speed Detector** service
 - **Overtaking Detector** service
 
-**Check service status:**
-
-```bash
-docker compose ps
-```
-
-### Stop Services
-
-```bash
-docker compose down -v
-```
-
 ## Using the System
 
 ### Creating a Vehicle
@@ -122,13 +105,13 @@ Create a new vehicle digital twin and register it with Hono:
 
 ```bash
 cd simulations
-python create_car.py <car_name> [--password <device_password>] [--cert <ca_cert_path>]
+python3 create_car.py <car_name> [--password <device_password>]
 ```
 
 **Example:**
 
 ```bash
-python create_car.py my-test-car --password secret123
+python3 create_car.py my-test-car --password secret123
 ```
 
 This will:
@@ -158,46 +141,6 @@ The system includes sample road data in `simulations/roads/`:
 - `right_lane.json` - Right lane coordinates
 
 You can script position updates using these files.
-
-### Monitoring Digital Twins
-
-#### View a Vehicle's Digital Twin
-
-```bash
-curl -u ${DITTO_USER}:${DITTO_PASS} -w '\n' \
-  ${DITTO_API_URL}/things/<tenant>:<car_name>
-```
-
-**Example:**
-
-```bash
-curl -u ditto:ditto -w '\n' \
-  https://ditto.example.com/api/2/things/org.eclipse.packages.c2e:my-test-car
-```
-
-#### Subscribe to Real-time Updates via WebSocket
-
-Use the [WebSocket API](https://eclipse.dev/ditto/httpapi-protocol-bindings-websocket.html) to receive real-time twin updates:
-
-```javascript
-const ws = new WebSocket('wss://<ditto-host>/ws/2');
-ws.send(JSON.stringify({
-  "type": "START-SEND-EVENTS",
-  "filter": "like(thingId,'*my-test-car')"
-}));
-```
-
-#### Monitor Service Detections
-
-Watch for speed violations and overtaking events in service logs:
-
-```bash
-# Speed violations
-docker compose logs -f speed_detector | grep "SPEED VIOLATION"
-
-# Overtaking events
-docker compose logs -f overtaking_detector | grep "OVERTAKING"
-```
 
 ## Services
 
@@ -241,8 +184,6 @@ python3 test_speeding.py
 
 ### Eclipse Ditto API
 
-**Base URL:** `${DITTO_API_URL}`
-
 - **Get Thing:** `GET /things/{thingId}`
 - **Update Thing:** `PUT /things/{thingId}`
 - **Update Feature:** `PUT /things/{thingId}/features/{featureId}`
@@ -250,8 +191,6 @@ python3 test_speeding.py
 [Full Ditto API Documentation](https://eclipse.dev/ditto/httpapi-overview.html)
 
 ### Eclipse Hono Management API
-
-**Base URL:** `${HONO_API_URL}`
 
 - **Register Device:** `POST /v1/devices/{tenantId}/{deviceId}`
 - **Get Device:** `GET /v1/devices/{tenantId}/{deviceId}`
@@ -265,4 +204,3 @@ See [LICENSE](LICENSE) file for details.
 ## Project Links
 
 - **Project Documentation:** [Microsite - PEI Automotive App](https://atnog.github.io/pei-automotive-microsite/)
-- **Ditto Helm Chart:** [ATNoG/ditto-helm-chart](https://github.com/ATNoG/ditto-helm-chart)
