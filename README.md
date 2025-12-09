@@ -41,10 +41,11 @@ source scripts/run.sh
 
 ### 3. Setup Environment Variables
 
-Create a `.env` file in the project root with the following variables:
+Create a `.env` file in the project root with some variables
 You can check them with:
 ```bash
 kubectl get pods -n cloud2edge
+kubectl get svc -n cloud2edge
 ```
 
 ```bash
@@ -66,9 +67,6 @@ MQTT_ADAPTER_PORT_MQTTS=8883
 
 # CA Certificate (for TLS)
 CERT=/path/to/ca-cert.pem
-
-# Speed Limit (in km/h)
-SPEED_LIMIT=120
 ```
 
 **Note:** Replace placeholder values with your actual deployment endpoints.
@@ -79,6 +77,7 @@ SPEED_LIMIT=120
 # For running services
 cd backend
 pip install -r requirements.txt
+```
 
 ## Running the System
 
@@ -171,13 +170,11 @@ You can script position updates using these files.
 Run the test suite:
 
 ```bash
-cd tests
+# Test speed detection
+pytest tests/test_speeding.py
 
 # Test overtaking detection
-python3 test_overtaking.py
-
-# Test speed detection
-python3 test_speeding.py
+pytest tests/test_overtaking.py
 ```
 
 ## API Reference
