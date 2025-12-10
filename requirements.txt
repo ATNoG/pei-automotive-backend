@@ -1,6 +1,10 @@
 websocket-client
 paho-mqtt
 python-dotenv
+<<<<<<< HEAD:requirements.txt
 pytest
 requests
 certifi
+=======
+pytest
+>>>>>>> 5ea2dc66c8521ca6eba562f46651b88a5c2e73af:backend/requirements.txt
