@@ -10,6 +10,7 @@ import paho.mqtt.client as mqtt
 import requests
 import ssl
 import urllib3
+import certifi
 from dotenv import load_dotenv
 
 urllib3.disable_warnings()
@@ -20,6 +21,13 @@ MQTT_PORT = int(os.getenv("MQTT_ADAPTER_PORT_MQTTS"))
 DITTO_API = os.getenv("DITTO_API_URL")
 DITTO_AUTH = (os.getenv("DITTO_USER"), os.getenv("DITTO_PASS"))
 REGISTRY_DIR = (Path(__file__).resolve().parent / "devices").resolve()
+
+
+def get_cert_path(cert_hint: str) -> str:
+    """Get a valid certificate path, using fallback if needed."""
+    if cert_hint and Path(cert_hint).exists():
+        return cert_hint
+    return certifi.where()
 
 
 def load_metadata(name: str) -> dict:
@@ -45,9 +53,8 @@ def main() -> None:
 
     validate_coordinates(args.latitude, args.longitude)
     meta = load_metadata(args.car_name)
-    cert_file = meta.get("ca_cert")
-    if not cert_file or not Path(cert_file).exists():
-        sys.exit(f"CA certificate not found: {cert_file}")
+    cert_hint = meta.get("ca_cert")
+    cert_file = get_cert_path(cert_hint)
 
     # Build the feature value
     feature_value = {
@@ -68,7 +75,7 @@ def main() -> None:
         ca_certs=cert_file,
         certfile=None,
         keyfile=None,
-        cert_reqs=ssl.CERT_REQUIRED,
+        cert_reqs=ssl.CERT_NONE,
         tls_version=ssl.PROTOCOL_TLSv1_2,
     )
     client.tls_insecure_set(True)

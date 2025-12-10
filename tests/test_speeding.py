@@ -1,6 +1,7 @@
 import json
 import time
 import subprocess
+import sys
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
@@ -14,7 +15,7 @@ def ensure_car_exists(car_name: str) -> None:
     meta = SIM_DIR / "devices" / f"{car_name}.json"
     if not meta.exists():
         subprocess.run(
-            ["python3", str(SIM_DIR / "create_car.py"), car_name],
+            [sys.executable, str(SIM_DIR / "create_car.py"), car_name],
             check=True,
         )
 
@@ -42,7 +43,7 @@ def test_speeding():
     for lon, lat in coords[:10]:  # first 10 points along the bridge
         subprocess.run(
             [
-                "python3",
+                sys.executable,
                 str(SIM_DIR / "send_position.py"),
                 car,
                 str(lat),
