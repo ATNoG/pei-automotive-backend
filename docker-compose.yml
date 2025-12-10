@@ -11,22 +11,22 @@ services:
   position_processor:
     build:
       context: .
-      dockerfile: services/position_processor/Dockerfile
+      dockerfile: src/services/position_processor/Dockerfile
     container_name: position_processor
     restart: unless-stopped
     env_file:
-      - ../.env
+      - .env
     depends_on:
       - mosquitto_broker
 
   speed_detector:
     build:
       context: .
-      dockerfile: services/speed_detector/Dockerfile
+      dockerfile: src/services/speed_detector/Dockerfile
     container_name: speed_detector
     restart: unless-stopped
     env_file:
-      - ../.env
+      - .env
     depends_on:
       - mosquitto_broker
       - position_processor
@@ -34,11 +34,11 @@ services:
   overtaking_detector:
     build:
       context: .
-      dockerfile: services/overtaking_detector/Dockerfile
+      dockerfile: src/services/overtaking_detector/Dockerfile
     container_name: overtaking_detector
     restart: unless-stopped
     env_file:
-      - ../.env
+      - .env
     depends_on:
       - mosquitto_broker
       - position_processor
