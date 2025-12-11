@@ -41,7 +41,7 @@ def test_overtaking():
     with open(ROADS_DIR / "left_lane.json") as f:
         left_lane = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    for t in range(20):
+    for t in range(8):
         # slow car starts ahead (index + 4) but moves slowly (1 step)
         slow_idx = t + 4
 
@@ -62,16 +62,21 @@ def test_overtaking():
             # fast car is passing -> Left Lane
             f_lon, f_lat = left_lane[fast_idx]
         else:
-            # fast car is ahead -> Left Lane
-            f_lon, f_lat = left_lane[fast_idx]
+            # fast car is ahead -> return to Right Lane
+            f_lon, f_lat = right_lane[fast_idx]
+
+        # Apply slight offset to move cars to the right (increase longitude)
+        lon_offset = 0.000005
+        s_lon += lon_offset
+        f_lon += lon_offset
 
         # send positions
         send_position(car_slow, s_lat, s_lon)
         send_position(car_fast, f_lat, f_lon)
 
-        time.sleep(1.0)
+        time.sleep(0.5)
 
-    time.sleep(3)
+    time.sleep(2)
     client.loop_stop()
 
     assert len(ALERTS) > 0, "Expected at least one overtaking alert, got none"
