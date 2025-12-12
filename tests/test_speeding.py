@@ -39,8 +39,9 @@ def test_speeding():
     with open(ROADS_DIR / "right_lane.json") as f:
         coords = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    # send positions quickly, should exceed speed limit
-    for lon, lat in coords[:10]:  # first 10 points along the bridge
+    # send positions with large steps to exceed speed limit of 80km/h
+    for i in range(0, len(coords), 3):
+        lon, lat = coords[i]
         subprocess.run(
             [
                 sys.executable,
@@ -51,9 +52,9 @@ def test_speeding():
             ],
             check=True,
         )
-        time.sleep(0.2)  # small dt → high computed speed
+        time.sleep(0.5)
 
-    time.sleep(2)
+    time.sleep(1)
     client.loop_stop()
 
     assert len(ALERTS) > 0, "Expected at least one speed alert, got none"

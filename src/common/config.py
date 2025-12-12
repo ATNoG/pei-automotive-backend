@@ -91,5 +91,5 @@ def load_config() -> AppConfig:
         car_updates_topic=car_updates_topic,
 
         # Speed detection
-        speed_limit_kmh=float(20),
+        speed_limit_kmh=float(80),
     )
