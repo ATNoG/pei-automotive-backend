@@ -12,7 +12,7 @@ TRUSTSTORE_PATH=/tmp/c2e_hono_truststore.pem
 eval $(./setCloud2EdgeEnv.sh $RELEASE $NS $TRUSTSTORE_PATH)
 
 # 2. Hono + Ditto setup
-cd hono 
+cd hono
 ./create_tenant.sh
 ./register_device.sh
 ./update_device_credentials.sh
