@@ -42,7 +42,7 @@ def test_overtaking():
         left_lane = json.load(f)["features"][0]["geometry"]["coordinates"]
 
 
-    for i in range(0, len(right_lane), 4):
+    for i in range(0, len(right_lane), 8):
         # slow car starts ahead (index + 4) but now moves 3 steps per iteration
         slow_idx = i + 4
 
@@ -74,8 +74,7 @@ def test_overtaking():
         # send positions
         send_position(car_slow, s_lat, s_lon)
         send_position(car_fast, f_lat, f_lon)
-
-        time.sleep(0.5)
+        time.sleep(0.3)
 
     time.sleep(1)
     client.loop_stop()

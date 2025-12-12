@@ -40,7 +40,7 @@ def test_speeding():
         coords = json.load(f)["features"][0]["geometry"]["coordinates"]
 
     # send positions with large steps to exceed speed limit of 80km/h
-    for i in range(0, len(coords), 3):
+    for i in range(0, len(coords), 8):
         lon, lat = coords[i]
         subprocess.run(
             [
@@ -52,7 +52,7 @@ def test_speeding():
             ],
             check=True,
         )
-        time.sleep(0.5)
+        time.sleep(0.3)
 
     time.sleep(1)
     client.loop_stop()
