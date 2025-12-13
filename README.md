@@ -22,6 +22,12 @@ This system provides real-time vehicle monitoring capabilities:
 ## Installation
 
 After verifying you have all the prerequisites, you can start the installation process.
+**Warnings:** 
+**1.** The following steps will install Eclipse Ditto and Eclipse Hono on your local Kubernetes cluster. Ensure you have sufficient resources available (atleast 6GB RAM).
+**2.** The current setup uses images that worked with us, using a "x86_64" architecture. If you are using a different architecture (like ARM), you may need to build the images yourself or pull compatible images directly using docker pull from the following links:
+[MongoDB](https://hub.docker.com/_/mongo/tags)
+[ActiveMQ-Artemis](https://hub.docker.com/r/apache/activemq-artemis/tags)
+**3.** This problem happens because the images on C2E were [outdated](https://github.com/eclipse/packages/pull/566) and most of them were removed, so we had to make a new yaml by hand (we hope to fix this in the future).
 
 ### 1. Clone this repo
 
@@ -32,7 +38,7 @@ cd pei-automotive-backend
 
 ### 2. Install Dependencies
 ```bash
-# Install K3s (latest stable version)
+# Install K3s - Ubuntu
 curl -sfL https://get.k3s.io | sh -
 
 # Install in WSL
@@ -44,7 +50,7 @@ mkdir -p ~/.kube
 sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
 sudo chown $USER:$USER ~/.kube/config
 
-# Install Helm
+# Install Helm - Both Linux and WSL
 curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
 ```
 
@@ -196,6 +202,15 @@ pytest tests/test_speeding.py
 
 # Test overtaking detection
 pytest tests/test_overtaking.py
+
+# Test route with courves
+pytest tests/test_curved_route.py
+```
+
+Check latency on our system:
+```bash
+cd timing
+python3 measure_latency.py <car_name>
 ```
 
 ## API Reference
