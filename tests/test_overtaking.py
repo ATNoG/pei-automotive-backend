@@ -2,6 +2,7 @@ import json
 import time
 import subprocess
 from pathlib import Path
+from threading import Thread
 import paho.mqtt.client as mqtt
 
 SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
@@ -42,12 +43,12 @@ def test_overtaking():
         left_lane = json.load(f)["features"][0]["geometry"]["coordinates"]
 
 
-    for i in range(0, len(right_lane)-40, 3):
+    for i in range(0, len(right_lane)-60, 3):
         # slow car starts ahead (index + 4) but now moves 3 steps per iteration
         slow_idx = i + 4
 
         # fast car starts behind (index 0)
-        fast_idx = round(i*1.3)
+        fast_idx = round(i*1.6)
 
         if slow_idx >= len(right_lane) or fast_idx >= len(right_lane):
             break
@@ -56,20 +57,27 @@ def test_overtaking():
 
         gap = slow_idx - fast_idx # positive = Slow car is ahead
 
-        if gap > 2:
+        if gap > 0.5:
             # fast car is far behind -> Right Lane
             f_lon, f_lat = right_lane[fast_idx]
-        elif gap > -2:
-            # fast car is passing -> Left Lane
+        elif gap > -5:
+            # fast car is passing -> Stay in Left Lane until clearly ahead
             f_lon, f_lat = left_lane[fast_idx]
         else:
-            # fast car is ahead -> return to Right Lane
+            # fast car is well ahead -> return to Right Lane
             f_lon, f_lat = right_lane[fast_idx]
 
-        # send positions
-        send_position(car_slow, s_lat, s_lon)
-        send_position(car_fast, f_lat, f_lon)
-        time.sleep(0.1)
+        # send positions in parallel using threads
+        thread_slow = Thread(target=send_position, args=(car_slow, s_lat, s_lon))
+        thread_fast = Thread(target=send_position, args=(car_fast, f_lat, f_lon))
+        
+        thread_slow.start()
+        thread_fast.start()
+        
+        thread_slow.join()
+        thread_fast.join()
+        
+        time.sleep(0.01)
 
     time.sleep(1)
     client.loop_stop()

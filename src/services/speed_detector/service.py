@@ -15,7 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
+
 from common.models import CarUpdate
+from common.overpass_client import get_speed_limit
 
 logger = logging.getLogger(__name__)
 
@@ -23,11 +25,8 @@ logger = logging.getLogger(__name__)
 class SpeedDetector:
     def __init__(self, config):
         self.config = config
-        self.speed_limit = config.speed_limit_kmh
-
-        # set local topic
+        self.default_speed_limit = config.speed_limit_kmh
         self.alert_topic = "alerts/speed"
-
         self.mqtt = MQTTClient(
             host=config.broker_host,
             port=config.broker_port,
@@ -48,12 +47,24 @@ class SpeedDetector:
         if update.speed_kmh is None:
             return
 
-        if update.speed_kmh > self.speed_limit:
+        # dynamic limit search
+        speed_limit = self.default_speed_limit
+        if update.latitude is not None and update.longitude is not None:
+            try:
+                limit_str = get_speed_limit(update.latitude, update.longitude)
+                if limit_str != "--":
+                    limit_val = ''.join([c for c in limit_str if c.isdigit() or c == "."])
+                    if limit_val:
+                        speed_limit = float(limit_val)
+            except Exception as e:
+                logger.warning(f"Error in Overpass API limit: {e}")
+
+        if update.speed_kmh > speed_limit:
             alert = {
                 "alert_type": "speed_violation",
                 "car_id": update.car_id,
                 "current_speed_kmh": update.speed_kmh,
-                "speed_limit_kmh": self.speed_limit,
+                "speed_limit_kmh": speed_limit,
                 "latitude": update.latitude,
                 "longitude": update.longitude,
                 "timestamp": time.time(),
@@ -61,7 +72,7 @@ class SpeedDetector:
 
             self.mqtt.publish(self.alert_topic, json.dumps(alert))
             logger.warning(
-                f"[SPEED] {update.car_id} speeding: {update.speed_kmh:.1f} km/h > {self.speed_limit}"
+                f"[SPEED] {update.car_id} speeding: {update.speed_kmh:.1f} km/h > {speed_limit}"
             )
 
     def run(self):
