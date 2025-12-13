@@ -30,7 +30,25 @@ git clone https://github.com/ATNoG/pei-automotive-backend.git
 cd pei-automotive-backend
 ```
 
-### 2. Install Eclipse Ditto and Hono
+### 2. Install Dependencies
+```bash
+# Install K3s (latest stable version)
+curl -sfL https://get.k3s.io | sh -
+
+# Install in WSL
+curl -s https://raw.githubusercontent.com/k3d-io/k3d/main/install.sh | bash
+k3d cluster create mycluster --api-port 6443 -p "8080:80@loadbalancer"
+
+# Set up kubectl access for your user
+mkdir -p ~/.kube
+sudo cp /etc/rancher/k3s/k3s.yaml ~/.kube/config
+sudo chown $USER:$USER ~/.kube/config
+
+# Install Helm
+curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+```
+
+### 3. Install Eclipse Ditto and Hono
 
 Clone Eclipse Ditto and Eclipse Hono using the Helm Chart repo:
 
@@ -40,15 +58,31 @@ git clone --recurse-submodules -j8 git@github.com:ATNoG/ditto-helm-chart.git
 
 For detailed installation instructions, refer to the [Helm Chart documentation](https://github.com/ATNoG/ditto-helm-chart).
 
-### 2. Run script to deploy Ditto and Hono
+### 4. Run script to deploy Ditto and Hono
 
 ```bash
-source scripts/run.sh
+source run.sh
 ```
 
-If you want to stop the containers running, you can run the `scripts/stop.sh` script.
+If you want to stop the containers running, you can run the `stop.sh` script.
 
-### 3. Setup Environment Variables
+### 5. Update cert location:
+```bash
+# Inside ditto-helm-chart
+mkdir local-twin
+cd local-twin
+mkdir certs
+cp /tmp/c2e_hono_truststore.pem certs/
+```
+
+### 6. Export variables
+1. Change scripts/c2e-env.sh to use current pem location
+2. Execute:
+```bash
+source scripts/c2e-env.sh
+```
+
+### 7. Setup Environment Variables
 
 Create a `.env` file in the project root with some variables.
 
@@ -79,7 +113,7 @@ MQTT_ADAPTER_PORT_MQTTS=8883
 
 **Note:** Replace placeholder values with your actual deployment endpoints.
 
-### 4. Install Python Dependencies
+### 8. Install Python Dependencies
 
 ```bash
 # For running services
@@ -115,12 +149,6 @@ cd simulations
 python3 create_car.py <car_name> [--password <device_password>]
 ```
 
-**Example:**
-
-```bash
-python3 create_car.py my-test-car --password secret123
-```
-
 This will:
 1. Create a digital twin in Eclipse Ditto
 2. Register the device in Eclipse Hono
@@ -133,21 +161,6 @@ Send GPS position updates for a vehicle:
 ```bash
 python3 send_position.py <car_name> <latitude> <longitude>
 ```
-
-**Example:**
-
-```bash
-# Send position update
-python3 send_position.py my-test-car 40.6316 -8.6579
-```
-
-**Using pre-defined routes:**
-
-The system includes sample road data in `simulations/roads/`:
-- `left_lane.json` - Left lane coordinates
-- `right_lane.json` - Right lane coordinates
-
-You can script position updates using these files.
 
 ## Services
 
