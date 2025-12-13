@@ -13,6 +13,17 @@ ditto:
     service:
       type: LoadBalancer
   mongodb:
+    image:
+      registry: docker.io
+      repository: mongo
+      tag: "7.0"
+    podSecurityContext:
+      enabled: true
+      fsGroup: 999
+    containerSecurityContext:
+      enabled: true
+      runAsUser: 999
+      runAsNonRoot: true
     readinessProbe:
       enabled: false
       initialDelaySeconds: 30
