@@ -97,7 +97,7 @@ def main() -> None:
     print(f"Connecting to {MQTT_HOST}:{MQTT_PORT}")
     client.connect(MQTT_HOST, MQTT_PORT, 60)
     client.loop_start()
-    time.sleep(1)
+    time.sleep(0.25)
 
     result = client.publish("telemetry", json.dumps(payload), qos=1)
     if result.rc != mqtt.MQTT_ERR_SUCCESS:

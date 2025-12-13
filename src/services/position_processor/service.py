@@ -56,7 +56,7 @@ class PositionProcessor:
             last_lat, last_lon, last_ts = last
             dt = now - last_ts
 
-            if dt > 0.3:  # avoid micro-updates
+            if dt > 0.05:  # allow faster updates for realistic speed calculation (50ms)
                 dist_m = haversine_distance_m(last_lat, last_lon, lat, lon)
                 speed_mps = dist_m / dt
                 speed_kmh = speed_mps * 3.6

@@ -62,7 +62,7 @@ def test_curved_route():
         send_position(car, lat, lon)
 
     # wait for final messages to be processed
-    time.sleep(2)
+    time.sleep(0.2)
     client.loop_stop()
 
     # verify that position updates were received
