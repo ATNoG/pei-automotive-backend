@@ -56,6 +56,8 @@ This will start:
 - **Overtaking Detector** service
 - **Mosquitto MQTT Broker** (message broker)
 
+And that's it! The cloud2edge is deployed and the backend services are running. You can now start using the system with tests and/or even build the [frontend](https://github.com/ATNoG/pei-automotive-frontend).
+
 ## Using the System
 
 ### Creating a Vehicle
