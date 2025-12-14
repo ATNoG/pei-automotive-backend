@@ -6,7 +6,7 @@ This repo has the code of our microservices that will process vehicle's telemetr
 
 We also have scripts to deploy the [cloud2edge](https://eclipse.dev/packages/packages/cloud2edge/) environment as well as tests (via pytest) to serve as simulations, so that the entirety of our project can be replicated and tested locally.
 
-## Prerequisites
+## Pre-Requisites
 
 Even though our script will install all the necessary tools in case they aren't installed, if you prefer to install them manually, please refer to Eclipse's [pre-requisites](https://eclipse.dev/packages/prereqs/) page with the tools required to deploy the cloud2edge environment.
 
@@ -44,7 +44,7 @@ chmod +x deploy.sh
 
 If you want to stop the containers running and remove the namespace, you can run the `stop.sh` script.
 
-### 3. Start docker containers
+### 3. Start Docker containers
 
 ```bash
 docker compose up --build
@@ -82,6 +82,12 @@ python3 send_position.py <car_name> <latitude> <longitude>
 
 ### Testing
 
+Install the required dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
 Run the test suite:
 
 ```bash
@@ -107,5 +113,5 @@ See [LICENSE](LICENSE) file for details.
 
 ## Project Links
 
-- [**Microsite:**](https://atnog.github.io/pei-automotive-microsite/)
-- [**Main Repo:**](https://github.com/ATNoG/pei-automotive)
+- [**Microsite**](https://atnog.github.io/pei-automotive-microsite/)
+- [**Main Repo**](https://github.com/ATNoG/pei-automotive)
