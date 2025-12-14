@@ -45,7 +45,7 @@ def test_curved_route():
     # subscribe to position updates topic
     client = mqtt.Client()
     client.connect("localhost", 1884)
-    client.subscribe(f"devices/{car}/position")
+    client.subscribe("cars/updates")
     client.on_message = on_position_update
     client.loop_start()
 
@@ -79,7 +79,7 @@ def test_curved_route():
     # Check that latitude decreases (moving south)
     first_lat = POSITION_UPDATES[0].get("latitude") or POSITION_UPDATES[0].get("position", {}).get("latitude")
     last_lat = POSITION_UPDATES[-1].get("latitude") or POSITION_UPDATES[-1].get("position", {}).get("latitude")
-    
+
     if first_lat and last_lat:
         assert len(POSITION_UPDATES) > 0
 
