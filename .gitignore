@@ -5,3 +5,6 @@ __pycache__
 devices/
 
 ditto-helm-chart/
+cloud2edge*
+
+timing_results*

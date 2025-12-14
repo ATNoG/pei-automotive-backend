@@ -1,9 +1,5 @@
 #!/usr/bin/env bash
-
-# ============================================================================
-# Cloud2Edge Deployment Script for PEI Automotive Backend
-# ============================================================================
-# This script automates the complete deployment of:
+# This script automates the complete deployment and installation of:
 # - K3s Kubernetes cluster
 # - Helm package manager
 # - Eclipse Cloud2Edge (Ditto + Hono)
@@ -12,34 +8,22 @@
 
 set -e
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-# Function to print colored output
 print_info() {
-    echo -e "${GREEN}[INFO]${NC} $1"
+    echo -e "[INFO] $1"
 }
 
 print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
+    echo -e "[ERROR] $1"
 }
 
 print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo -e "[WARNING] $1"
 }
 
 print_step() {
-    echo -e "${BLUE}[STEP]${NC} $1"
+    echo -e "[STEP] $1"
 }
 
-echo "============================================================================"
-echo "PEI Automotive Backend - Cloud2Edge Deployment"
-echo "============================================================================"
-echo ""
 
 # Check if running from correct directory
 if [ ! -f "requirements.txt" ]; then
@@ -47,11 +31,8 @@ if [ ! -f "requirements.txt" ]; then
     exit 1
 fi
 
-# ============================================================================
 # STEP 1: Install K3s
-# ============================================================================
-print_step "1/8 - Checking K3s installation..."
-
+print_step "1/10 - Checking K3s installation..."
 if command -v k3s >/dev/null 2>&1; then
     print_info "K3s is already installed"
     if ! sudo systemctl is-active --quiet k3s; then
@@ -80,10 +61,8 @@ for i in {1..30}; do
     sleep 2
 done
 
-# ============================================================================
 # STEP 2: Install Helm
-# ============================================================================
-print_step "2/8 - Checking Helm installation..."
+print_step "2/10 - Checking Helm installation..."
 
 if command -v helm >/dev/null 2>&1; then
     print_info "Helm is already installed ($(helm version --short))"
@@ -93,17 +72,13 @@ else
     print_info "Helm installed successfully"
 fi
 
-# ============================================================================
 # STEP 3: Create Kubernetes namespace
-# ============================================================================
-print_step "3/8 - Creating namespace cloud2edge..."
+print_step "3/10 - Creating namespace cloud2edge..."
 
 sudo kubectl create namespace cloud2edge --dry-run=client -o yaml | sudo kubectl apply -f -
 
-# ============================================================================
 # STEP 4: Clone repositories
-# ============================================================================
-print_step "4/8 - Cloning required repositories..."
+print_step "4/10 - Cloning required repositories..."
 
 if [ ! -d "cloud2edge-repo" ]; then
     print_info "Cloning Eclipse packages repository..."
@@ -112,17 +87,8 @@ else
     print_info "cloud2edge-repo already exists, skipping clone"
 fi
 
-if [ ! -d "ditto-helm-chart" ]; then
-    print_info "Cloning ATNoG ditto-helm-chart repository..."
-    git clone https://github.com/ATNoG/ditto-helm-chart.git
-else
-    print_info "ditto-helm-chart already exists, skipping clone"
-fi
-
-# ============================================================================
-# STEP 5: Update Helm dependencies
-# ============================================================================
-print_step "5/8 - Updating Cloud2Edge Chart versions..."
+# STEP 5: Update Cloud2Edge versions
+print_step "5/10 - Updating Cloud2Edge Chart versions..."
 
 # Update Chart.yaml to use latest versions
 sed -i 's/version: ~2\.6\.[0-9]*/version: ~2.6.6/' cloud2edge-repo/packages/cloud2edge/Chart.yaml
@@ -135,10 +101,8 @@ cd cloud2edge-repo/packages/cloud2edge
 helm dependency update
 cd ../../..
 
-# ============================================================================
 # STEP 6: Create custom values file
-# ============================================================================
-print_step "6/8 - Creating custom values file..."
+print_step "6/10 - Creating custom values file..."
 
 cat > cloud2edge-custom-values.yaml << 'EOF'
 # Custom values to increase memory for all Ditto and Hono services to avoid OOMKilled
@@ -210,10 +174,8 @@ hono:
           memory: "768Mi"
 EOF
 
-# ============================================================================
 # STEP 7: Deploy Cloud2Edge
-# ============================================================================
-print_step "7/8 - Deploying Cloud2Edge with Helm..."
+print_step "7/10 - Deploying Cloud2Edge with Helm..."
 
 if sudo KUBECONFIG=/etc/rancher/k3s/k3s.yaml helm list -n cloud2edge | grep -q c2e; then
     print_info "Cloud2Edge already installed, upgrading..."
@@ -229,10 +191,8 @@ else
         --timeout 15m
 fi
 
-# ============================================================================
 # STEP 8: Wait for pods and create .env file
-# ============================================================================
-print_step "8/8 - Waiting for all pods to be ready..."
+print_step "8/10 - Waiting for all pods to be ready..."
 
 MAX_WAIT=300
 ELAPSED=0
@@ -264,9 +224,9 @@ sleep 20
 print_info "Verifying deployment..."
 sudo kubectl get pods -n cloud2edge
 
-# ============================================================================
+# STEP 9: Creating .env file
+print_step "9/10 - Creating .env file for Docker Compose..."
 # Get NodePorts for services
-# ============================================================================
 print_info "Detecting service ports..."
 
 DITTO_PORT=$(sudo kubectl get svc -n cloud2edge c2e-ditto-nginx -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
@@ -274,11 +234,6 @@ HONO_HTTP_PORT=$(sudo kubectl get svc -n cloud2edge c2e-hono-adapter-http -o jso
 HONO_MQTT_PORT=$(sudo kubectl get svc -n cloud2edge c2e-hono-adapter-mqtt -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
 HONO_AMQP_PORT=$(sudo kubectl get svc -n cloud2edge c2e-hono-adapter-amqp -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
 HONO_REG_PORT=$(sudo kubectl get svc -n cloud2edge c2e-hono-service-device-registry-ext -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
-
-# ============================================================================
-# Create .env file for Docker Compose
-# ============================================================================
-print_info "Creating .env file for Docker Compose..."
 
 # Get the certificate file path
 CERT_PATH="$(pwd)/cloud2edge-repo/charts/hono/example/certs/trusted-certs.pem"
@@ -326,9 +281,7 @@ EOF
 
 print_info ".env file created successfully"
 
-# ============================================================================
 # Verify Ditto accessibility
-# ============================================================================
 print_info "Verifying Ditto gateway accessibility..."
 for i in {1..30}; do
     if curl -s -u ditto:ditto http://localhost:$DITTO_PORT/api/2/things >/dev/null 2>&1; then
@@ -343,42 +296,10 @@ for i in {1..30}; do
     fi
 done
 
-# ============================================================================
-# Final Summary
-# ============================================================================
-echo ""
-echo "============================================================================"
-echo "✓ Deployment completed successfully!"
-echo "============================================================================"
-echo ""
-echo "Services:"
-echo "  - Ditto UI:          http://${HOST_IP}:$DITTO_PORT (or http://localhost:$DITTO_PORT)"
-echo "  - Ditto API:         http://${HOST_IP}:$DITTO_PORT/api"
-echo "  - Hono HTTP:         https://${HOST_IP}:$HONO_HTTP_PORT"
-echo "  - Hono MQTT:         ${HOST_IP}:$HONO_MQTT_PORT"
-echo "  - Hono AMQP:         ${HOST_IP}:$HONO_AMQP_PORT"
-echo "  - Hono Device Reg:   https://${HOST_IP}:$HONO_REG_PORT"
-echo ""
-echo "Credentials:"
-echo "  - Ditto:  ditto / ditto"
-echo "  - Tenant: org.eclipse.packages.c2e"
-echo "  - Device: demo-device / demo-secret"
-echo ""
-echo "Configuration:"
-echo "  - .env file created with correct ports and URLs"
-echo "  - Docker Compose is ready to use"
-echo ""
-echo "Next steps:"
-echo "  1. Start Docker containers: docker-compose up -d"
-echo "  2. Run simulations: python simulations/car_simulation.py"
-echo "  3. Run tests: pytest tests/ -v"
-echo ""
-echo "Useful commands:"
-echo "  - View pods: kubectl get pods -n cloud2edge"
-echo "  - View logs: kubectl logs -n cloud2edge <pod-name>"
-echo "  - Stop K3s: sudo systemctl stop k3s"
-echo "  - Restart K3s: sudo systemctl restart k3s"
-echo ""
-echo "Note: The demo device 'org.eclipse.packages.c2e:demo-device' is pre-provisioned"
-echo "      and ready to use for testing."
-echo ""
+# STEP 10: Clean up
+print_step "10/10 - Cleaning up no longer needed files"
+rm -rf ditto-helm-chart
+rm -rf cloud2edge*
+print_info "No longer needed files removed"
+
+print_info "CONGRATS!! Cloud2Edge has been deploy in this machine!!"
