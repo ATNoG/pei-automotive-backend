@@ -57,8 +57,14 @@ def test_curved_route():
 
     # send positions along the curved route
     # Sample every 5th point to simulate realistic movement
-    for i in range(0, len(coords), 2):
+    for i in range(0, len(coords), 3):
         lon, lat = coords[i]
+        send_position(car, lat, lon)
+        time.sleep(0.02)  # simulate brief delay between updates
+
+    # finish route at last coordinate
+    if (lon, lat) != coords[-1]:
+        lon, lat = coords[-1]
         send_position(car, lat, lon)
 
     # wait for final messages to be processed
