@@ -8,3 +8,4 @@ ditto-helm-chart/
 cloud2edge*
 
 timing_results*
+venv/
