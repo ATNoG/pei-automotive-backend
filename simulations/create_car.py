@@ -21,7 +21,7 @@ HONO_API = os.getenv("HONO_API_URL")
 HONO_AUTH = (os.getenv("HONO_USER"), os.getenv("HONO_PASS"))
 HONO_TENANT = os.getenv("HONO_TENANT")
 
-# Use CERT from env if it exists and is accessible, otherwise use certifi
+# Use CERT from env if it exists and is accessible, otherwise use certifi.
 _CERT_ENV = os.getenv("CERT")
 DEFAULT_CERT = _CERT_ENV if _CERT_ENV and Path(_CERT_ENV).exists() else certifi.where()
 REGISTRY_DIR = (Path(__file__).resolve().parent / "devices").resolve()
