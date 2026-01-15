@@ -20,6 +20,7 @@ DITTO_AUTH = (os.getenv("DITTO_USER"), os.getenv("DITTO_PASS"))
 HONO_API = os.getenv("HONO_API_URL")
 HONO_AUTH = (os.getenv("HONO_USER"), os.getenv("HONO_PASS"))
 HONO_TENANT = os.getenv("HONO_TENANT")
+SECRET = "1342"
 
 # Use CERT from env if it exists and is accessible, otherwise use certifi
 _CERT_ENV = os.getenv("CERT")
