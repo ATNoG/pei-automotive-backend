@@ -42,3 +42,15 @@ services:
     depends_on:
       - mosquitto_broker
       - position_processor
+
+  highway_entry_detector:
+    build:
+      context: .
+      dockerfile: src/services/highway_entry_detector/Dockerfile
+    container_name: highway_entry_detector
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - mosquitto_broker
+      - position_processor
