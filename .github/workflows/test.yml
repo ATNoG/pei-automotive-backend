@@ -22,7 +22,7 @@ jobs:
           sleep 2
 
       - name: Install/Update dependencies
-        run:
+        run: |
           pip install -r requirements.txt
           sleep 2
 
