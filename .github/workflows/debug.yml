@@ -1,0 +1,9 @@
+name: Debug Runner
+on: workflow_dispatch # Allows you to run it manually from the Actions tab
+
+jobs:
+  test-connection:
+    runs-on: self-hosted
+    steps:
+      - name: Simple Echo
+        run: echo "The runner is alive at $(date)"
