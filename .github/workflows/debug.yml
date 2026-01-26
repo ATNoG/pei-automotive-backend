@@ -1,5 +1,5 @@
 name: Debug Runner
-on: workflow_dispatch # Allows you to run it manually from the Actions tab
+on: workflow_dispatch
 
 jobs:
   test-connection:
