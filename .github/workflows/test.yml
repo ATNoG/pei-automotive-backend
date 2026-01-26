@@ -17,14 +17,18 @@ jobs:
         run: |
           NOT_READY=$(kubectl get pods -n cloud2edge --no-headers 2>/dev/null | grep -vE 'Running|Completed' | wc -l)
           [ "$NOT_READY" -eq 0 ] || (echo "$NOT_READY pods not ready" && exit 1)
+          sleep 2
 
       - name: Install/Update dependencies
-        run: pip install -r requirements.txt
+        run:
+          pip install -r requirements.txt
+          sleep 2
 
       - name: Generate .env file
         run: |
           chmod +x make_env.sh
           ./make_env.sh
+          sleep 2
 
       - name: Start services
         run: |
