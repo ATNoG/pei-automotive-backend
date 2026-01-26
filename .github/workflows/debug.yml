@@ -1,6 +1,5 @@
 name: Debug Runner
 
-
 on:
   push:
     branches: [main, feature-tests-on-ci]
