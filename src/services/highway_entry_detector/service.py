@@ -164,13 +164,16 @@ class HighwayEntryDetector:
             # Predict positions based on heading and speed
             if entering_car.heading_deg is not None:
                 # Calculate new position for entering car
+                # Heading: 0° = North, 90° = East, 180° = South, 270° = West
                 entering_heading_rad = math.radians(entering_car.heading_deg)
                 entering_dist = entering_speed_ms * t_sec
                 
                 # Convert distance to lat/lon offset
-                # Approximate: 1 degree lat ≈ 111km, 1 degree lon ≈ 111km * cos(lat)
-                entering_lat_offset = (entering_dist / 111000) * math.cos(entering_heading_rad)
-                entering_lon_offset = (entering_dist / 111000) * math.sin(entering_heading_rad) / math.cos(math.radians(entering_lat))
+                # North component (latitude): cos(heading) * distance
+                # East component (longitude): sin(heading) * distance
+                # 1 degree lat ≈ 111km, 1 degree lon ≈ 111km * cos(lat)
+                entering_lat_offset = (entering_dist * math.cos(entering_heading_rad)) / 111000
+                entering_lon_offset = (entering_dist * math.sin(entering_heading_rad)) / (111000 * math.cos(math.radians(entering_lat)))
                 
                 pred_entering_lat = entering_lat + entering_lat_offset
                 pred_entering_lon = entering_lon + entering_lon_offset
@@ -183,8 +186,8 @@ class HighwayEntryDetector:
                 highway_heading_rad = math.radians(highway_car.heading_deg)
                 highway_dist = highway_speed_ms * t_sec
                 
-                highway_lat_offset = (highway_dist / 111000) * math.cos(highway_heading_rad)
-                highway_lon_offset = (highway_dist / 111000) * math.sin(highway_heading_rad) / math.cos(math.radians(highway_lat))
+                highway_lat_offset = (highway_dist * math.cos(highway_heading_rad)) / 111000
+                highway_lon_offset = (highway_dist * math.sin(highway_heading_rad)) / (111000 * math.cos(math.radians(highway_lat)))
                 
                 pred_highway_lat = highway_lat + highway_lat_offset
                 pred_highway_lon = highway_lon + highway_lon_offset
