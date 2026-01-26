@@ -8,6 +8,8 @@ on:
 jobs:
   test:
     runs-on: self-hosted
+    permissions:
+      contents: read
     timeout-minutes: 15
 
     steps:
