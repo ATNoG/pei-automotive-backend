@@ -1,5 +1,10 @@
 name: Debug Runner
-on: workflow_dispatch
+
+on:
+  push:
+    branches: [main, feature-tests-on-ci]
+  pull_request:
+    branches: [main, feature-tests-on-ci]
 
 jobs:
   test-connection:
