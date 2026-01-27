@@ -5,9 +5,18 @@
 
 set -e
 
+# Setup kubeconfig - try ~/.kube/config first, then system default
+if [ -f "$HOME/.kube/config" ]; then
+    export KUBECONFIG="$HOME/.kube/config"
+    echo "[INFO] Using kubeconfig: $KUBECONFIG"
+else
+    echo "[ERROR] No kubeconfig found at ~/.kube/config"
+    exit 1
+fi
+
 # Check if running from correct directory
 if [ ! -f "requirements.txt" ]; then
-    echo -e "[ERROR] This script must be run from the project root directory"
+    echo "[ERROR] This script must be run from the project root directory"
     exit 1
 fi
 
