@@ -22,8 +22,6 @@ fi
 
 echo -e "[INFO] Detecting service ports..."
 
-kubectl get svc -n cloud2edge c2e-ditto-nginx
-
 # Get NodePorts for services
 DITTO_PORT=$(kubectl get svc -n cloud2edge c2e-ditto-nginx -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
 HONO_HTTP_PORT=$(kubectl get svc -n cloud2edge c2e-hono-adapter-http -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
