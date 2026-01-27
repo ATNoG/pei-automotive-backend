@@ -101,23 +101,30 @@ class HighwayEntryDetector:
 
     def _classify_car(self, update: CarUpdate) -> Optional[str]:
         """Classify if car is on highway or entering road"""
-        # Check entering road first with higher priority
-        # Use tighter threshold for entering to distinguish from highway at merge point
-        is_near_entering = self._is_near_route(
-            update.latitude, update.longitude, 
-            self.entering_coords, threshold_m=15
-        )
+        # Calculate minimum distance to each route (excluding the merge point area)
+        # This helps distinguish between routes near the merge point
         
-        if is_near_entering:
+        entering_min_dist = float('inf')
+        highway_min_dist = float('inf')
+        
+        # For entering road, skip the last few points (near merge) for classification
+        entering_check_coords = self.entering_coords[:-3] if len(self.entering_coords) > 3 else self.entering_coords
+        for route_lat, route_lon in entering_check_coords:
+            dist = haversine_distance_m(update.latitude, update.longitude, route_lat, route_lon)
+            entering_min_dist = min(entering_min_dist, dist)
+        
+        # For highway, check all points
+        for route_lat, route_lon in self.highway_coords:
+            dist = haversine_distance_m(update.latitude, update.longitude, route_lat, route_lon)
+            highway_min_dist = min(highway_min_dist, dist)
+        
+        # Use relative distance comparison - car belongs to the closest route
+        # But only if within reasonable threshold
+        threshold_m = 30
+        
+        if entering_min_dist < threshold_m and entering_min_dist < highway_min_dist:
             return "entering"
-        
-        # Check if near highway (use larger threshold)
-        is_near_highway = self._is_near_route(
-            update.latitude, update.longitude, 
-            self.highway_coords, threshold_m=25
-        )
-        
-        if is_near_highway:
+        elif highway_min_dist < threshold_m:
             return "highway"
         
         return None
@@ -220,21 +227,34 @@ class HighwayEntryDetector:
         # Save updated state (even without speed/heading for tracking)
         self.cars[update.car_id] = update
         
-        # Must have speed and heading to be analyzed
-        if update.speed_kmh is None or update.heading_deg is None:
-            return
-        
-        # Skip if speed is zero (stationary cars)
-        if update.speed_kmh == 0:
-            return
-
-        # Classify the car
+        # Classify the car and track in appropriate set (regardless of speed/heading)
         car_type = self._classify_car(update)
         
         if car_type == "entering":
             self.entering_cars.add(update.car_id)
             self.highway_cars.discard(update.car_id)
-            
+        elif car_type == "highway":
+            self.highway_cars.add(update.car_id)
+            self.entering_cars.discard(update.car_id)
+            # Remove from alerted pairs when car moves away from merge zone
+            dist_to_merge = self._distance_to_merge_point(update.latitude, update.longitude)
+            if dist_to_merge > self.ENTRY_ZONE_M * 2:
+                # Clean up old alerts for this car
+                self.alerted_pairs = {
+                    pair for pair in self.alerted_pairs 
+                    if update.car_id not in pair
+                }
+        
+        # For collision analysis, we need speed and heading
+        if update.speed_kmh is None or update.heading_deg is None:
+            return
+        
+        # Skip collision analysis if speed is zero (stationary cars)
+        if update.speed_kmh == 0:
+            return
+
+        # Only analyze entering cars for collision detection
+        if car_type == "entering":
             # Check if car is approaching merge point
             dist_to_merge = self._distance_to_merge_point(update.latitude, update.longitude)
             
@@ -314,18 +334,6 @@ class HighwayEntryDetector:
                                     f"can safely merge. Min distance to {highway_car_id}: {min_dist:.1f}m"
                                 )
                                 self.alerted_pairs.add(pair_key)
-        
-        elif car_type == "highway":
-            self.highway_cars.add(update.car_id)
-            self.entering_cars.discard(update.car_id)
-            # Remove from alerted pairs when car moves away from merge zone
-            dist_to_merge = self._distance_to_merge_point(update.latitude, update.longitude)
-            if dist_to_merge > self.ENTRY_ZONE_M * 2:
-                # Clean up old alerts for this car
-                self.alerted_pairs = {
-                    pair for pair in self.alerted_pairs 
-                    if update.car_id not in pair
-                }
 
     def run(self):
         logger.info("Starting Highway Entry Detector...")
