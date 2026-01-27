@@ -1,0 +1,46 @@
+name: Test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: self-hosted
+    permissions:
+      contents: read
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check if all C2E pods are up
+        run: |
+          NOT_READY=$(kubectl get pods -n cloud2edge --no-headers 2>/dev/null | grep -vE 'Running|Completed' | wc -l)
+          [ "$NOT_READY" -eq 0 ] || (echo "$NOT_READY pods not ready" && exit 1)
+          sleep 2
+
+      - name: Install/Update dependencies
+        run: |
+          pip install -r requirements.txt
+          sleep 2
+
+      - name: Generate .env file
+        run: |
+          chmod +x make_env.sh
+          ./make_env.sh
+          sleep 2
+
+      - name: Start services
+        run: |
+          docker compose up --build -d
+          sleep 10
+
+      - name: Run tests
+        run: |
+          pytest -v
+
+      - name: Cleanup
+        if: always()
+        run: docker compose down -v
