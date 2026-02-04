@@ -86,12 +86,21 @@ def test_highway_entry_unsafe():
     client.loop_stop()
 
     unsafe_alerts = [a for a in ALERTS if a.get("status") == "unsafe"]
+    
+    # Remove car device files to avoid interference with next test
+    highway_car_file = SIM_DIR / "devices" / f"{highway_car}.json"
+    entering_car_file = SIM_DIR / "devices" / f"{entering_car}.json"
+    if highway_car_file.exists():
+        highway_car_file.unlink()
+    if entering_car_file.exists():
+        entering_car_file.unlink()
+    
     assert len(unsafe_alerts) > 0, f"Expected unsafe alert but got: {ALERTS}"
 
 
 def test_highway_entry_safe():
     ALERTS.clear()
-    
+
     highway_car = "highway-car-2"
     entering_car = "entering-car-2"
     
@@ -118,14 +127,15 @@ def test_highway_entry_safe():
     )
     # Start highway car well behind the merge point (but within 100m detection range)
     # It moves slowly so entering car can merge safely
-    highway_start_idx = max(0, merge_idx - 15)
+    highway_start_idx = max(0, merge_idx - 13)
 
     for step in range(10):
         entering_idx = min(step * len(entering_route) // 10, len(entering_route) - 1)
         entering_lat, entering_lon = entering_route[entering_idx]
         
-        # Highway car moves very slowly (step // 4) so it stays far enough back
-        highway_idx = highway_start_idx + step // 4
+        # Highway car moves very slowly (step // 2) so it stays far enough back
+        # But ensure it moves at least 1 step to have a valid speed
+        highway_idx = highway_start_idx + max(1, step // 2)
         highway_idx = min(highway_idx, len(highway_route) - 1)
         highway_lat, highway_lon = highway_route[highway_idx]
         
@@ -149,6 +159,15 @@ def test_highway_entry_safe():
     client.loop_stop()
 
     safe_alerts = [a for a in ALERTS if a.get("status") == "safe"]
+
+    # Remove car device files to avoid interference with future tests
+    highway_car_file = SIM_DIR / "devices" / f"{highway_car}.json"
+    entering_car_file = SIM_DIR / "devices" / f"{entering_car}.json"
+    if highway_car_file.exists():
+        highway_car_file.unlink()
+    if entering_car_file.exists():
+        entering_car_file.unlink()
+
     assert len(safe_alerts) > 0, f"Expected safe alert but got: {ALERTS}"
 
 

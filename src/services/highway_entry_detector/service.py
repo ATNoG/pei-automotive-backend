@@ -29,7 +29,7 @@ class HighwayEntryDetector:
     # Detection parameters
     ENTRY_ZONE_M = 100  # distance to consider entry zone (meters)
     MERGE_POINT_DETECTION_M = 20  # distance to merge point to trigger analysis
-    COLLISION_THRESHOLD_M = 10  # minimum safe distance (meters)
+    COLLISION_THRESHOLD_M = 15  # minimum safe distance (meters) - increased for highway merge safety
     PREDICTION_TIME_S = 5  # time window for prediction (seconds)
     
     def __init__(self, config):
