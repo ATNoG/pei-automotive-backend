@@ -135,82 +135,139 @@ class HighwayEntryDetector:
             return float('inf')
         return haversine_distance_m(lat, lon, self.merge_point[0], self.merge_point[1])
 
+    def _find_closest_point_on_route(self, lat: float, lon: float, route: List[Tuple[float, float]]) -> int:
+        """Find the index of the closest point on a route to the given position"""
+        if not route:
+            return 0
+        
+        min_dist = float('inf')
+        closest_idx = 0
+        
+        for i, (route_lat, route_lon) in enumerate(route):
+            dist = haversine_distance_m(lat, lon, route_lat, route_lon)
+            if dist < min_dist:
+                min_dist = dist
+                closest_idx = i
+        
+        return closest_idx
+    
+    def _simulate_position_along_route(self, route: List[Tuple[float, float]], 
+                                       start_idx: int, distance_m: float) -> Optional[Tuple[float, float]]:
+        """
+        Simulate moving along a route from start_idx for distance_m meters.
+        Returns the predicted (lat, lon) position.
+        """
+        if not route or start_idx >= len(route):
+            return None
+        
+        current_idx = start_idx
+        remaining_distance = distance_m
+        
+        while current_idx < len(route) - 1 and remaining_distance > 0:
+            current_lat, current_lon = route[current_idx]
+            next_lat, next_lon = route[current_idx + 1]
+            
+            segment_distance = haversine_distance_m(current_lat, current_lon, next_lat, next_lon)
+            
+            if segment_distance >= remaining_distance:
+                # Interpolate within this segment
+                ratio = remaining_distance / segment_distance
+                final_lat = current_lat + (next_lat - current_lat) * ratio
+                final_lon = current_lon + (next_lon - current_lon) * ratio
+                return (final_lat, final_lon)
+            else:
+                # Move to next segment
+                remaining_distance -= segment_distance
+                current_idx += 1
+        
+        # Reached end of route, return last point
+        return route[-1]
+
     def _predict_collision(self, entering_car: CarUpdate, highway_car: CarUpdate) -> Tuple[bool, float, float]:
         """
-        Predict if a collision would occur if entering car merges now.
+        Predict if a collision would occur by simulating both cars along their actual routes.
+        The entering car follows the entering route until merge, then follows the highway route.
+        The highway car continues along the highway route.
         
         Returns:
             (collision_detected, time_to_collision, closest_distance)
         """
-        # Get current positions
-        entering_lat, entering_lon = entering_car.latitude, entering_car.longitude
-        highway_lat, highway_lon = highway_car.latitude, highway_car.longitude
-        
         # Get speeds in m/s
         entering_speed_ms = (entering_car.speed_kmh or 0) / 3.6
         highway_speed_ms = (highway_car.speed_kmh or 0) / 3.6
         
         # Calculate current distance
         current_distance = haversine_distance_m(
-            entering_lat, entering_lon, 
-            highway_lat, highway_lon
+            entering_car.latitude, entering_car.longitude, 
+            highway_car.latitude, highway_car.longitude
         )
         
         # If already too close, it's unsafe
         if current_distance < self.COLLISION_THRESHOLD_M:
             return True, 0.0, current_distance
         
-        # Predict future positions over time window
+        # Find current positions on their respective routes
+        entering_idx = self._find_closest_point_on_route(
+            entering_car.latitude, entering_car.longitude, self.entering_coords
+        )
+        highway_idx = self._find_closest_point_on_route(
+            highway_car.latitude, highway_car.longitude, self.highway_coords
+        )
+        
+        # Find merge point index on highway route
+        merge_idx_on_highway = self._find_closest_point_on_route(
+            self.merge_point[0], self.merge_point[1], self.highway_coords
+        ) if self.merge_point else len(self.highway_coords) - 1
+        
         min_distance = current_distance
         time_to_min_distance = 0.0
         
-        # Simulate both cars moving along their headings
+        # Simulate future positions over time window
         for t in range(1, int(self.PREDICTION_TIME_S * 10)):  # check every 0.1s
             t_sec = t / 10.0
             
-            # Predict positions based on heading and speed
-            if entering_car.heading_deg is not None:
-                # Calculate new position for entering car
-                # Heading: 0° = North, 90° = East, 180° = South, 270° = West
-                entering_heading_rad = math.radians(entering_car.heading_deg)
-                entering_dist = entering_speed_ms * t_sec
-                
-                # Convert distance to lat/lon offset
-                # North component (latitude): cos(heading) * distance
-                # East component (longitude): sin(heading) * distance
-                # 1 degree lat ≈ 111km, 1 degree lon ≈ 111km * cos(lat)
-                entering_lat_offset = (entering_dist * math.cos(entering_heading_rad)) / 111000
-                entering_lon_offset = (entering_dist * math.sin(entering_heading_rad)) / (111000 * math.cos(math.radians(entering_lat)))
-                
-                pred_entering_lat = entering_lat + entering_lat_offset
-                pred_entering_lon = entering_lon + entering_lon_offset
-            else:
-                pred_entering_lat = entering_lat
-                pred_entering_lon = entering_lon
+            # Distance each car travels
+            entering_travel_dist = entering_speed_ms * t_sec
+            highway_travel_dist = highway_speed_ms * t_sec
             
-            if highway_car.heading_deg is not None:
-                # Calculate new position for highway car
-                highway_heading_rad = math.radians(highway_car.heading_deg)
-                highway_dist = highway_speed_ms * t_sec
-                
-                highway_lat_offset = (highway_dist * math.cos(highway_heading_rad)) / 111000
-                highway_lon_offset = (highway_dist * math.sin(highway_heading_rad)) / (111000 * math.cos(math.radians(highway_lat)))
-                
-                pred_highway_lat = highway_lat + highway_lat_offset
-                pred_highway_lon = highway_lon + highway_lon_offset
-            else:
-                pred_highway_lat = highway_lat
-                pred_highway_lon = highway_lon
+            # Simulate entering car: follows entering route, then highway route after merge
+            distance_to_merge_along_route = 0
+            temp_idx = entering_idx
+            while temp_idx < len(self.entering_coords) - 1:
+                seg_dist = haversine_distance_m(
+                    self.entering_coords[temp_idx][0], self.entering_coords[temp_idx][1],
+                    self.entering_coords[temp_idx + 1][0], self.entering_coords[temp_idx + 1][1]
+                )
+                distance_to_merge_along_route += seg_dist
+                temp_idx += 1
             
-            # Calculate distance at this time
-            pred_distance = haversine_distance_m(
-                pred_entering_lat, pred_entering_lon,
-                pred_highway_lat, pred_highway_lon
+            if entering_travel_dist < distance_to_merge_along_route:
+                # Still on entering route
+                pred_entering_pos = self._simulate_position_along_route(
+                    self.entering_coords, entering_idx, entering_travel_dist
+                )
+            else:
+                # Past merge point, now on highway
+                remaining_dist = entering_travel_dist - distance_to_merge_along_route
+                pred_entering_pos = self._simulate_position_along_route(
+                    self.highway_coords, merge_idx_on_highway, remaining_dist
+                )
+            
+            # Simulate highway car: continues along highway route
+            pred_highway_pos = self._simulate_position_along_route(
+                self.highway_coords, highway_idx, highway_travel_dist
             )
             
-            if pred_distance < min_distance:
-                min_distance = pred_distance
-                time_to_min_distance = t_sec
+            # Calculate distance between predicted positions
+            if pred_entering_pos and pred_highway_pos:
+                pred_distance = haversine_distance_m(
+                    pred_entering_pos[0], pred_entering_pos[1],
+                    pred_highway_pos[0], pred_highway_pos[1]
+                )
+                
+                if pred_distance < min_distance:
+                    min_distance = pred_distance
+                    time_to_min_distance = t_sec
         
         # Collision detected if minimum distance is below threshold
         collision = min_distance < self.COLLISION_THRESHOLD_M

@@ -110,16 +110,22 @@ def test_highway_entry_safe():
     with open(ROADS_DIR / "entering.json") as f:
         entering_route = json.load(f)
     
-    # Start highway car at the beginning - far from merge point
-    # It moves slowly so the entering car merges well before it arrives
-    highway_start_idx = 0
+    # Find merge point and position highway car to be within detection range but safely behind
+    merge_lat, merge_lon = entering_route[-1]
+    merge_idx = min(
+        range(len(highway_route)),
+        key=lambda i: ((highway_route[i][0] - merge_lat)**2 + (highway_route[i][1] - merge_lon)**2)**0.5
+    )
+    # Start highway car well behind the merge point (but within 100m detection range)
+    # It moves slowly so entering car can merge safely
+    highway_start_idx = max(0, merge_idx - 15)
 
     for step in range(10):
         entering_idx = min(step * len(entering_route) // 10, len(entering_route) - 1)
         entering_lat, entering_lon = entering_route[entering_idx]
         
-        # Highway car moves slowly (step // 3) so it stays far from merge
-        highway_idx = highway_start_idx + step // 3
+        # Highway car moves very slowly (step // 4) so it stays far enough back
+        highway_idx = highway_start_idx + step // 4
         highway_idx = min(highway_idx, len(highway_route) - 1)
         highway_lat, highway_lon = highway_route[highway_idx]
         
