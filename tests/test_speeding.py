@@ -39,8 +39,7 @@ def test_speeding():
     with open(ROADS_DIR / "right_lane_speeding.json") as f:
         coords = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    # This reliably exceeds the 80 km/h limit for alert triggering
-    for i in range(0, len(coords)-40, 5):
+    for i in range(0, len(coords)-40, 6):
         lon, lat = coords[i]
         subprocess.run(
             [
@@ -52,7 +51,7 @@ def test_speeding():
             ],
             check=True,
         )
-        time.sleep(0.01)
+        time.sleep(0.05)
 
     time.sleep(1)
     client.loop_stop()
