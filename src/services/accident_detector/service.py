@@ -123,9 +123,9 @@ class AccidentDetector:
         heading_diff = abs(car.heading_deg - bearing_to_accident)
         heading_diff = min(heading_diff, 360 - heading_diff)
 
-        # < 90° means accident is in front of the car
+        # <= 90° means accident is in front of or perpendicular to the car
         # > 90° means car has already passed the accident
-        return heading_diff < 90
+        return heading_diff <= 90
 
     def _should_notify_car(self, car: CarState, accident: Accident) -> bool:
         """

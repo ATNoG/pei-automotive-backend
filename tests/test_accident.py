@@ -17,9 +17,9 @@ ROADS_DIR = SIM_DIR / "roads"
 # Configuration
 MQTT_HOST = os.getenv("TEST_MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("TEST_MQTT_PORT", "1884"))
-POSITION_INTERVAL = 0.01 
-STEP_SIZE = 4  # Points to skip for higher speed
-PHASE1_PERCENTAGE = 0.6
+POSITION_INTERVAL = 0.05
+STEP_SIZE = 3  # Points to skip for higher speed
+PHASE1_PERCENTAGE = 0.75
 ALERT_TIMEOUT = 3.0
 THREAD_TIMEOUT = 60.0 
 
@@ -118,6 +118,7 @@ def test_accident_directional_notification():
         phase2_end = min_len
 
         # PHASE 1: All cars driving normally at high speed
+        last_idx = 0
         for i in range(0, phase1_end, STEP_SIZE):
             acc_lon, acc_lat = accident_coords[i]
             beh_lon, beh_lat = behind_coords[i]
@@ -129,22 +130,36 @@ def test_accident_directional_notification():
                 (car_ahead, ahe_lat, ahe_lon),
             ])
             time.sleep(POSITION_INTERVAL)
+            last_idx = i
 
         # PHASE 2: accident-car stops while others continue
-        accident_idx = phase1_end
+        accident_idx = last_idx
         accident_lon, accident_lat = accident_coords[accident_idx]
 
+        # Calculate how many iterations we need (synchronized timing)
+        num_iterations = 8  # accident-car sends 8 stopped updates
+        
         def accident_thread():
             """Accident car: send repeated updates at same position (stopped)."""
-            for _ in range(8):
+            for _ in range(num_iterations):
                 send_position(accident_car, accident_lat, accident_lon)
-                time.sleep(0.3)
+                time.sleep(POSITION_INTERVAL)
 
         def other_cars_thread():
-            """Other cars continue moving toward/past accident location."""
-            for i in range(accident_idx, phase2_end, STEP_SIZE):
-                beh_lon, beh_lat = behind_coords[i]
-                ahe_lon, ahe_lat = ahead_coords[i]
+            """Other cars continue moving past accident location."""
+            # Continue from next index
+            for iteration in range(num_iterations):
+                idx = accident_idx + STEP_SIZE + (iteration * STEP_SIZE)
+                
+                # Keep moving if within bounds, else maintain last position
+                if idx < len(behind_coords) and idx < len(ahead_coords):
+                    beh_lon, beh_lat = behind_coords[idx]
+                    ahe_lon, ahe_lat = ahead_coords[idx]
+                else:
+                    # Reached end of route - continue at constant position
+                    beh_lon, beh_lat = behind_coords[-1]
+                    ahe_lon, ahe_lat = ahead_coords[-1]
+                
                 send_positions_parallel([
                     (car_behind, beh_lat, beh_lon),
                     (car_ahead, ahe_lat, ahe_lon),
