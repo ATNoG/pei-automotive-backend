@@ -1,5 +1,4 @@
 services:
-
   mosquitto_broker:
     image: eclipse-mosquitto:2
     container_name: mosquitto_broker
@@ -36,6 +35,18 @@ services:
       context: .
       dockerfile: src/services/overtaking_detector/Dockerfile
     container_name: overtaking_detector
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - mosquitto_broker
+      - position_processor
+
+  emergency_vehicle_detector:
+    build:
+      context: .
+      dockerfile: src/services/emergency_vehicle_detector/Dockerfile
+    container_name: emergency_vehicle_detector
     restart: unless-stopped
     env_file:
       - .env

@@ -45,7 +45,7 @@ class PositionProcessor:
             on_gps_update=self._handle_raw_gps,
         )
 
-    def _handle_raw_gps(self, car_id: str, lat: float, lon: float):
+    def _handle_raw_gps(self, car_id: str, lat: float, lon: float, emergency: bool = False):
         now = time.time()
         last = self.states.get(car_id)
 
@@ -78,6 +78,7 @@ class PositionProcessor:
             longitude=lon,
             speed_kmh=speed_kmh,
             heading_deg=heading,
+            emergency=emergency,
             timestamp=now,
         )
 

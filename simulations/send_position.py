@@ -55,10 +55,12 @@ def main() -> None:
     meta = load_metadata(args.car_name)
     cert_hint = meta.get("ca_cert")
     cert_file = get_cert_path(cert_hint)
+    emergency = meta.get("emergency", False)
 
     # Build the feature value
     feature_value = {
         "gps": {"properties": {"latitude": args.latitude, "longitude": args.longitude}},
+        "info": {"properties": {"emergency": emergency}},
     }
 
     # Create Ditto command payload for twin update
