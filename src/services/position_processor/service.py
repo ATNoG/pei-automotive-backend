@@ -6,7 +6,7 @@
 # and publishes the new car data updates to a MQTT broker
 #
 # also resolves the speed limit for the current road segment
-# using the Overpass API
+# using the tile-cached Overpass road data
 # so the frontend never needs to call external APIs itself.
 #
 from __future__ import annotations
@@ -25,22 +25,9 @@ from common.models import CarUpdate
 from common.mqtt_client import MQTTClient
 from common.ditto_client import DittoWSClient
 from common.utils import haversine_distance_m, bearing_deg
-from common.overpass_client import get_speed_limit, DEFAULT_SPEED_LIMIT_KMH
+from common.overpass_client import get_road_info, DEFAULT_SPEED_LIMIT_KMH
 
 logger = logging.getLogger(__name__)
-
-
-def _parse_speed_limit(limit_str: str) -> Optional[float]:
-    """Convert the string returned by get_speed_limit() into a float, or None."""
-    if not limit_str or limit_str == "--":
-        return None
-    digits = ''.join(c for c in limit_str if c.isdigit() or c == '.')
-    if not digits:
-        return None
-    try:
-        return float(digits)
-    except ValueError:
-        return None
 
 
 class PositionProcessor:
@@ -53,7 +40,7 @@ class PositionProcessor:
             password=config.broker_password,
             client_id="position-processor",
         )
-        # state for each car
+        # state for each car: (lat, lon, timestamp)
         self.states: Dict[str, Tuple[float, float, float]] = {}
         # Ditto WebSocket client
         self.ditto = DittoWSClient(
@@ -64,20 +51,36 @@ class PositionProcessor:
         )
 
     def _resolve_speed_limit(self, lat: float, lon: float) -> float:
+        """
+        Look up the speed limit for the road nearest to (lat, lon).
+
+        Uses the tile-cached Overpass data via get_road_info, which also
+        returns the OSM way id and highway type for richer logging.
+        Always returns a valid positive float.
+        """
         try:
-            limit_str = get_speed_limit(lat, lon)
-            parsed = _parse_speed_limit(limit_str)
-            return parsed if parsed is not None else float(DEFAULT_SPEED_LIMIT_KMH)
+            speed_limit, way_id, hw_type = get_road_info(lat, lon)
+            if way_id is not None:
+                logger.debug(
+                    "Speed limit %.0f km/h from way %d (%s) near (%.5f, %.5f)",
+                    speed_limit, way_id, hw_type, lat, lon,
+                )
+            else:
+                logger.debug(
+                    "No road matched near (%.5f, %.5f), using default %.0f km/h",
+                    lat, lon, speed_limit,
+                )
+            return speed_limit
         except Exception as e:
-            logger.warning(f"Speed-limit lookup failed: {e}")
+            logger.warning("Speed-limit lookup failed: %s", e)
             return float(DEFAULT_SPEED_LIMIT_KMH)
 
     def _handle_raw_gps(self, car_id: str, lat: float, lon: float):
         now = time.time()
         last = self.states.get(car_id)
 
-        speed_kmh = None
-        heading = None
+        speed_kmh: Optional[float] = None
+        heading: Optional[float] = None
 
         if last is not None:
             last_lat, last_lon, last_ts = last
@@ -113,8 +116,8 @@ class PositionProcessor:
         )
 
         logger.info(
-            f"[PROC] {car_id}: lat={lat:.6f}, lon={lon:.6f}, "
-            f"speed={speed_kmh}, heading={heading}, speed_limit={speed_limit}"
+            "[PROC] %s: lat=%.6f, lon=%.6f, speed=%s, heading=%s, speed_limit=%.0f",
+            car_id, lat, lon, speed_kmh, heading, speed_limit,
         )
 
         # publish to MQTT
