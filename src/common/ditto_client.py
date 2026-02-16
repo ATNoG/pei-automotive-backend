@@ -20,7 +20,7 @@ class DittoWSClient:
         ws_url: str,
         username: str,
         password: str,
-        on_gps_update: Callable[[str, float, float], None],
+        on_gps_update: Callable[[str, float, float, bool], None],
     ):
         self.ws_url = ws_url
         self.username = username
@@ -73,9 +73,14 @@ class DittoWSClient:
         if lat is None or lon is None:
             return
 
+        # extract emergency flag from info feature
+        info_feature = value.get("info", {})
+        info_props = info_feature.get("properties", {}) if isinstance(info_feature, dict) else {}
+        emergency = bool(info_props.get("emergency", False))
+
         # callback with raw GPS
         try:
-            self.on_gps_update(car_id, float(lat), float(lon))
+            self.on_gps_update(car_id, float(lat), float(lon), emergency)
         except Exception as e:
             logger.error("Error in on_gps_update callback: %s", e)
 
