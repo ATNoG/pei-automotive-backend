@@ -13,6 +13,7 @@ class CarUpdate:
     longitude: float
     speed_kmh: Optional[float] = None
     heading_deg: Optional[float] = None
+    speed_limit_kmh: Optional[float] = None
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> Dict:
@@ -22,6 +23,7 @@ class CarUpdate:
             "longitude": self.longitude,
             "speed_kmh": self.speed_kmh,
             "heading_deg": self.heading_deg,
+            "speed_limit_kmh": self.speed_limit_kmh,
             "timestamp": self.timestamp,
         }
 
@@ -36,5 +38,6 @@ class CarUpdate:
             longitude=data["longitude"],
             speed_kmh=data.get("speed_kmh"),
             heading_deg=data.get("heading_deg"),
+            speed_limit_kmh=data.get("speed_limit_kmh"),
             timestamp=data.get("timestamp", time.time()),
         )

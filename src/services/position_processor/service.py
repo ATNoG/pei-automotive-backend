@@ -5,12 +5,16 @@
 # calculates speed and heading given previous states
 # and publishes the new car data updates to a MQTT broker
 #
+# also resolves the speed limit for the current road segment
+# using the Overpass API
+# so the frontend never needs to call external APIs itself.
+#
 from __future__ import annotations
 import time
 import logging
 import sys
 from pathlib import Path
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Optional
 
 # add parent dir
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -21,8 +25,22 @@ from common.models import CarUpdate
 from common.mqtt_client import MQTTClient
 from common.ditto_client import DittoWSClient
 from common.utils import haversine_distance_m, bearing_deg
+from common.overpass_client import get_speed_limit, DEFAULT_SPEED_LIMIT_KMH
 
 logger = logging.getLogger(__name__)
+
+
+def _parse_speed_limit(limit_str: str) -> Optional[float]:
+    """Convert the string returned by get_speed_limit() into a float, or None."""
+    if not limit_str or limit_str == "--":
+        return None
+    digits = ''.join(c for c in limit_str if c.isdigit() or c == '.')
+    if not digits:
+        return None
+    try:
+        return float(digits)
+    except ValueError:
+        return None
 
 
 class PositionProcessor:
@@ -44,6 +62,15 @@ class PositionProcessor:
             password=config.ditto_password,
             on_gps_update=self._handle_raw_gps,
         )
+
+    def _resolve_speed_limit(self, lat: float, lon: float) -> float:
+        try:
+            limit_str = get_speed_limit(lat, lon)
+            parsed = _parse_speed_limit(limit_str)
+            return parsed if parsed is not None else float(DEFAULT_SPEED_LIMIT_KMH)
+        except Exception as e:
+            logger.warning(f"Speed-limit lookup failed: {e}")
+            return float(DEFAULT_SPEED_LIMIT_KMH)
 
     def _handle_raw_gps(self, car_id: str, lat: float, lon: float):
         now = time.time()
@@ -71,6 +98,9 @@ class PositionProcessor:
         # update state
         self.states[car_id] = (lat, lon, now)
 
+        # resolve speed limit for the current road segment
+        speed_limit = self._resolve_speed_limit(lat, lon)
+
         # build enriched CarUpdate
         update = CarUpdate(
             car_id=car_id,
@@ -78,12 +108,13 @@ class PositionProcessor:
             longitude=lon,
             speed_kmh=speed_kmh,
             heading_deg=heading,
+            speed_limit_kmh=speed_limit,
             timestamp=now,
         )
 
         logger.info(
             f"[PROC] {car_id}: lat={lat:.6f}, lon={lon:.6f}, "
-            f"speed={speed_kmh}, heading={heading}"
+            f"speed={speed_kmh}, heading={heading}, speed_limit={speed_limit}"
         )
 
         # publish to MQTT
