@@ -1,10 +1,10 @@
-"""
-Tile-cached Overpass speed-limit resolver.
-
-Pre-fetches all driveable roads in a ~1.7 km × 1.3 km area on the first
-cache miss, then resolves every subsequent lookup with a local
-point-to-polyline distance calculation (~0.3 ms per call).
-"""
+#
+# overpass_client.py
+# tile-cached Overpass speed-limit resolver.
+#
+# Pre-fetches all driveable roads in a ~1.7 km × 1.3 km area on the first
+# cache miss, then resolves every subsequent lookup with a local
+# point-to-polyline distance calculation (~0.3 ms per call).
 
 from __future__ import annotations
 
