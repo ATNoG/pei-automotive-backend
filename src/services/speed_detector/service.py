@@ -52,12 +52,20 @@ class SpeedDetector:
         if update.latitude is not None and update.longitude is not None:
             try:
                 limit_str = get_speed_limit(update.latitude, update.longitude)
-                if limit_str != "--":
+                if limit_str and limit_str != "--":
+                    # Extract numeric value from the speed limit string
                     limit_val = ''.join([c for c in limit_str if c.isdigit() or c == "."])
                     if limit_val:
                         speed_limit = float(limit_val)
+                    else:
+                        # If parsing fails, use default
+                        logger.debug(f"Could not parse speed limit '{limit_str}', using default {self.default_speed_limit}")
+                else:
+                    # If API returns "--", use default
+                    logger.debug(f"No speed limit found for location, using default {self.default_speed_limit}")
             except Exception as e:
-                logger.warning(f"Error in Overpass API limit: {e}")
+                logger.warning(f"Error getting speed limit: {e}, using default {self.default_speed_limit}")
+                # Continue with default speed limit
 
         if update.speed_kmh > speed_limit:
             alert = {
