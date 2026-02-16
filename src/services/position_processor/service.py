@@ -13,6 +13,7 @@ from __future__ import annotations
 import time
 import logging
 import sys
+import threading
 from pathlib import Path
 from typing import Dict, Tuple, Optional
 
@@ -40,8 +41,9 @@ class PositionProcessor:
             password=config.broker_password,
             client_id="position-processor",
         )
-        # state for each car: (lat, lon, timestamp)
+        # state for each car (thread-safe access)
         self.states: Dict[str, Tuple[float, float, float]] = {}
+        self.states_lock = threading.Lock()
         # Ditto WebSocket client
         self.ditto = DittoWSClient(
             ws_url=config.ditto_ws_url,
@@ -77,29 +79,32 @@ class PositionProcessor:
 
     def _handle_raw_gps(self, car_id: str, lat: float, lon: float):
         now = time.time()
-        last = self.states.get(car_id)
+        
+        # Thread-safe state access
+        with self.states_lock:
+            last = self.states.get(car_id)
 
-        speed_kmh: Optional[float] = None
-        heading: Optional[float] = None
+            speed_kmh = None
+            heading = None
 
-        if last is not None:
-            last_lat, last_lon, last_ts = last
-            dt = now - last_ts
+            if last is not None:
+                last_lat, last_lon, last_ts = last
+                dt = now - last_ts
 
-            if dt > 0.05:  # allow faster updates for realistic speed calculation (50ms)
-                dist_m = haversine_distance_m(last_lat, last_lon, lat, lon)
-                speed_mps = dist_m / dt
-                speed_kmh = speed_mps * 3.6
+                if dt > 0.05:  # allow faster updates for realistic speed calculation (50ms)
+                    dist_m = haversine_distance_m(last_lat, last_lon, lat, lon)
+                    speed_mps = dist_m / dt
+                    speed_kmh = speed_mps * 3.6
 
-                # filter unrealistic values
-                if speed_kmh > 600 or speed_kmh < 0:
-                    speed_kmh = None
+                    # filter unrealistic values
+                    if speed_kmh > 600 or speed_kmh < 0:
+                        speed_kmh = None
 
-                if dist_m > 1.0:
-                    heading = bearing_deg(last_lat, last_lon, lat, lon)
+                    if dist_m > 1.0:
+                        heading = bearing_deg(last_lat, last_lon, lat, lon)
 
-        # update state
-        self.states[car_id] = (lat, lon, now)
+            # update state
+            self.states[car_id] = (lat, lon, now)
 
         # resolve speed limit for the current road segment
         speed_limit = self._resolve_speed_limit(lat, lon)
