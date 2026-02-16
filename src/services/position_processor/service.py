@@ -77,7 +77,8 @@ class PositionProcessor:
             logger.warning("Speed-limit lookup failed: %s", e)
             return float(DEFAULT_SPEED_LIMIT_KMH)
 
-    def _handle_raw_gps(self, car_id: str, lat: float, lon: float):
+
+    def _handle_raw_gps(self, car_id: str, lat: float, lon: float, emergency: bool = False):
         now = time.time()
         
         # Thread-safe state access
@@ -117,6 +118,7 @@ class PositionProcessor:
             speed_kmh=speed_kmh,
             heading_deg=heading,
             speed_limit_kmh=speed_limit,
+            emergency=emergency,
             timestamp=now,
         )
 

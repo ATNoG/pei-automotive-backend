@@ -40,6 +40,7 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="Provision Ditto + Hono for a car.")
     parser.add_argument("car_name")
     parser.add_argument("--password", help="Optional device password")
+    parser.add_argument("--emergency", action="store_true", default=False, help="Flag this car as an emergency vehicle")
     parser.add_argument("--cert", default=DEFAULT_CERT, help="CA certificate path hint to store alongside metadata")
     args = parser.parse_args()
 
@@ -93,7 +94,10 @@ def main() -> None:
 
     thing_payload = {
         "policyId": thing_id,
-        "features": {"gps": {"properties": {"latitude": 0, "longitude": 0}}},
+        "features": {
+            "gps": {"properties": {"latitude": 0, "longitude": 0}},
+            "info": {"properties": {"emergency": args.emergency}},
+        },
     }
     ensure(
         requests.put(
@@ -137,6 +141,7 @@ def main() -> None:
         "hono_tenant": HONO_TENANT,
         "auth_id": auth_id,
         "password": password,
+        "emergency": args.emergency,
         "ca_cert": args.cert,
     }
     meta_path.write_text(json.dumps(meta, indent=2))
