@@ -100,7 +100,7 @@ def test_speeding(get_car_id):
             f"Speed alert missing speed_limit_kmh field: {alert}"
         )
         
- if __name__ == "__main__":
+if __name__ == "__main__":
     def get_car_id(base_name: str) -> str:
         return f"{base_name}-{str(uuid.uuid4())[:8]}"
     test_speeding(get_car_id)
