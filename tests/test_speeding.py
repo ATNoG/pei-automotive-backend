@@ -63,3 +63,8 @@ def test_speeding(get_car_id):
         car_file.unlink()
 
     assert len(ALERTS) > 0, "Expected at least one speed alert, got none"
+
+if __name__ == "__main__":
+    def get_car_id(base_name: str) -> str:
+        return f"{base_name}-{str(uuid.uuid4())[:8]}"
+    test_speeding(get_car_id)

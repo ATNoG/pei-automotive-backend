@@ -209,5 +209,7 @@ def test_accident_directional_notification(get_car_id):
 
 
 if __name__ == "__main__":
-    test_accident_directional_notification()
+    def get_car_id(base_name: str) -> str:
+        return f"{base_name}-{str(uuid.uuid4())[:8]}"
+    test_accident_directional_notification(get_car_id)
     print("\nTest passed: Only car-behind (approaching accident) was notified")

@@ -92,4 +92,6 @@ def test_curved_route(get_car_id):
 
 
 if __name__ == "__main__":
-    test_curved_route()
+    def get_car_id(base_name: str) -> str:
+        return f"{base_name}-{str(uuid.uuid4())[:8]}"
+    test_curved_route(get_car_id)

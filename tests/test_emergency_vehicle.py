@@ -111,4 +111,6 @@ def test_emergency_vehicle(get_car_id):
 
 
 if __name__ == "__main__":
-    test_emergency_vehicle()
+    def get_car_id(base_name: str) -> str:
+        return f"{base_name}-{str(uuid.uuid4())[:8]}"
+    test_emergency_vehicle(get_car_id)

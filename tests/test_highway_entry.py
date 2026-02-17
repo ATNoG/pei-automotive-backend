@@ -179,6 +179,8 @@ def test_highway_entry_safe(get_car_id):
 
 
 if __name__ == "__main__":
-    test_highway_entry_unsafe()
-    test_highway_entry_safe()
+    def get_car_id(base_name: str) -> str:
+        return f"{base_name}-{str(uuid.uuid4())[:8]}" 
+    test_highway_entry_unsafe(get_car_id)
+    test_highway_entry_safe(get_car_id)
 

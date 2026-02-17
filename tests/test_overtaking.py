@@ -94,4 +94,6 @@ def test_overtaking(get_car_id):
     assert len(ALERTS) > 0, "Expected at least one overtaking alert, got none"
 
 if __name__ == "__main__":
-    test_overtaking()
+    def get_car_id(base_name: str) -> str:
+        return f"{base_name}-{str(uuid.uuid4())[:8]}"
+    test_overtaking(get_car_id)
