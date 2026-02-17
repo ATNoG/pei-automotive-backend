@@ -2,6 +2,7 @@ import json
 import time
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
@@ -39,7 +40,8 @@ def send_position(car_name: str, lat: float, lon: float) -> None:
 
 def test_curved_route():
     """Test vehicle navigation on a curved route with complex trajectory."""
-    car = "curved-route-car"
+    random_id = str(uuid.uuid4())[:8]
+    car = f"curved-route-car-{random_id}"
     ensure_car_exists(car)
 
     # subscribe to position updates topic
@@ -70,6 +72,11 @@ def test_curved_route():
     # wait for final messages to be processed
     time.sleep(0.2)
     client.loop_stop()
+
+    # Remove car device file to avoid interference with next test
+    car_file = SIM_DIR / "devices" / f"{car}.json"
+    if car_file.exists():
+        car_file.unlink()
 
     # verify that position updates were received
     assert len(POSITION_UPDATES) > 0, "Expected position updates, got none"

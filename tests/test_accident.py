@@ -5,6 +5,7 @@ import subprocess
 import sys
 import queue
 import threading
+import uuid
 from pathlib import Path
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -91,9 +92,10 @@ def collect_alerts(alert_queue: queue.Queue, timeout: float = ALERT_TIMEOUT) -> 
 
 
 def test_accident_directional_notification():
-    accident_car = "accident-car"
-    car_behind = "car-behind"
-    car_ahead = "car-ahead"
+    random_id = str(uuid.uuid4())[:8]
+    accident_car = f"accident-car-{random_id}"
+    car_behind = f"car-behind-{random_id}"
+    car_ahead = f"car-ahead-{random_id}"
 
     ensure_car_exists(accident_car)
     ensure_car_exists(car_behind)
@@ -194,6 +196,17 @@ def test_accident_directional_notification():
         f"Car AHEAD should NOT receive alerts (accident is behind it). "
         f"Got {len(alerts['car-ahead'])} alerts."
     )
+
+    # Remove car device files to avoid interference with next test
+    accident_car_file = SIM_DIR / "devices" / f"{accident_car}.json"
+    car_behind_file = SIM_DIR / "devices" / f"{car_behind}.json"
+    car_ahead_file = SIM_DIR / "devices" / f"{car_ahead}.json"
+    if accident_car_file.exists():
+        accident_car_file.unlink()
+    if car_behind_file.exists():
+        car_behind_file.unlink()
+    if car_ahead_file.exists():
+        car_ahead_file.unlink()
 
 
 if __name__ == "__main__":

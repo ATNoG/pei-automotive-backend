@@ -2,6 +2,7 @@ import json
 import time
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from threading import Thread
 
@@ -26,8 +27,9 @@ def on_highway_entry_alert(client, userdata, msg):
 
 
 def test_highway_entry_unsafe():
-    highway_car = "highway-car"
-    entering_car = "entering-car"
+    random_id = str(uuid.uuid4())[:8]
+    highway_car = f"highway-car-{random_id}"
+    entering_car = f"entering-car-{random_id}"
     ensure_car_exists(highway_car)
     ensure_car_exists(entering_car)
 
@@ -101,8 +103,9 @@ def test_highway_entry_unsafe():
 def test_highway_entry_safe():
     ALERTS.clear()
 
-    highway_car = "highway-car-2"
-    entering_car = "entering-car-2"
+    random_id = str(uuid.uuid4())[:8]
+    highway_car = f"highway-car-{random_id}"
+    entering_car = f"entering-car-{random_id}"
     
     ensure_car_exists(highway_car)
     ensure_car_exists(entering_car)

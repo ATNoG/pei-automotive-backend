@@ -2,6 +2,7 @@ import json
 import time
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
@@ -25,7 +26,8 @@ def on_speed_alert(client, userdata, msg):
 
 
 def test_speeding():
-    car = "speed-car"
+    random_id = str(uuid.uuid4())[:8]
+    car = f"speed-car-{random_id}"
     ensure_car_exists(car)
 
     # subscribe to speed alerts
@@ -55,5 +57,10 @@ def test_speeding():
 
     time.sleep(1)
     client.loop_stop()
+
+    # Remove car device file to avoid interference with next test
+    car_file = SIM_DIR / "devices" / f"{car}.json"
+    if car_file.exists():
+        car_file.unlink()
 
     assert len(ALERTS) > 0, "Expected at least one speed alert, got none"

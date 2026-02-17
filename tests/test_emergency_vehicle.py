@@ -2,6 +2,7 @@ import json
 import time
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 from threading import Thread
 import paho.mqtt.client as mqtt
@@ -34,8 +35,9 @@ def send_position(car_name: str, lat: float, lon: float) -> None:
 
 
 def test_emergency_vehicle():
-    car_regular = "ev-test-regular"      # regular car (victim)
-    car_emergency = "ev-test-emergency"  # emergency vehicle
+    random_id = str(uuid.uuid4())[:8]
+    car_regular = f"ev-test-regular-{random_id}"      # regular car (victim)
+    car_emergency = f"ev-test-emergency-{random_id}"  # emergency vehicle
 
     ensure_car_exists(car_regular, emergency=False)
     ensure_car_exists(car_emergency, emergency=True)
@@ -91,6 +93,14 @@ def test_emergency_vehicle():
 
     time.sleep(1)
     client.loop_stop()
+
+    # Remove car device files to avoid interference with next test
+    car_regular_file = SIM_DIR / "devices" / f"{car_regular}.json"
+    car_emergency_file = SIM_DIR / "devices" / f"{car_emergency}.json"
+    if car_regular_file.exists():
+        car_regular_file.unlink()
+    if car_emergency_file.exists():
+        car_emergency_file.unlink()
 
     assert len(ALERTS) > 0, "Expected at least one emergency vehicle alert, got none"
     # Verify alert structure
