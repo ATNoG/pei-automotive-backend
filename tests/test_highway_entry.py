@@ -27,6 +27,8 @@ def on_highway_entry_alert(client, userdata, msg):
 
 
 def test_highway_entry_unsafe():
+    ALERTS.clear()  # Clear alerts at the start
+    
     random_id = str(uuid.uuid4())[:8]
     highway_car = f"highway-car-{random_id}"
     entering_car = f"entering-car-{random_id}"
@@ -39,14 +41,15 @@ def test_highway_entry_unsafe():
     client.subscribe("alerts/highway_entry")
     client.on_message = on_highway_entry_alert
     client.loop_start()
+    
+    # Wait for MQTT connection to be fully established
+    time.sleep(0.1)
 
     # load coordinates
     with open(ROADS_DIR / "highway.json") as f:
         highway_route = json.load(f)
     with open(ROADS_DIR / "entering.json") as f:
         entering_route = json.load(f)
-
-    ALERTS.clear()
     
     merge_lat, merge_lon = entering_route[-1]
     # Find the highway point closest to merge point
@@ -82,7 +85,7 @@ def test_highway_entry_unsafe():
         thread_entering.join()
         thread_highway.join()
         
-        time.sleep(0.01)
+        time.sleep(0.05) 
 
     time.sleep(1)
     client.loop_stop()
@@ -115,6 +118,9 @@ def test_highway_entry_safe():
     client.subscribe("alerts/highway_entry")
     client.on_message = on_highway_entry_alert
     client.loop_start()
+    
+    # Wait for MQTT connection to be fully established
+    time.sleep(0.1)
 
     with open(ROADS_DIR / "highway.json") as f:
         highway_route = json.load(f)
@@ -156,7 +162,7 @@ def test_highway_entry_safe():
         thread_entering.join()
         thread_highway.join()
         
-        time.sleep(0.01)
+        time.sleep(0.05)
 
     time.sleep(1)
     client.loop_stop()
