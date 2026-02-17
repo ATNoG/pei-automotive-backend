@@ -77,9 +77,9 @@ def mqtt_alert_collector(topics: list[str]):
         client.disconnect()
 
 
-def collect_alerts(alert_queue: queue.Queue, timeout: float = ALERT_TIMEOUT) -> dict:
+def collect_alerts(alert_queue: queue.Queue, car_ids: list[str], timeout: float = ALERT_TIMEOUT) -> dict:
     """Collect accident alerts from queue with timeout."""
-    alerts = {"car-behind": [], "car-ahead": []}
+    alerts = {car_id: [] for car_id in car_ids}
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -183,18 +183,18 @@ def test_accident_directional_notification():
 
         # Wait for pipeline processing and collect alerts
         time.sleep(2)
-        alerts = collect_alerts(alert_queue, timeout=ALERT_TIMEOUT)
+        alerts = collect_alerts(alert_queue, [car_behind, car_ahead], timeout=ALERT_TIMEOUT)
 
     # Assertions
-    assert len(alerts["car-behind"]) > 0, (
+    assert len(alerts[car_behind]) > 0, (
         f"Car BEHIND should receive accident alerts. "
-        f"Got {len(alerts['car-behind'])} alerts. "
+        f"Got {len(alerts[car_behind])} alerts. "
         f"Check that accident-car speed reached >30 km/h before stopping."
     )
 
-    assert len(alerts["car-ahead"]) == 0, (
+    assert len(alerts[car_ahead]) == 0, (
         f"Car AHEAD should NOT receive alerts (accident is behind it). "
-        f"Got {len(alerts['car-ahead'])} alerts."
+        f"Got {len(alerts[car_ahead])} alerts."
     )
 
     # Remove car device files to avoid interference with next test
