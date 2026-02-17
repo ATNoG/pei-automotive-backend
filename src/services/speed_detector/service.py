@@ -2,6 +2,9 @@
 # Speeding detector
 # detects if the car is speeding
 #
+# Reads the speed_limit_kmh directly from the CarUpdate
+# (computed by position_processor) instead of querying Overpass itself.
+#
 from __future__ import annotations
 import json
 import logging
@@ -15,9 +18,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
-
 from common.models import CarUpdate
-from common.overpass_client import get_speed_limit
+from common.overpass_client import DEFAULT_SPEED_LIMIT_KMH
 
 logger = logging.getLogger(__name__)
 
@@ -25,7 +27,6 @@ logger = logging.getLogger(__name__)
 class SpeedDetector:
     def __init__(self, config):
         self.config = config
-        self.default_speed_limit = config.speed_limit_kmh
         self.alert_topic = "alerts/speed"
         self.mqtt = MQTTClient(
             host=config.broker_host,
@@ -47,25 +48,9 @@ class SpeedDetector:
         if update.speed_kmh is None:
             return
 
-        # dynamic limit search
-        speed_limit = self.default_speed_limit
-        if update.latitude is not None and update.longitude is not None:
-            try:
-                limit_str = get_speed_limit(update.latitude, update.longitude)
-                if limit_str and limit_str != "--":
-                    # Extract numeric value from the speed limit string
-                    limit_val = ''.join([c for c in limit_str if c.isdigit() or c == "."])
-                    if limit_val:
-                        speed_limit = float(limit_val)
-                    else:
-                        # If parsing fails, use default
-                        logger.debug(f"Could not parse speed limit '{limit_str}', using default {self.default_speed_limit}")
-                else:
-                    # If API returns "--", use default
-                    logger.debug(f"No speed limit found for location, using default {self.default_speed_limit}")
-            except Exception as e:
-                logger.warning(f"Error getting speed limit: {e}, using default {self.default_speed_limit}")
-                # Continue with default speed limit
+        # use the speed limit already resolved by position_processor,
+        # fall back to the global default when it is absent
+        speed_limit = update.speed_limit_kmh if update.speed_limit_kmh is not None else DEFAULT_SPEED_LIMIT_KMH
 
         if update.speed_kmh > speed_limit:
             alert = {
