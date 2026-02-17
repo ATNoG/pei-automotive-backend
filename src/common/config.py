@@ -26,11 +26,6 @@ class AppConfig:
     # Topics
     car_updates_topic: str
 
-    # Global speed configuration,
-    # this will change in the future with
-    # specific road's limits
-    speed_limit_kmh: float
-
 
 def _derive_ws_url_from_http(http_url: str) -> str:
     # convert http to websocket for ditto
@@ -89,7 +84,4 @@ def load_config() -> AppConfig:
 
         # Topics
         car_updates_topic=car_updates_topic,
-
-        # Speed detection
-        speed_limit_kmh=float(50), # default - fallback
     )
