@@ -26,12 +26,11 @@ def on_highway_entry_alert(client, userdata, msg):
     ALERTS.append(json.loads(msg.payload.decode()))
 
 
-def test_highway_entry_unsafe():
+def test_highway_entry_unsafe(get_car_id):
     ALERTS.clear()  # Clear alerts at the start
     
-    random_id = str(uuid.uuid4())[:8]
-    highway_car = f"highway-car-{random_id}"
-    entering_car = f"entering-car-{random_id}"
+    highway_car = get_car_id("highway-car")
+    entering_car = get_car_id("entering-car")
     ensure_car_exists(highway_car)
     ensure_car_exists(entering_car)
 
@@ -103,12 +102,11 @@ def test_highway_entry_unsafe():
     assert len(unsafe_alerts) > 0, f"Expected unsafe alert but got: {ALERTS}"
 
 
-def test_highway_entry_safe():
+def test_highway_entry_safe(get_car_id):
     ALERTS.clear()
 
-    random_id = str(uuid.uuid4())[:8]
-    highway_car = f"highway-car-{random_id}"
-    entering_car = f"entering-car-{random_id}"
+    highway_car = get_car_id("highway-car-2")
+    entering_car = get_car_id("entering-car-2")
     
     ensure_car_exists(highway_car)
     ensure_car_exists(entering_car)

@@ -25,9 +25,8 @@ def on_speed_alert(client, userdata, msg):
     ALERTS.append(json.loads(msg.payload.decode()))
 
 
-def test_speeding():
-    random_id = str(uuid.uuid4())[:8]
-    car = f"speed-car-{random_id}"
+def test_speeding(get_car_id):
+    car = get_car_id("speed-car")
     ensure_car_exists(car)
 
     # subscribe to speed alerts

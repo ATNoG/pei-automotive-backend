@@ -91,11 +91,10 @@ def collect_alerts(alert_queue: queue.Queue, car_ids: list[str], timeout: float 
     return alerts
 
 
-def test_accident_directional_notification():
-    random_id = str(uuid.uuid4())[:8]
-    accident_car = f"accident-car-{random_id}"
-    car_behind = f"car-behind-{random_id}"
-    car_ahead = f"car-ahead-{random_id}"
+def test_accident_directional_notification(get_car_id):
+    accident_car = get_car_id("accident-car")
+    car_behind = get_car_id("car-behind")
+    car_ahead = get_car_id("car-ahead")
 
     ensure_car_exists(accident_car)
     ensure_car_exists(car_behind)
@@ -185,6 +184,17 @@ def test_accident_directional_notification():
         time.sleep(2)
         alerts = collect_alerts(alert_queue, [car_behind, car_ahead], timeout=ALERT_TIMEOUT)
 
+    # Remove car device files to avoid interference with next test
+    accident_car_file = SIM_DIR / "devices" / f"{accident_car}.json"
+    car_behind_file = SIM_DIR / "devices" / f"{car_behind}.json"
+    car_ahead_file = SIM_DIR / "devices" / f"{car_ahead}.json"
+    if accident_car_file.exists():
+        accident_car_file.unlink()
+    if car_behind_file.exists():
+        car_behind_file.unlink()
+    if car_ahead_file.exists():
+        car_ahead_file.unlink()
+
     # Assertions
     assert len(alerts[car_behind]) > 0, (
         f"Car BEHIND should receive accident alerts. "
@@ -196,17 +206,6 @@ def test_accident_directional_notification():
         f"Car AHEAD should NOT receive alerts (accident is behind it). "
         f"Got {len(alerts[car_ahead])} alerts."
     )
-
-    # Remove car device files to avoid interference with next test
-    accident_car_file = SIM_DIR / "devices" / f"{accident_car}.json"
-    car_behind_file = SIM_DIR / "devices" / f"{car_behind}.json"
-    car_ahead_file = SIM_DIR / "devices" / f"{car_ahead}.json"
-    if accident_car_file.exists():
-        accident_car_file.unlink()
-    if car_behind_file.exists():
-        car_behind_file.unlink()
-    if car_ahead_file.exists():
-        car_ahead_file.unlink()
 
 
 if __name__ == "__main__":

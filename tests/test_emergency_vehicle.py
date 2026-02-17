@@ -34,10 +34,9 @@ def send_position(car_name: str, lat: float, lon: float) -> None:
     )
 
 
-def test_emergency_vehicle():
-    random_id = str(uuid.uuid4())[:8]
-    car_regular = f"ev-test-regular-{random_id}"      # regular car (victim)
-    car_emergency = f"ev-test-emergency-{random_id}"  # emergency vehicle
+def test_emergency_vehicle(get_car_id):
+    car_regular = get_car_id("ev-test-regular")      # regular car (victim)
+    car_emergency = get_car_id("ev-test-emergency")  # emergency vehicle
 
     ensure_car_exists(car_regular, emergency=False)
     ensure_car_exists(car_emergency, emergency=True)

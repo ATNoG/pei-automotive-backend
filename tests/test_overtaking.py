@@ -25,10 +25,9 @@ def send_position(car_name: str, lat: float, lon: float) -> None:
         car_name, str(lat), str(lon)
     ], check=True)
 
-def test_overtaking():
-    random_id = str(uuid.uuid4())[:8]
-    car_slow = f"overtaking-car-front-{random_id}" # victim
-    car_fast = f"overtaking-car-behind-{random_id}" # overtaker
+def test_overtaking(get_car_id):
+    car_slow = get_car_id("overtaking-car-front") # victim
+    car_fast = get_car_id("overtaking-car-behind") # overtaker
 
     ensure_car_exists(car_slow)
     ensure_car_exists(car_fast)

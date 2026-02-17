@@ -38,10 +38,9 @@ def send_position(car_name: str, lat: float, lon: float) -> None:
     ], check=True)
 
 
-def test_curved_route():
+def test_curved_route(get_car_id):
     """Test vehicle navigation on a curved route with complex trajectory."""
-    random_id = str(uuid.uuid4())[:8]
-    car = f"curved-route-car-{random_id}"
+    car = get_car_id("curved-route-car")
     ensure_car_exists(car)
 
     # subscribe to position updates topic
