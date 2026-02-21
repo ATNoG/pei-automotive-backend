@@ -111,7 +111,7 @@ def test_highway_entry_safe(get_car_id):
     client.loop_start()
     
     # Wait for MQTT connection to be fully established
-    time.sleep(0.3)
+    time.sleep(0.1)
 
     with open(ROADS_DIR / "highway.json") as f:
         highway_route = json.load(f)
@@ -155,11 +155,10 @@ def test_highway_entry_safe(get_car_id):
         
         time.sleep(0.05)
 
-    time.sleep(2)  # Wait for detection and alert processing
+    time.sleep(1)  # Wait for detection and alert processing
     client.loop_stop()
 
     safe_alerts = [a for a in ALERTS if a.get("status") == "safe"]
-
 
     assert len(safe_alerts) > 0, f"Expected safe alert but got: {ALERTS}"
 
