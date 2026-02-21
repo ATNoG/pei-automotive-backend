@@ -42,7 +42,7 @@ def test_highway_entry_unsafe(get_car_id):
     client.loop_start()
     
     # Wait for MQTT connection to be fully established
-    time.sleep(0.1)
+    time.sleep(0.3)
 
     # load coordinates
     with open(ROADS_DIR / "highway.json") as f:
@@ -84,20 +84,13 @@ def test_highway_entry_unsafe(get_car_id):
         thread_entering.join()
         thread_highway.join()
         
-        time.sleep(0.05) 
+        time.sleep(0.05)
 
-    time.sleep(1)
+    time.sleep(2)
     client.loop_stop()
 
     unsafe_alerts = [a for a in ALERTS if a.get("status") == "unsafe"]
     
-    # Remove car device files to avoid interference with next test
-    highway_car_file = SIM_DIR / "devices" / f"{highway_car}.json"
-    entering_car_file = SIM_DIR / "devices" / f"{entering_car}.json"
-    if highway_car_file.exists():
-        highway_car_file.unlink()
-    if entering_car_file.exists():
-        entering_car_file.unlink()
     
     assert len(unsafe_alerts) > 0, f"Expected unsafe alert but got: {ALERTS}"
 
@@ -118,7 +111,7 @@ def test_highway_entry_safe(get_car_id):
     client.loop_start()
     
     # Wait for MQTT connection to be fully established
-    time.sleep(0.1)
+    time.sleep(0.3)
 
     with open(ROADS_DIR / "highway.json") as f:
         highway_route = json.load(f)
@@ -162,18 +155,11 @@ def test_highway_entry_safe(get_car_id):
         
         time.sleep(0.05)
 
-    time.sleep(1)
+    time.sleep(2)  # Wait for detection and alert processing
     client.loop_stop()
 
     safe_alerts = [a for a in ALERTS if a.get("status") == "safe"]
 
-    # Remove car device files to avoid interference with future tests
-    highway_car_file = SIM_DIR / "devices" / f"{highway_car}.json"
-    entering_car_file = SIM_DIR / "devices" / f"{entering_car}.json"
-    if highway_car_file.exists():
-        highway_car_file.unlink()
-    if entering_car_file.exists():
-        entering_car_file.unlink()
 
     assert len(safe_alerts) > 0, f"Expected safe alert but got: {ALERTS}"
 

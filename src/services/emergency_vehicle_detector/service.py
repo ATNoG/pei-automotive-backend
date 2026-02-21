@@ -41,7 +41,16 @@ class EVDetector:
 
     def _on_car_update(self, payload: str):
         try:
-            update = CarUpdate.from_dict(json.loads(payload))
+            data = json.loads(payload)
+            
+            # Handle test cleanup
+            if data.get("_test_cleanup"):
+                car_id = data.get("car_id")
+                if car_id:
+                    self._cleanup_car(car_id)
+                return
+            
+            update = CarUpdate.from_dict(data)
         except Exception as e:
             logger.error(f"Failed to parse car update: {e}")
             return
@@ -85,6 +94,12 @@ class EVDetector:
                     f"[EV] Emergency vehicle {update.car_id} is {dist:.1f}m "
                     f"from {other_id}"
                 )
+
+    def _cleanup_car(self, car_id: str):
+        """Remove all state for a specific car (used for test cleanup)."""
+        if car_id in self.cars:
+            del self.cars[car_id]
+            logger.info(f"[CLEANUP] Removed car state: {car_id}")
 
     def run(self):
         logger.info("Starting Emergency Vehicle Detector...")

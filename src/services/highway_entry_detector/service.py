@@ -276,7 +276,16 @@ class HighwayEntryDetector:
 
     def _on_car_update(self, payload: str):
         try:
-            update = CarUpdate.from_dict(json.loads(payload))
+            data = json.loads(payload)
+            
+            # Handle test cleanup
+            if data.get("_test_cleanup"):
+                car_id = data.get("car_id")
+                if car_id:
+                    self._cleanup_car(car_id)
+                return
+            
+            update = CarUpdate.from_dict(data)
         except Exception as e:
             logger.error(f"Failed to parse car update: {e}")
             return
@@ -391,6 +400,26 @@ class HighwayEntryDetector:
                                     f"can safely merge. Min distance to {highway_car_id}: {min_dist:.1f}m"
                                 )
                                 self.alerted_pairs.add(pair_key)
+
+    def _cleanup_car(self, car_id: str):
+        """Remove all state for a specific car (used for test cleanup)."""
+        # Remove from cars dictionary
+        if car_id in self.cars:
+            del self.cars[car_id]
+            logger.info(f"[CLEANUP] Removed car state: {car_id}")
+        
+        # Remove from classification sets
+        self.highway_cars.discard(car_id)
+        self.entering_cars.discard(car_id)
+        
+        # Remove from alerted pairs
+        pairs_to_remove = {
+            pair for pair in self.alerted_pairs 
+            if car_id in pair
+        }
+        self.alerted_pairs -= pairs_to_remove
+        if pairs_to_remove:
+            logger.info(f"[CLEANUP] Removed {len(pairs_to_remove)} alert pairs for {car_id}")
 
     def run(self):
         logger.info("Starting Highway Entry Detector...")

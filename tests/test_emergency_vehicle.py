@@ -93,13 +93,6 @@ def test_emergency_vehicle(get_car_id):
     time.sleep(1)
     client.loop_stop()
 
-    # Remove car device files to avoid interference with next test
-    car_regular_file = SIM_DIR / "devices" / f"{car_regular}.json"
-    car_emergency_file = SIM_DIR / "devices" / f"{car_emergency}.json"
-    if car_regular_file.exists():
-        car_regular_file.unlink()
-    if car_emergency_file.exists():
-        car_emergency_file.unlink()
 
     assert len(ALERTS) > 0, "Expected at least one emergency vehicle alert, got none"
     # Verify alert structure

@@ -78,18 +78,11 @@ def test_overtaking(get_car_id):
         thread_slow.join()
         thread_fast.join()
         
-        time.sleep(0.01)
+        time.sleep(0.02)
 
-    time.sleep(1)
+    time.sleep(2)
     client.loop_stop()
 
-    # Remove car device files to avoid interference with next test
-    car_slow_file = SIM_DIR / "devices" / f"{car_slow}.json"
-    car_fast_file = SIM_DIR / "devices" / f"{car_fast}.json"
-    if car_slow_file.exists():
-        car_slow_file.unlink()
-    if car_fast_file.exists():
-        car_fast_file.unlink()
 
     assert len(ALERTS) > 0, "Expected at least one overtaking alert, got none"
 

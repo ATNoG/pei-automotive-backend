@@ -63,7 +63,16 @@ class OvertakingDetector:
 
     def _on_car_update(self, payload: str):
         try:
-            update = CarUpdate.from_dict(json.loads(payload))
+            data = json.loads(payload)
+            
+            # Handle test cleanup
+            if data.get("_test_cleanup"):
+                car_id = data.get("car_id")
+                if car_id:
+                    self._cleanup_car(car_id)
+                return
+            
+            update = CarUpdate.from_dict(data)
         except Exception as e:
             logger.error(f"Failed to parse car update: {e}")
             return
@@ -123,6 +132,23 @@ class OvertakingDetector:
 
             # save new relative sign
             self.relative_positions[key] = sign
+
+    def _cleanup_car(self, car_id: str):
+        """Remove all state for a specific car (used for test cleanup)."""
+        # Remove car state
+        if car_id in self.cars:
+            del self.cars[car_id]
+            logger.info(f"[CLEANUP] Removed car state: {car_id}")
+        
+        # Remove any relative position pairs involving this car
+        pairs_to_remove = [
+            key for key in self.relative_positions.keys()
+            if car_id in key
+        ]
+        for key in pairs_to_remove:
+            del self.relative_positions[key]
+        if pairs_to_remove:
+            logger.info(f"[CLEANUP] Removed {len(pairs_to_remove)} position pairs for {car_id}")
 
     def run(self):
         logger.info("Starting Overtaking Detector...")

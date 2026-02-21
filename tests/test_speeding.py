@@ -63,13 +63,9 @@ def test_speeding(get_car_id):
         )
         time.sleep(0.01)
 
-    time.sleep(1)
+    time.sleep(2)
     client.loop_stop()
 
-    # Remove car device file to avoid interference with next test
-    car_file = SIM_DIR / "devices" / f"{car}.json"
-    if car_file.exists():
-        car_file.unlink()
 
     assert len(ALERTS) > 0, "Expected at least one speed alert, got none"
 

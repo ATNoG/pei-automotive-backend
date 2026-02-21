@@ -72,10 +72,6 @@ def test_curved_route(get_car_id):
     time.sleep(0.2)
     client.loop_stop()
 
-    # Remove car device file to avoid interference with next test
-    car_file = SIM_DIR / "devices" / f"{car}.json"
-    if car_file.exists():
-        car_file.unlink()
 
     # verify that position updates were received
     assert len(POSITION_UPDATES) > 0, "Expected position updates, got none"

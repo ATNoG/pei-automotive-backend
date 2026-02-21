@@ -79,6 +79,15 @@ class PositionProcessor:
 
 
     def _handle_raw_gps(self, car_id: str, lat: float, lon: float, emergency: bool = False):
+        # Handle test cleanup marker (coordinates at origin with tiny tolerance)
+        if abs(lat) < 0.0001 and abs(lon) < 0.0001:
+            # This is a cleanup signal, remove the car state
+            with self.states_lock:
+                if car_id in self.states:
+                    del self.states[car_id]
+                    logger.info(f"[CLEANUP] Removed car state: {car_id}")
+            return
+        
         now = time.time()
         
         # Thread-safe state access

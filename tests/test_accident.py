@@ -71,6 +71,7 @@ def mqtt_alert_collector(topics: list[str]):
         for topic in topics:
             client.subscribe(topic, qos=1)
         client.loop_start()
+        time.sleep(0.2)
         yield client, alert_queue
     finally:
         client.loop_stop()
@@ -181,19 +182,9 @@ def test_accident_directional_notification(get_car_id):
             raise TimeoutError("Simulation threads did not complete in time")
 
         # Wait for pipeline processing and collect alerts
-        time.sleep(2)
+        time.sleep(3)
         alerts = collect_alerts(alert_queue, [car_behind, car_ahead], timeout=ALERT_TIMEOUT)
 
-    # Remove car device files to avoid interference with next test
-    accident_car_file = SIM_DIR / "devices" / f"{accident_car}.json"
-    car_behind_file = SIM_DIR / "devices" / f"{car_behind}.json"
-    car_ahead_file = SIM_DIR / "devices" / f"{car_ahead}.json"
-    if accident_car_file.exists():
-        accident_car_file.unlink()
-    if car_behind_file.exists():
-        car_behind_file.unlink()
-    if car_ahead_file.exists():
-        car_ahead_file.unlink()
 
     # Assertions
     assert len(alerts[car_behind]) > 0, (
