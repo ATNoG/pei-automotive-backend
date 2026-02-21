@@ -327,6 +327,9 @@ class HighwayEntryDetector:
             if dist_to_merge < self.MERGE_POINT_DETECTION_M:
                 logger.info(f"[ENTRY DETECTION] Car {update.car_id} is approaching merge point (distance: {dist_to_merge:.1f}m)")
                 
+                # Track if we found any highway cars in detection zone
+                found_highway_car_in_zone = False
+                
                 # Check for potential collisions with highway cars
                 for highway_car_id in self.highway_cars:
                     if highway_car_id not in self.cars:
@@ -348,6 +351,7 @@ class HighwayEntryDetector:
                     )
                     
                     if dist_highway_to_merge < self.ENTRY_ZONE_M:
+                        found_highway_car_in_zone = True
                         logger.info(f"[ENTRY DETECTION] Analyzing collision: entering {update.car_id} vs highway {highway_car_id}, dist={dist_highway_to_merge:.1f}m")
                         # Predict collision
                         collision, ttc, min_dist = self._predict_collision(update, highway_car)
@@ -400,6 +404,31 @@ class HighwayEntryDetector:
                                     f"can safely merge. Min distance to {highway_car_id}: {min_dist:.1f}m"
                                 )
                                 self.alerted_pairs.add(pair_key)
+                
+                # If no highway cars found in detection zone, it's safe to enter
+                if not found_highway_car_in_zone:
+                    # Only alert once per entering car
+                    if update.car_id not in [pair[0] for pair in self.alerted_pairs]:
+                        alert = {
+                            "alert_type": "highway_entry_safe",
+                            "entering_car_id": update.car_id,
+                            "highway_car_id": None,
+                            "entering_speed_kmh": update.speed_kmh,
+                            "highway_speed_kmh": None,
+                            "predicted_min_distance_m": None,
+                            "status": "safe",
+                            "timestamp": time.time(),
+                            "latitude": update.latitude,
+                            "longitude": update.longitude,
+                        }
+                        
+                        self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                        logger.info(
+                            f"[HIGHWAY ENTRY - SAFE] Car {update.car_id} "
+                            f"can safely merge - no highway traffic detected in entry zone"
+                        )
+                        # Mark this entering car as alerted
+                        self.alerted_pairs.add((update.car_id, "no-traffic"))
 
     def _cleanup_car(self, car_id: str):
         """Remove all state for a specific car (used for test cleanup)."""

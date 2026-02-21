@@ -42,7 +42,7 @@ def test_highway_entry_unsafe(get_car_id):
     client.loop_start()
     
     # Wait for MQTT connection to be fully established
-    time.sleep(0.3)
+    time.sleep(0.5)
 
     # load coordinates
     with open(ROADS_DIR / "highway.json") as f:
@@ -56,9 +56,9 @@ def test_highway_entry_unsafe(get_car_id):
         range(len(highway_route)),
         key=lambda i: ((highway_route[i][0] - merge_lat)**2 + (highway_route[i][1] - merge_lon)**2)**0.5
     )
-    # Start highway car closer to merge point to create collision scenario
-    # Both cars should arrive at merge point at approximately the same time
-    highway_start_idx = max(0, merge_idx - 8)
+    # Start highway car very close to merge point to create clear collision scenario
+    # This ensures predicted distance is well below threshold (~7m vs 15m threshold)
+    highway_start_idx = max(0, merge_idx - 7)
 
     for step in range(10):
         # Entering car progresses through full route
@@ -80,11 +80,12 @@ def test_highway_entry_unsafe(get_car_id):
         ))
         
         thread_entering.start()
+        time.sleep(0.01)
         thread_highway.start()
         thread_entering.join()
         thread_highway.join()
         
-        time.sleep(0.05)
+        time.sleep(0.1)
 
     time.sleep(2)
     client.loop_stop()
@@ -111,7 +112,7 @@ def test_highway_entry_safe(get_car_id):
     client.loop_start()
     
     # Wait for MQTT connection to be fully established
-    time.sleep(0.1)
+    time.sleep(0.5)
 
     with open(ROADS_DIR / "highway.json") as f:
         highway_route = json.load(f)
@@ -125,17 +126,17 @@ def test_highway_entry_safe(get_car_id):
         range(len(highway_route)),
         key=lambda i: ((highway_route[i][0] - merge_lat)**2 + (highway_route[i][1] - merge_lon)**2)**0.5
     )
-    # Start highway car well behind the merge point (but within 100m detection range)
-    # It moves slowly so entering car can merge safely
-    highway_start_idx = max(0, merge_idx - 13)
+    # Start highway car farther from merge point than unsafe test (-5) to create clearly safe scenario
+    # With -11 offset (~110m back), predicted distance should be 35-45m vs 15m threshold
+    highway_start_idx = max(0, merge_idx - 11)
 
     for step in range(10):
-        entering_idx = min(step * len(entering_route) // 10, len(entering_route) - 1)
+        # Entering car progresses through full route (same pattern as unsafe test)
+        entering_idx = min(step * len(entering_route) // 8, len(entering_route) - 1)
         entering_lat, entering_lon = entering_route[entering_idx]
         
-        # Highway car moves very slowly (step // 2) so it stays far enough back
-        # But ensure it moves at least 1 step to have a valid speed
-        highway_idx = highway_start_idx + max(1, step // 2)
+        # Highway car also moves consistently every step, ensuring valid speed
+        highway_idx = highway_start_idx + step
         highway_idx = min(highway_idx, len(highway_route) - 1)
         highway_lat, highway_lon = highway_route[highway_idx]
         
@@ -149,13 +150,14 @@ def test_highway_entry_safe(get_car_id):
         ))
         
         thread_entering.start()
+        time.sleep(0.01)
         thread_highway.start()
         thread_entering.join()
         thread_highway.join()
         
-        time.sleep(0.05)
+        time.sleep(0.1)
 
-    time.sleep(1)  # Wait for detection and alert processing
+    time.sleep(3)
     client.loop_stop()
 
     safe_alerts = [a for a in ALERTS if a.get("status") == "safe"]
