@@ -2,6 +2,7 @@ import json
 import time
 import subprocess
 import sys
+import uuid
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
@@ -29,8 +30,8 @@ def on_speed_alert(client, userdata, msg):
         CAR_UPDATES.append(payload)
 
 
-def test_speeding():
-    car = "speed-car"
+def test_speeding(get_car_id):
+    car = get_car_id("speed-car")
     ensure_car_exists(car)
 
     ALERTS.clear()
@@ -62,8 +63,9 @@ def test_speeding():
         )
         time.sleep(0.01)
 
-    time.sleep(1)
+    time.sleep(2)
     client.loop_stop()
+
 
     assert len(ALERTS) > 0, "Expected at least one speed alert, got none"
 
@@ -93,3 +95,8 @@ def test_speeding():
         assert "speed_limit_kmh" in alert, (
             f"Speed alert missing speed_limit_kmh field: {alert}"
         )
+        
+if __name__ == "__main__":
+    def get_car_id(base_name: str) -> str:
+        return f"{base_name}-{str(uuid.uuid4())[:8]}"
+    test_speeding(get_car_id)

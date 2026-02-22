@@ -5,6 +5,7 @@ import subprocess
 import sys
 import queue
 import threading
+import uuid
 from pathlib import Path
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -70,15 +71,16 @@ def mqtt_alert_collector(topics: list[str]):
         for topic in topics:
             client.subscribe(topic, qos=1)
         client.loop_start()
+        time.sleep(0.2)
         yield client, alert_queue
     finally:
         client.loop_stop()
         client.disconnect()
 
 
-def collect_alerts(alert_queue: queue.Queue, timeout: float = ALERT_TIMEOUT) -> dict:
+def collect_alerts(alert_queue: queue.Queue, car_ids: list[str], timeout: float = ALERT_TIMEOUT) -> dict:
     """Collect accident alerts from queue with timeout."""
-    alerts = {"car-behind": [], "car-ahead": []}
+    alerts = {car_id: [] for car_id in car_ids}
     deadline = time.time() + timeout
     while time.time() < deadline:
         try:
@@ -90,10 +92,10 @@ def collect_alerts(alert_queue: queue.Queue, timeout: float = ALERT_TIMEOUT) -> 
     return alerts
 
 
-def test_accident_directional_notification():
-    accident_car = "accident-car"
-    car_behind = "car-behind"
-    car_ahead = "car-ahead"
+def test_accident_directional_notification(get_car_id):
+    accident_car = get_car_id("accident-car")
+    car_behind = get_car_id("car-behind")
+    car_ahead = get_car_id("car-ahead")
 
     ensure_car_exists(accident_car)
     ensure_car_exists(car_behind)
@@ -180,22 +182,25 @@ def test_accident_directional_notification():
             raise TimeoutError("Simulation threads did not complete in time")
 
         # Wait for pipeline processing and collect alerts
-        time.sleep(2)
-        alerts = collect_alerts(alert_queue, timeout=ALERT_TIMEOUT)
+        time.sleep(3)
+        alerts = collect_alerts(alert_queue, [car_behind, car_ahead], timeout=ALERT_TIMEOUT)
+
 
     # Assertions
-    assert len(alerts["car-behind"]) > 0, (
+    assert len(alerts[car_behind]) > 0, (
         f"Car BEHIND should receive accident alerts. "
-        f"Got {len(alerts['car-behind'])} alerts. "
+        f"Got {len(alerts[car_behind])} alerts. "
         f"Check that accident-car speed reached >30 km/h before stopping."
     )
 
-    assert len(alerts["car-ahead"]) == 0, (
+    assert len(alerts[car_ahead]) == 0, (
         f"Car AHEAD should NOT receive alerts (accident is behind it). "
-        f"Got {len(alerts['car-ahead'])} alerts."
+        f"Got {len(alerts[car_ahead])} alerts."
     )
 
 
 if __name__ == "__main__":
-    test_accident_directional_notification()
+    def get_car_id(base_name: str) -> str:
+        return f"{base_name}-{str(uuid.uuid4())[:8]}"
+    test_accident_directional_notification(get_car_id)
     print("\nTest passed: Only car-behind (approaching accident) was notified")

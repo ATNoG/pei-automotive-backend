@@ -227,6 +227,14 @@ class AccidentDetector:
     def _on_car_update(self, payload: str):
         try:
             data = json.loads(payload)
+            
+            # Handle test cleanup
+            if data.get("_test_cleanup"):
+                car_id = data.get("car_id")
+                if car_id:
+                    self._cleanup_car(car_id)
+                return
+            
             update = CarUpdate.from_dict(data)
         except Exception as e:
             logger.error(f"Error processing car update: {e}")
@@ -302,6 +310,22 @@ class AccidentDetector:
                 self.mqtt.publish(f"alerts/accident/{update.car_id}", json.dumps(notification))
 
         self._cleanup_expired_accidents()
+
+    def _cleanup_car(self, car_id: str):
+        """Remove all state for a specific car (used for test cleanup)."""
+        # Remove car state
+        if car_id in self.cars:
+            del self.cars[car_id]
+            logger.info(f"[CLEANUP] Removed car state: {car_id}")
+        
+        # Remove any accidents caused by this car
+        accidents_to_remove = [
+            event_id for event_id, accident in self.active_accidents.items()
+            if accident.source_vehicle_id == car_id
+        ]
+        for event_id in accidents_to_remove:
+            del self.active_accidents[event_id]
+            logger.info(f"[CLEANUP] Removed accident {event_id} caused by {car_id}")
 
     def run(self):
         logger.info("Starting Accident Detector...")

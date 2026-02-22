@@ -1,6 +1,7 @@
 import json
 import time
 import subprocess
+import uuid
 from pathlib import Path
 from threading import Thread
 import paho.mqtt.client as mqtt
@@ -24,9 +25,9 @@ def send_position(car_name: str, lat: float, lon: float) -> None:
         car_name, str(lat), str(lon)
     ], check=True)
 
-def test_overtaking():
-    car_slow = "overtaking-car-front" # victim
-    car_fast = "overtaking-car-behind" # overtaker
+def test_overtaking(get_car_id):
+    car_slow = get_car_id("overtaking-car-front") # victim
+    car_fast = get_car_id("overtaking-car-behind") # overtaker
 
     ensure_car_exists(car_slow)
     ensure_car_exists(car_fast)
@@ -77,12 +78,15 @@ def test_overtaking():
         thread_slow.join()
         thread_fast.join()
         
-        time.sleep(0.01)
+        time.sleep(0.02)
 
-    time.sleep(1)
+    time.sleep(2)
     client.loop_stop()
+
 
     assert len(ALERTS) > 0, "Expected at least one overtaking alert, got none"
 
 if __name__ == "__main__":
-    test_overtaking()
+    def get_car_id(base_name: str) -> str:
+        return f"{base_name}-{str(uuid.uuid4())[:8]}"
+    test_overtaking(get_car_id)
