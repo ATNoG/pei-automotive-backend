@@ -77,3 +77,14 @@ services:
     depends_on:
       - mosquitto_broker
       - position_processor
+
+  meteo_consumer:
+    build:
+      context: .
+      dockerfile: src/services/meteo_consumer/Dockerfile
+    container_name: meteo_consumer
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - mosquitto_broker
