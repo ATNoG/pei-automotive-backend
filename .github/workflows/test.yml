@@ -35,17 +35,7 @@ jobs:
       - name: Start services
         run: |
           docker compose up --build -d
-          echo "Waiting for all services to connect to MQTT broker..."
-          EXPECTED_SERVICES=8
-          for i in $(seq 1 40); do
-            CONNECTED=$(docker logs mosquitto_broker 2>&1 | grep -c "New client connected" || true)
-            echo "Attempt $i: $CONNECTED/$EXPECTED_SERVICES services connected"
-            if [ "$CONNECTED" -ge "$EXPECTED_SERVICES" ]; then
-              echo "All services ready!"
-              break
-            fi
-            sleep 3
-          done
+          sleep 10
 
       - name: Run tests
         run: |
