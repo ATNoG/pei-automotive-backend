@@ -88,3 +88,16 @@ services:
       - .env
     depends_on:
       - mosquitto_broker
+
+  station_assigner:
+    build:
+      context: .
+      dockerfile: src/services/station_assigner/Dockerfile
+    container_name: station_assigner
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - mosquitto_broker
+      - position_processor
+      - meteo_consumer

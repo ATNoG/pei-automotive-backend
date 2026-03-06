@@ -1,6 +1,42 @@
 from geopy.distance import geodesic
 from geopy.point import Point
 import json
+from typing import Dict, Optional, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from common.models import Station
+
+
+def find_nearest_station(car_lat: float, car_lon: float, stations: Dict[int, 'Station']) -> Optional['Station']:
+    """
+    Find the nearest weather station to a car's position.
+    
+    Args:
+        car_lat: Car's latitude
+        car_lon: Car's longitude
+        stations: Dictionary of station_id -> Station objects
+    
+    Returns:
+        The nearest Station object, or None if no stations available
+    """
+    if not stations:
+        return None
+    
+    car_point = (car_lat, car_lon)
+    nearest_station = None
+    min_distance = float('inf')
+    
+    for station in stations.values():
+        if station.location:
+            station_point = (station.location.latitude, station.location.longitude)
+            distance = geodesic(car_point, station_point).meters
+            
+            if distance < min_distance:
+                min_distance = distance
+                nearest_station = station
+    
+    return nearest_station
+
 
 def generate_steps(start_lat, start_lon, end_lat, end_lon, step_m=5):
     start = Point(start_lat, start_lon)

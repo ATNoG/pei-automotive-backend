@@ -4,3 +4,4 @@ python-dotenv
 pytest
 requests
 certifi
+geopy

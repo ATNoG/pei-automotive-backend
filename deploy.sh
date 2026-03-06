@@ -273,6 +273,8 @@ MQTT_BROKER_PASSWORD=
 
 # MQTT Topics
 MQTT_CAR_UPDATES_TOPIC=cars/updates
+MQTT_METEO_UPDATES_TOPIC=meteo/updates
+MQTT_STATION_ASSIGNMENT_TOPIC=cars/station
 
 # Hono MQTT Adapter (External access from host or containers)
 MQTT_ADAPTER_IP=${HOST_IP}

@@ -31,6 +31,7 @@ class AppConfig:
     # Topics
     car_updates_topic: str
     meteo_updates_topic: str
+    station_assignment_topic_base: str
 
 
 def _derive_ws_url_from_http(http_url: str) -> str:
@@ -81,6 +82,7 @@ def load_config() -> AppConfig:
     # Core topic: normalized car updates
     car_updates_topic = _get_env("MQTT_CAR_UPDATES_TOPIC", default="cars/updates")
     meteo_updates_topic = _get_env("MQTT_METEO_UPDATES_TOPIC", default="meteo/updates")
+    station_assignment_topic_base = _get_env("MQTT_STATION_ASSIGNMENT_TOPIC", default="cars/station")
 
     return AppConfig(
         # Ditto
@@ -102,4 +104,5 @@ def load_config() -> AppConfig:
         # Topics
         car_updates_topic=car_updates_topic,
         meteo_updates_topic=meteo_updates_topic,
+        station_assignment_topic_base=station_assignment_topic_base,
     )

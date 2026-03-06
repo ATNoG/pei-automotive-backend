@@ -95,6 +95,27 @@ class Station:
         return json.dumps(self.to_dict())
 
     @classmethod
+    def from_dict(cls, data: Dict) -> "Station":
+        """Parse a dictionary into a Station object"""
+        location_data = data.get("location", {})
+        location = Point(
+            longitude=location_data.get("longitude"),
+            latitude=location_data.get("latitude"),
+        )
+        
+        measurement = None
+        measurement_data = data.get("measurement")
+        if measurement_data:
+            measurement = Measurement.from_dict(measurement_data)
+        
+        return cls(
+            station_id=data.get("station_id"),
+            location=location,
+            location_name=data.get("location_name", ""),
+            measurement=measurement,
+        )
+
+    @classmethod
     def from_ditto_thing(cls, thing_data: Dict) -> "Station":
         """Parse a Ditto thing JSON into a Station object"""
         attributes = thing_data.get("attributes", {})
