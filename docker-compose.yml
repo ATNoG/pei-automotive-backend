@@ -88,6 +88,8 @@ services:
       - .env
     depends_on:
       - mosquitto_broker
+    extra_hosts:
+      - "tomastest.com:10.255.38.67"
 
   station_assigner:
     build:
