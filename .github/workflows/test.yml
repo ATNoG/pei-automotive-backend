@@ -27,6 +27,10 @@ jobs:
           sleep 2
 
       - name: Generate .env file
+        env:
+          WEATHER_API_URL: ${{ secrets.WEATHER_API_URL }}
+          WEATHER_USER: ${{ secrets.WEATHER_USER }}
+          WEATHER_PASS: ${{ secrets.WEATHER_PASS }}
         run: |
           chmod +x make_env.sh
           ./make_env.sh
