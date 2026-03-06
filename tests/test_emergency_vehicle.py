@@ -101,6 +101,9 @@ def test_emergency_vehicle(get_car_id):
     assert alert["emergency_vehicle_id"] is not None
     assert alert["regular_car_id"] is not None
     assert alert["distance_m"] <= 500
+    assert alert["direction"] in ("ahead", "behind", "nearby"), (
+        f"Expected direction to be ahead, behind, or nearby, got {alert['direction']}"
+    )
 
 
 if __name__ == "__main__":
