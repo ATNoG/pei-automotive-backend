@@ -17,6 +17,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Add production Ditto to /etc/hosts
+        run: |
+          echo "10.255.38.67 tomastest.com" | sudo tee -a /etc/hosts
+          echo "[INFO] Added tomastest.com to /etc/hosts"
+          cat /etc/hosts | grep tomastest.com
+
       - name: Check if all C2E pods are up
         run: |
           NOT_READY=$(kubectl get pods -n cloud2edge --no-headers 2>/dev/null | grep -vE 'Running|Completed' | wc -l)
