@@ -18,7 +18,7 @@ from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
 from common.models import CarUpdate
-from common.utils import haversine_distance_m
+from common.utils import haversine_distance_m, bearing_deg
 
 logger = logging.getLogger(__name__)
 
@@ -78,13 +78,18 @@ class EVDetector:
             )
 
             if dist <= self.PROXIMITY_M:
+                # Determine if the EV is ahead or behind the regular car
+                direction = self._compute_direction(other, update)
+
                 alert = {
                     "alert_type": "emergency_vehicle_nearby",
                     "emergency_vehicle_id": update.car_id,
                     "regular_car_id": other_id,
                     "distance_m": round(dist, 2),
+                    "direction": direction,
                     "ev_latitude": update.latitude,
                     "ev_longitude": update.longitude,
+                    "ev_heading_deg": update.heading_deg,
                     "car_latitude": other.latitude,
                     "car_longitude": other.longitude,
                     "timestamp": time.time(),
@@ -92,7 +97,7 @@ class EVDetector:
                 self.mqtt.publish(self.alert_topic, json.dumps(alert))
                 logger.warning(
                     f"[EV] Emergency vehicle {update.car_id} is {dist:.1f}m "
-                    f"from {other_id}"
+                    f"{direction} {other_id}"
                 )
 
     def _cleanup_car(self, car_id: str):
@@ -100,6 +105,26 @@ class EVDetector:
         if car_id in self.cars:
             del self.cars[car_id]
             logger.info(f"[CLEANUP] Removed car state: {car_id}")
+
+    def _compute_direction(self, regular_car: CarUpdate, ev: CarUpdate) -> str:
+        """Determine if the emergency vehicle is ahead of or behind the regular car.
+
+        Uses the regular car's heading and the bearing from the regular car
+        to the EV.  If the angular difference is within ±90° of the car's
+        heading the EV is ahead; otherwise it is behind.
+        """
+        if regular_car.heading_deg is None:
+            return "nearby"
+
+        brng = bearing_deg(
+            regular_car.latitude, regular_car.longitude,
+            ev.latitude, ev.longitude,
+        )
+        diff = (brng - regular_car.heading_deg + 360) % 360
+        # diff in (0, 360): 0-90 or 270-360 means the EV is in front
+        if diff <= 90 or diff >= 270:
+            return "ahead"
+        return "behind"
 
     def run(self):
         logger.info("Starting Emergency Vehicle Detector...")
