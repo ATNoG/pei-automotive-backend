@@ -58,7 +58,7 @@ def test_station_assignment_basic(get_car_id):
     client.on_message = on_station_assignment
     client.on_subscribe = on_subscribe
     client.connect("localhost", 1884)
-    client.subscribe(f"cars/station/{car_id}")
+    client.subscribe(f"cars/station/{car_id}", qos=1)
     client.loop_start()
 
     # Wait for subscription to be confirmed
@@ -122,7 +122,7 @@ def test_station_assignment_changes(get_car_id):
     client.on_message = on_station_assignment
     client.on_subscribe = on_subscribe
     client.connect("localhost", 1884)
-    client.subscribe(f"cars/station/{car_id}")
+    client.subscribe(f"cars/station/{car_id}", qos=1)
     client.loop_start()
 
     # Wait for subscription to be confirmed
@@ -186,7 +186,7 @@ def test_station_assignment_no_duplicate_on_same_station(get_car_id):
     client.on_message = on_station_assignment
     client.on_subscribe = on_subscribe
     client.connect("localhost", 1884)
-    client.subscribe(f"cars/station/{car_id}")
+    client.subscribe(f"cars/station/{car_id}", qos=1)
     client.loop_start()
 
     # Wait for subscription to be confirmed
