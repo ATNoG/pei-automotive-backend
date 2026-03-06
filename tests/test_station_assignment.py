@@ -48,10 +48,6 @@ def send_position(car_name: str, lat: float, lon: float) -> None:
     )
 
 
-@pytest.mark.skipif(
-    os.getenv("CI") == "true", 
-    reason="Station tests require external Weather API which is unreliable in CI"
-)
 def test_station_assignment_basic(get_car_id):
     """Test that a car receives a station assignment when it moves."""
     car_id = get_car_id("station-test-car")
@@ -114,10 +110,6 @@ def test_station_assignment_basic(get_car_id):
         client.disconnect()
 
 
-@pytest.mark.skipif(
-    os.getenv("CI") == "true",
-    reason="Station tests require external Weather API which is unreliable in CI"
-)
 def test_station_assignment_changes(get_car_id):
     """Test that station assignment updates when car moves to a different nearest station."""
     car_id = get_car_id("station-test-moving-car")
@@ -181,10 +173,6 @@ def test_station_assignment_changes(get_car_id):
         client.loop_stop()
         client.disconnect()
 
-@pytest.mark.skipif(
-    os.getenv("CI") == "true",
-    reason="Station tests require external Weather API which is unreliable in CI"
-)
 def test_station_assignment_no_duplicate_on_same_station(get_car_id):
     """Test that station assignment doesn't publish duplicate messages when car stays in same station's range."""
     car_id = get_car_id("station-test-stationary-car")
