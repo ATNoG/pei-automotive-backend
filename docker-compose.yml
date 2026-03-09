@@ -77,3 +77,29 @@ services:
     depends_on:
       - mosquitto_broker
       - position_processor
+
+  meteo_consumer:
+    build:
+      context: .
+      dockerfile: src/services/meteo_consumer/Dockerfile
+    container_name: meteo_consumer
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - mosquitto_broker
+    extra_hosts:
+      - "tomastest.com:10.255.38.67"
+
+  station_assigner:
+    build:
+      context: .
+      dockerfile: src/services/station_assigner/Dockerfile
+    container_name: station_assigner
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - mosquitto_broker
+      - position_processor
+      - meteo_consumer

@@ -17,6 +17,11 @@ class AppConfig:
     ditto_username: str
     ditto_password: str
 
+    # Weather API (for meteo data)
+    weather_api_url: str
+    weather_username: str
+    weather_password: str
+
     # MQTT Broker
     broker_host: str
     broker_port: int
@@ -25,6 +30,8 @@ class AppConfig:
 
     # Topics
     car_updates_topic: str
+    meteo_updates_topic: str
+    station_assignment_topic_base: str
 
 
 def _derive_ws_url_from_http(http_url: str) -> str:
@@ -56,6 +63,11 @@ def load_config() -> AppConfig:
     ditto_user = _get_env("DITTO_USER", required=True)
     ditto_pass = _get_env("DITTO_PASS", required=True)
 
+    # Weather API credentials (required)
+    weather_api_url = _get_env("WEATHER_API_URL", required=True)
+    weather_user = _get_env("WEATHER_USER", required=True)
+    weather_pass = _get_env("WEATHER_PASS", required=True)
+
     # MQTT basic config
     broker_host = _get_env("MQTT_BROKER_HOST", required=True)
     broker_port_str = _get_env("MQTT_BROKER_PORT", default="1883")
@@ -69,12 +81,19 @@ def load_config() -> AppConfig:
 
     # Core topic: normalized car updates
     car_updates_topic = _get_env("MQTT_CAR_UPDATES_TOPIC", default="cars/updates")
+    meteo_updates_topic = _get_env("MQTT_METEO_UPDATES_TOPIC", default="meteo/updates")
+    station_assignment_topic_base = _get_env("MQTT_STATION_ASSIGNMENT_TOPIC", default="cars/station")
 
     return AppConfig(
         # Ditto
         ditto_ws_url=ditto_ws,
         ditto_username=ditto_user,
         ditto_password=ditto_pass,
+
+        # Weather API (for meteo)
+        weather_api_url=weather_api_url,
+        weather_username=weather_user,
+        weather_password=weather_pass,
 
         # MQTT
         broker_host=broker_host,
@@ -84,4 +103,6 @@ def load_config() -> AppConfig:
 
         # Topics
         car_updates_topic=car_updates_topic,
+        meteo_updates_topic=meteo_updates_topic,
+        station_assignment_topic_base=station_assignment_topic_base,
     )

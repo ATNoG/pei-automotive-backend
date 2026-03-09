@@ -60,6 +60,8 @@ class MQTTClient:
     def connect(self):
         try:
             self.client.connect(self.host, self.port, keepalive=60)
+        except KeyboardInterrupt:
+            raise
         except Exception as e:
             logger.error(f"Error connecting to MQTT broker: {e}")
             raise

@@ -11,9 +11,17 @@ jobs:
     permissions:
       contents: read
     timeout-minutes: 15
+    env:
+      CI: "true"
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Add production Ditto to /etc/hosts
+        run: |
+          echo "10.255.38.67 tomastest.com" | sudo tee -a /etc/hosts
+          echo "[INFO] Added tomastest.com to /etc/hosts"
+          cat /etc/hosts | grep tomastest.com
 
       - name: Check if all C2E pods are up
         run: |
@@ -27,6 +35,10 @@ jobs:
           sleep 2
 
       - name: Generate .env file
+        env:
+          WEATHER_API_URL: ${{ secrets.WEATHER_API_URL }}
+          WEATHER_USER: ${{ secrets.WEATHER_USER }}
+          WEATHER_PASS: ${{ secrets.WEATHER_PASS }}
         run: |
           chmod +x make_env.sh
           ./make_env.sh
