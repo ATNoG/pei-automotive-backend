@@ -75,6 +75,10 @@ class TrafficJamDetector:
     PROXIMITY_RADIUS_M = 500  # cars must be within 500m to be in same jam
     HEADING_TOLERANCE_DEG = 30  # cars must be traveling within ±30° to be in same jam
     
+    # Notification parameters
+    NOTIFICATION_RADIUS_M = 2000  # notify cars within 2km of jam
+    MIN_SPEED_FOR_NOTIFICATION = 10  # km/h - car must be moving to receive notification
+    
     # State management
     JAM_EXPIRY_S = 300  # 5 minutes - expire jams without updates
     ALERT_COOLDOWN_S = 120  # 2 minutes - prevent duplicate alerts for same jam
@@ -198,6 +202,89 @@ class TrafficJamDetector:
         time_since_last_alert = now - jam.last_alert_time
         return time_since_last_alert >= self.ALERT_COOLDOWN_S
 
+    def _is_jam_ahead(self, car: CarState, jam: TrafficJam) -> bool:
+        """
+        Determine if the traffic jam is AHEAD of the car.
+        
+        Uses the car's heading to check if the jam location
+        is in front of it. Works for any road geometry.
+        
+        Returns True if jam is ahead, False if car already passed.
+        """
+        if car.heading_deg is None:
+            return False
+
+        # Bearing from car to jam center
+        bearing_to_jam = bearing_deg(
+            car.latitude, car.longitude,
+            jam.center_latitude, jam.center_longitude
+        )
+
+        # Angular difference
+        heading_diff = abs(car.heading_deg - bearing_to_jam)
+        heading_diff = min(heading_diff, 360 - heading_diff)
+
+        # <= 90° means jam is in front of or perpendicular to the car
+        # > 90° means car has already passed the jam
+        return heading_diff <= 90
+
+    def _should_notify_car(self, car: CarState, jam: TrafficJam) -> bool:
+        """
+        Check if a car should receive a traffic jam notification.
+        
+        Conditions:
+        1. Not already in the jam
+        2. Within notification radius (2km)
+        3. Moving (not stopped)
+        4. Jam is AHEAD (not already passed)
+        """
+        # Skip cars already in the jam
+        if car.car_id in jam.car_ids:
+            return False
+
+        # Car must be moving to receive notification
+        if car.speed_kmh is None or car.speed_kmh < self.MIN_SPEED_FOR_NOTIFICATION:
+            return False
+
+        # Check distance
+        dist = haversine_distance_m(
+            car.latitude, car.longitude,
+            jam.center_latitude, jam.center_longitude
+        )
+        if dist > self.NOTIFICATION_RADIUS_M:
+            return False
+
+        # Check if jam is ahead
+        return self._is_jam_ahead(car, jam)
+
+    def _notify_nearby_vehicles(self, jam: TrafficJam) -> int:
+        """Notify vehicles approaching the jam. Returns count."""
+        notified = 0
+
+        for car_id, car_state in self.cars.items():
+            if self._should_notify_car(car_state, jam):
+                dist = haversine_distance_m(
+                    car_state.latitude, car_state.longitude,
+                    jam.center_latitude, jam.center_longitude
+                )
+
+                notification = {
+                    "notification_type": "traffic_jam_alert",
+                    "target_car_id": car_id,
+                    "jam_id": jam.jam_id,
+                    "jam": jam.to_dict(),
+                    "distance_m": dist,
+                    "timestamp": time.time(),
+                }
+
+                # Send to individual car and broadcast
+                self.mqtt.publish(f"alerts/traffic_jam/{car_id}", json.dumps(notification))
+                
+                logger.info(f"[JAM NOTIFY] {car_id} - jam ahead at {dist:.0f}m")
+                notified += 1
+
+        return notified
+
     def _detect_traffic_jams(self):
         """
         Detect traffic jams by analyzing clusters of slow-moving cars.
@@ -268,6 +355,9 @@ class TrafficJamDetector:
                 # Send alert for new jam
                 if self._should_alert_for_jam(new_jam):
                     self._publish_jam_alert(new_jam)
+                    # Notify nearby vehicles approaching the jam
+                    notified = self._notify_nearby_vehicles(new_jam)
+                    logger.info(f"[JAM NOTIFY] Notified {notified} vehicles approaching jam")
                     new_jam.last_alert_time = now
 
     def _publish_jam_alert(self, jam: TrafficJam):
@@ -367,6 +457,27 @@ class TrafficJamDetector:
 
         # Detect traffic jams
         self._detect_traffic_jams()
+        
+        # Check if this car should be notified about existing jams
+        if update.car_id in self.cars:
+            car_state = self.cars[update.car_id]
+            for jam in self.active_jams.values():
+                if jam.active and self._should_notify_car(car_state, jam):
+                    dist = haversine_distance_m(
+                        car_state.latitude, car_state.longitude,
+                        jam.center_latitude, jam.center_longitude
+                    )
+                    
+                    notification = {
+                        "notification_type": "traffic_jam_alert",
+                        "target_car_id": update.car_id,
+                        "jam_id": jam.jam_id,
+                        "jam": jam.to_dict(),
+                        "distance_m": dist,
+                        "timestamp": now,
+                    }
+                    
+                    self.mqtt.publish(f"alerts/traffic_jam/{update.car_id}", json.dumps(notification))
         
         # Cleanup old data
         self._cleanup_old_jams()
