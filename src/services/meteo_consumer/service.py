@@ -75,7 +75,8 @@ class MeteoConsumer:
                 
                 self.mqtt.publish(
                     self.config.meteo_updates_topic,
-                    json.dumps(payload)
+                    json.dumps(payload),
+                    retain=True
                 )
                 
                 logger.info(
@@ -89,11 +90,12 @@ class MeteoConsumer:
         """Main loop: fetch and publish meteo data periodically"""
         logger.info("Meteo Consumer started")
         self.mqtt.connect()
+        self.mqtt.start_loop()
         logger.info(f"Connected to MQTT broker at {self.config.broker_host}:{self.config.broker_port}")
-        
+
         # Initial fetch
         self.fetch_and_publish_meteo_data()
-        
+
         # Poll periodically
         while True:
             try:
@@ -106,7 +108,7 @@ class MeteoConsumer:
                 logger.error(f"Error in main loop: {e}", exc_info=True)
                 # Wait a bit before retrying
                 time.sleep(30)
-        
+
         self.mqtt.disconnect()
 
 

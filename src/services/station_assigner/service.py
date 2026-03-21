@@ -109,7 +109,7 @@ class StationAssigner:
                 "timestamp": time.time(),
             }
             
-            self.mqtt.publish(topic, json.dumps(payload))
+            self.mqtt.publish(topic, json.dumps(payload), retain=True)
             
             logger.info(
                 f"[ASSIGNMENT] Car {update.car_id} -> Station {nearest.station_id} "
