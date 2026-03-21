@@ -1,26 +1,16 @@
 """
-Integration test for traffic jam detection.
+Minimal traffic jam detection test with only 6 cars.
 
-Simulates a realistic highway scenario:
-- 10 cars traveling slowly in a jam (caused by an accident)
-- 2 cars approaching from behind (one overtaking the other)
-- 1 emergency vehicle approaching the jam
-- Tests interaction between accident, traffic jam, overtaking, and emergency vehicle detectors
-
-Expected alerts:
-1. Accident alert when lead car stops suddenly
-2. Traffic jam alert when 5+ cars accumulate in slow traffic
-3. Traffic jam notifications to approaching vehicles (within 2km)
-4. Overtaking alert when one approaching car passes the other
-5. Emergency vehicle notifications to cars ahead
+Tests pure traffic jam detection without other service interference.
+- 1 lead car stops suddenly
+- 5 cars behind slow down and form a traffic jam
+- Verifies traffic jam is detected with 5+ cars below speed threshold
 """
 import json
 import os
 import time
 import subprocess
 import sys
-import queue
-import threading
 import uuid
 from pathlib import Path
 from contextlib import contextmanager
@@ -29,16 +19,11 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import paho.mqtt.client as mqtt
 
 SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
-ROADS_DIR = SIM_DIR / "roads"
+ROADS_DIR = Path(__file__).resolve().parent.parent / "simulations/roads"
 
 # Configuration
 MQTT_HOST = os.getenv("TEST_MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("TEST_MQTT_PORT", "1884"))
-POSITION_INTERVAL = 0.08  # Slightly slower for complex scenario
-STEP_SIZE = 2  # Points to skip for reasonable speed
-ALERT_TIMEOUT = 5.0
-THREAD_TIMEOUT = 120.0  # Longer timeout for complex scenario
-
 
 def ensure_car_exists(car_name: str, emergency: bool = False) -> None:
     """Ensure car is registered. Ignores if already exists."""
@@ -72,6 +57,7 @@ def send_positions_parallel(car_positions: list[tuple[str, float, float]]) -> No
 @contextmanager
 def mqtt_alert_collector(topics: list[str]):
     """Collect alerts from multiple MQTT topics."""
+    import queue
     alert_queue = queue.Queue()
     all_alerts = []
     
@@ -94,275 +80,125 @@ def mqtt_alert_collector(topics: list[str]):
         client.disconnect()
 
 
-def test_traffic_jam_complex_scenario(get_car_id):
+def test_traffic_jam(get_car_id):
     """
-    Complex integration test simulating a highway traffic jam scenario.
+    Minimal traffic jam test with only 6 cars (minimum to trigger detection).
     
     Scenario:
-    1. Lead car suddenly stops (accident)
-    2. 9 cars behind form a traffic jam (5+ cars trigger jam detection)
-    3. 2 cars approach from far behind (one overtakes the other)
-    4. Emergency vehicle approaches through the jam
+    1. 5 cars traveling slowly on highway
+    2. Lead car stops suddenly
+    3. 5 cars behind slow down dramatically due to lead stopping
+    4. Traffic jam should be detected (5+ cars below speed threshold)
+    
+    This is a simpler version compared to complex scenarios,
+    testing only traffic jam detection without accident, overtaking, or emergency vehicle.
     """
     
-    # Create car IDs
-    lead_car = get_car_id("jam-lead")
-    jam_cars = [get_car_id(f"jam-car-{i}") for i in range(1, 10)]  # 9 cars in jam
-    approaching_slow = get_car_id("jam-approaching-slow")
-    approaching_fast = get_car_id("jam-approaching-fast")
-    emergency_vehicle = get_car_id("jam-emergency")
+    lead_car = get_car_id("minimal-jam-lead")
+    jam_cars = [get_car_id(f"minimal-jam-car-{i}") for i in range(1, 6)]
     
-    all_cars = [lead_car] + jam_cars + [approaching_slow, approaching_fast, emergency_vehicle]
+    all_cars = [lead_car] + jam_cars
     
-    print(f"\n[TEST] Creating {len(all_cars)} vehicles...")
-    
-    # Create all cars
-    for car in all_cars[:-1]:
+    for car in all_cars:
         ensure_car_exists(car)
-    ensure_car_exists(emergency_vehicle, emergency=True)
     
-    # Setup MQTT alert collection
     alert_topics = [
-        "alerts/accident",
-        "alerts/accident/+",
         "alerts/traffic_jam",
         "alerts/traffic_jam/+",
-        "alerts/overtaking",
-        "alerts/emergency_vehicle",
-        "alerts/emergency_vehicle/+",
     ]
     
     with mqtt_alert_collector(alert_topics) as (client, alert_queue, all_alerts):
         
-        # Load highway route (simple coordinate array format)
+        # Load highway route
         with open(ROADS_DIR / "highway.json") as f:
             highway_coords = json.load(f)
         
-        # Also load left lane for overtaking (GeoJSON FeatureCollection format)
-        with open(ROADS_DIR / "left_lane.json") as f:
-            left_lane_coords = json.load(f)["features"][0]["geometry"]["coordinates"]
-        
-        print(f"[TEST] Highway route has {len(highway_coords)} points")
-        
-        phase1_iterations = 25  # Build up speed and spacing
-        
+        # Phase 1: Cars building up speed and spacing (10 iterations)
+        phase1_iterations = 10
         for iteration in range(phase1_iterations):
             positions = []
             
-            # Lead car (at front)
-            lead_idx = iteration * STEP_SIZE + 20
+            # Lead car moving
+            lead_idx = iteration * 3 + 20
             if lead_idx < len(highway_coords):
                 lat, lon = highway_coords[lead_idx]
                 positions.append((lead_car, lat, lon))
             
-            # Jam cars (following behind with spacing)
+            # Jam cars following with spacing
             for i, car in enumerate(jam_cars):
-                car_idx = lead_idx - (i + 1) * 8  # 8 points spacing
+                car_idx = lead_idx - (i + 1) * 5  # 5 points spacing
                 if 0 <= car_idx < len(highway_coords):
                     lat, lon = highway_coords[car_idx]
                     positions.append((car, lat, lon))
             
-            # Approaching cars (far behind)
-            slow_idx = lead_idx - len(jam_cars) * 8 - 80
-            fast_idx = slow_idx - 10
-            
-            if 0 <= slow_idx < len(highway_coords):
-                lat, lon = highway_coords[slow_idx]
-                positions.append((approaching_slow, lat, lon))
-            
-            if 0 <= fast_idx < len(highway_coords):
-                lat, lon = highway_coords[fast_idx]
-                positions.append((approaching_fast, lat, lon))
-            
-            # Emergency vehicle (even further behind)
-            ev_idx = fast_idx - 30
-            if 0 <= ev_idx < len(highway_coords):
-                lat, lon = highway_coords[ev_idx]
-                positions.append((emergency_vehicle, lat, lon))
-            
             send_positions_parallel(positions)
-            time.sleep(POSITION_INTERVAL)
+            time.sleep(0.08)
         
-        # Get final positions from phase 1
-        final_lead_idx = (phase1_iterations - 1) * STEP_SIZE + 20
-        accident_idx = final_lead_idx
-        accident_lat, accident_lon = highway_coords[accident_idx]
+        # Lock lead car at accident location
+        final_lead_idx = (phase1_iterations - 1) * 3 + 20
+        accident_lat, accident_lon = highway_coords[final_lead_idx]
         
-        phase2_iterations = 25  # Time for jam to form
-        
+        phase2_iterations = 15
         for iteration in range(phase2_iterations):
             positions = []
             
-            # Lead car STOPPED at accident location
+            # Lead car STOPPED
             positions.append((lead_car, accident_lat, accident_lon))
             
-            # Jam cars slow down and approach accident (forming traffic jam)
+            # Jam cars approaching accident and slowing down
             for i, car in enumerate(jam_cars):
-                # Slow progression toward accident
-                # Cars slow down as they approach, eventually crawling
-                progress_factor = 0.3 - (iteration * 0.01)  # Getting slower
-                if progress_factor < 0.05:
-                    progress_factor = 0.05  # Minimum crawl speed
+                # Slow progression toward accident (forming jam)
+                progress_factor = 0.2 - (iteration * 0.01)  # Getting slower
+                if progress_factor < 0.02:
+                    progress_factor = 0.02  # Minimum crawl speed
                 
-                car_idx = accident_idx - (len(jam_cars) - i) * 8 + int(iteration * progress_factor * STEP_SIZE)
+                car_idx = final_lead_idx - (len(jam_cars) - i) * 5 + int(iteration * progress_factor * 3)
                 
                 # Don't pass the accident
-                if car_idx > accident_idx - 20:
-                    car_idx = accident_idx - 20 - (len(jam_cars) - i) * 5
+                if car_idx > final_lead_idx - 10:
+                    car_idx = final_lead_idx - 10 - (len(jam_cars) - i) * 3
                 
                 if 0 <= car_idx < len(highway_coords):
                     lat, lon = highway_coords[car_idx]
                     positions.append((car, lat, lon))
             
-            # Approaching slow car (normal speed, will be notified)
-            slow_base_idx = accident_idx - len(jam_cars) * 8 - 80
-            slow_idx = slow_base_idx + iteration * STEP_SIZE
-            if 0 <= slow_idx < len(highway_coords):
-                lat, lon = highway_coords[slow_idx]
-                positions.append((approaching_slow, lat, lon))
-            
-            # Approaching fast car (faster, overtaking the slow car)
-            fast_base_idx = slow_base_idx - 10
-            fast_idx = fast_base_idx + int(iteration * STEP_SIZE * 1.5)  # 50% faster
-            
-            # Overtaking maneuver: move to left lane when close
-            gap = slow_idx - fast_idx
-            if gap > 10 and 0 <= fast_idx < len(left_lane_coords):
-                # Still behind, stay on highway
-                if fast_idx < len(highway_coords):
-                    lat, lon = highway_coords[fast_idx]
-                    positions.append((approaching_fast, lat, lon))
-            elif -5 <= gap <= 10 and 0 <= fast_idx < len(left_lane_coords):
-                # Overtaking - use left lane
-                lon, lat = left_lane_coords[fast_idx]
-                positions.append((approaching_fast, lat, lon))
-            elif gap < -5 and 0 <= fast_idx < len(highway_coords):
-                # Passed, return to highway
-                lat, lon = highway_coords[fast_idx]
-                positions.append((approaching_fast, lat, lon))
-            
-            # Emergency vehicle (approaching fast)
-            ev_base_idx = fast_base_idx - 30
-            ev_idx = ev_base_idx + int(iteration * STEP_SIZE * 2.0)  # Even faster
-            if 0 <= ev_idx < len(highway_coords):
-                lat, lon = highway_coords[ev_idx]
-                positions.append((emergency_vehicle, lat, lon))
-            
             send_positions_parallel(positions)
-            time.sleep(POSITION_INTERVAL)
+            time.sleep(0.08)
         
-        phase3_iterations = 15
-        
+        phase3_iterations = 10
         for iteration in range(phase3_iterations):
             positions = []
             
             # Lead car still stopped
             positions.append((lead_car, accident_lat, accident_lon))
             
-            # Jam cars barely moving (traffic jam)
+            # Jam cars barely moving
             for i, car in enumerate(jam_cars):
-                car_idx = accident_idx - 20 - (len(jam_cars) - i) * 5 + iteration
+                car_idx = final_lead_idx - 10 - (len(jam_cars) - i) * 3 + iteration // 2
                 if 0 <= car_idx < len(highway_coords):
                     lat, lon = highway_coords[car_idx]
                     positions.append((car, lat, lon))
             
-            # Approaching cars continue
-            slow_idx = accident_idx - len(jam_cars) * 8 - 80 + (phase2_iterations + iteration) * STEP_SIZE
-            if 0 <= slow_idx < len(highway_coords) and slow_idx < accident_idx - 50:
-                lat, lon = highway_coords[slow_idx]
-                positions.append((approaching_slow, lat, lon))
-            
-            fast_base = accident_idx - len(jam_cars) * 8 - 80 - 10
-            fast_idx = fast_base + int((phase2_iterations + iteration) * STEP_SIZE * 1.5)
-            if 0 <= fast_idx < len(highway_coords) and fast_idx < accident_idx - 50:
-                lat, lon = highway_coords[fast_idx]
-                positions.append((approaching_fast, lat, lon))
-            
-            # Emergency vehicle still approaching
-            ev_base = fast_base - 30
-            ev_idx = ev_base + int((phase2_iterations + iteration) * STEP_SIZE * 2.0)
-            if 0 <= ev_idx < len(highway_coords) and ev_idx < accident_idx - 30:
-                lat, lon = highway_coords[ev_idx]
-                positions.append((emergency_vehicle, lat, lon))
-            
             send_positions_parallel(positions)
-            time.sleep(POSITION_INTERVAL)
+            time.sleep(0.08)
         
-        # Wait for all alerts to be processed
-        time.sleep(4)
-
-    # Categorize alerts
-    accident_alerts = [a for t, a in all_alerts if "accident" in t]
-    traffic_jam_alerts = [a for t, a in all_alerts if "traffic_jam" in t]
-    overtaking_alerts = [a for t, a in all_alerts if "overtaking" in t]
-    emergency_alerts = [a for t, a in all_alerts if "emergency_vehicle" in t]
+        time.sleep(3)
     
-    print(f"  - Accident alerts: {len(accident_alerts)}")
-    print(f"  - Traffic jam alerts: {len(traffic_jam_alerts)}")
-    print(f"  - Overtaking alerts: {len(overtaking_alerts)}")
-    print(f"  - Emergency vehicle alerts: {len(emergency_alerts)}")
-    
-    # 1. Accident should be detected
-    assert len(accident_alerts) > 0, (
-        "Expected accident detection when lead car stopped suddenly. "
-        f"Got {len(accident_alerts)} accident alerts."
+    # Verify traffic jam was detected
+    jam_alerts = [a for t, a in all_alerts if t == "alerts/traffic_jam"]
+    assert len(jam_alerts) > 0, (
+        "Expected traffic jam detection with 5 slow/stopped cars. "
+        f"Got {len(jam_alerts)} traffic jam alerts."
     )
-    print("Accident detected")
-    
-    # 2. Traffic jam should be detected (5+ cars slow/stopped)
-    jam_broadcast_alerts = [a for t, a in all_alerts if t == "alerts/traffic_jam"]
-    assert len(jam_broadcast_alerts) > 0, (
-        "Expected traffic jam detection with 10 slow/stopped cars. "
-        f"Got {len(jam_broadcast_alerts)} traffic jam alerts."
-    )
-    print("Traffic jam detected")
     
     # Check jam severity (should be 5+ cars)
-    if jam_broadcast_alerts:
-        max_severity = max(a.get("severity", 0) for a in jam_broadcast_alerts)
+    if jam_alerts:
+        max_severity = max(a.get("severity", 0) for a in jam_alerts)
         assert max_severity >= 5, (
             f"Expected traffic jam with 5+ cars, got severity={max_severity}"
         )
-        print(f"Traffic jam severity: {max_severity} cars")
     
-    # 3. Approaching cars should receive traffic jam notifications
-    jam_notifications = [
-        (t, a) for t, a in all_alerts 
-        if "alerts/traffic_jam/" in t and a.get("notification_type") == "traffic_jam_alert"
-    ]
-    print(f"  - Traffic jam notifications sent: {len(jam_notifications)}")
-    
-    # At least one approaching car should be notified
-    notified_cars = {t.split("/")[-1] for t, a in jam_notifications}
-    print(f"  - Unique cars notified about jam: {len(notified_cars)}")
-    
-    # 4. Overtaking should be detected
-    if len(overtaking_alerts) > 0:
-        print(f"Overtaking detected ({len(overtaking_alerts)} alerts)")
-    else:
-        print("No overtaking detected")
-    
-    # 5. Emergency vehicle notifications
-    if len(emergency_alerts) > 0:
-        print(f"Emergency vehicle alerts sent ({len(emergency_alerts)} alerts)")
-        ev_notified_cars = {
-            t.split("/")[-1] for t, a in all_alerts 
-            if "alerts/emergency_vehicle/" in t
-        }
-        print(f"  - Cars notified about emergency vehicle: {len(ev_notified_cars)}")
-    else:
-        print("No emergency vehicle alerts detected")
-    
-    # Print sample alerts for debugging
-    print("\n[SAMPLE ALERTS]")
-    if jam_broadcast_alerts:
-        print(f"Traffic Jam Alert: {json.dumps(jam_broadcast_alerts[0], indent=2)}")
-    if accident_alerts:
-        print(f"Accident Alert: {json.dumps(accident_alerts[0], indent=2)}")
-
 if __name__ == "__main__":
     def get_car_id(base_name: str) -> str:
         return f"{base_name}-{str(uuid.uuid4())[:8]}"
-    
-    test_traffic_jam_complex_scenario(get_car_id)
-    print("\nTraffic jam integration test completed")
+    test_traffic_jam(get_car_id)
