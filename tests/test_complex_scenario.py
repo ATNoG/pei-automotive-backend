@@ -35,7 +35,7 @@ ROADS_DIR = SIM_DIR / "roads"
 MQTT_HOST = os.getenv("TEST_MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("TEST_MQTT_PORT", "1884"))
 POSITION_INTERVAL = 0.08  # Slightly slower for complex scenario
-STEP_SIZE = 2  # Points to skip for reasonable speed
+STEP_SIZE = 3  # Increased from 2 to move cars faster along shorter highway
 ALERT_TIMEOUT = 5.0
 THREAD_TIMEOUT = 60.0  # Reduced from 120.0 since test is much shorter now
 
@@ -114,8 +114,6 @@ def test_complex_scenario(get_car_id):
     
     all_cars = [lead_car] + jam_cars + [approaching_slow, approaching_fast, emergency_vehicle]
     
-    print(f"\n[TEST] Creating {len(all_cars)} vehicles...")
-    
     # Create all cars
     for car in all_cars[:-1]:
         ensure_car_exists(car)
@@ -141,10 +139,8 @@ def test_complex_scenario(get_car_id):
         # Also load left lane for overtaking (GeoJSON FeatureCollection format)
         with open(ROADS_DIR / "left_lane.json") as f:
             left_lane_coords = json.load(f)["features"][0]["geometry"]["coordinates"]
-        
-        print(f"[TEST] Highway route has {len(highway_coords)} points")
-        
-        phase1_iterations = 15  # Build up speed and spacing (reduced from 25)
+    
+        phase1_iterations = 25  # Build up speed and spacing
         
         for iteration in range(phase1_iterations):
             positions = []
@@ -163,7 +159,7 @@ def test_complex_scenario(get_car_id):
                     positions.append((car, lat, lon))
             
             # Approaching cars (far behind)
-            slow_idx = lead_idx - len(jam_cars) * 8 - 80
+            slow_idx = lead_idx - len(jam_cars) * 8 - 50
             fast_idx = slow_idx - 10
             
             if 0 <= slow_idx < len(highway_coords):
@@ -215,7 +211,7 @@ def test_complex_scenario(get_car_id):
                     positions.append((car, lat, lon))
             
             # Approaching slow car (normal speed, will be notified)
-            slow_base_idx = accident_idx - len(jam_cars) * 8 - 80
+            slow_base_idx = accident_idx - len(jam_cars) * 8 - 50
             slow_idx = slow_base_idx + iteration * STEP_SIZE
             if 0 <= slow_idx < len(highway_coords):
                 lat, lon = highway_coords[slow_idx]
@@ -267,12 +263,12 @@ def test_complex_scenario(get_car_id):
                     positions.append((car, lat, lon))
             
             # Approaching cars continue
-            slow_idx = accident_idx - len(jam_cars) * 8 - 80 + (phase2_iterations + iteration) * STEP_SIZE
+            slow_idx = accident_idx - len(jam_cars) * 8 - 50 + (phase2_iterations + iteration) * STEP_SIZE
             if 0 <= slow_idx < len(highway_coords) and slow_idx < accident_idx - 50:
                 lat, lon = highway_coords[slow_idx]
                 positions.append((approaching_slow, lat, lon))
             
-            fast_base = accident_idx - len(jam_cars) * 8 - 80 - 10
+            fast_base = accident_idx - len(jam_cars) * 8 - 50 - 10
             fast_idx = fast_base + int((phase2_iterations + iteration) * STEP_SIZE * 1.5)
             if 0 <= fast_idx < len(highway_coords) and fast_idx < accident_idx - 50:
                 lat, lon = highway_coords[fast_idx]
