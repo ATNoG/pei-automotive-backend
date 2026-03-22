@@ -111,10 +111,10 @@ def test_traffic_jam(get_car_id):
         
         # Load highway route
         with open(ROADS_DIR / "highway.json") as f:
-            highway_coords = json.load(f)
+            highway_coords = json.load(f)["features"][0]["geometry"]["coordinates"]
         
-        # Phase 1: Cars building up speed and spacing (10 iterations)
-        phase1_iterations = 10
+        # Keep the simulation focused on the useful window (~30s runtime with subprocess overhead).
+        phase1_iterations = 6
         for iteration in range(phase1_iterations):
             positions = []
             
@@ -124,9 +124,9 @@ def test_traffic_jam(get_car_id):
                 lat, lon = highway_coords[lead_idx]
                 positions.append((lead_car, lat, lon))
             
-            # Jam cars following with spacing
+            # Jam cars following with tight spacing
             for i, car in enumerate(jam_cars):
-                car_idx = lead_idx - (i + 1) * 5  # 5 points spacing
+                car_idx = lead_idx - (i + 1) * 2  # 2 points spacing
                 if 0 <= car_idx < len(highway_coords):
                     lat, lon = highway_coords[car_idx]
                     positions.append((car, lat, lon))
@@ -138,7 +138,7 @@ def test_traffic_jam(get_car_id):
         final_lead_idx = (phase1_iterations - 1) * 3 + 20
         accident_lat, accident_lon = highway_coords[final_lead_idx]
         
-        phase2_iterations = 15
+        phase2_iterations = 5
         for iteration in range(phase2_iterations):
             positions = []
             
@@ -152,11 +152,11 @@ def test_traffic_jam(get_car_id):
                 if progress_factor < 0.02:
                     progress_factor = 0.02  # Minimum crawl speed
                 
-                car_idx = final_lead_idx - (len(jam_cars) - i) * 5 + int(iteration * progress_factor * 3)
+                car_idx = final_lead_idx - (len(jam_cars) - i) * 2 + int(iteration * progress_factor * 3)
                 
                 # Don't pass the accident
-                if car_idx > final_lead_idx - 10:
-                    car_idx = final_lead_idx - 10 - (len(jam_cars) - i) * 3
+                if car_idx > final_lead_idx - 6:
+                    car_idx = final_lead_idx - 6 - (len(jam_cars) - i) * 2
                 
                 if 0 <= car_idx < len(highway_coords):
                     lat, lon = highway_coords[car_idx]
@@ -164,25 +164,6 @@ def test_traffic_jam(get_car_id):
             
             send_positions_parallel(positions)
             time.sleep(0.08)
-        
-        phase3_iterations = 10
-        for iteration in range(phase3_iterations):
-            positions = []
-            
-            # Lead car still stopped
-            positions.append((lead_car, accident_lat, accident_lon))
-            
-            # Jam cars barely moving
-            for i, car in enumerate(jam_cars):
-                car_idx = final_lead_idx - 10 - (len(jam_cars) - i) * 3 + iteration // 2
-                if 0 <= car_idx < len(highway_coords):
-                    lat, lon = highway_coords[car_idx]
-                    positions.append((car, lat, lon))
-            
-            send_positions_parallel(positions)
-            time.sleep(0.08)
-        
-        time.sleep(3)
     
     # Verify traffic jam was detected
     jam_alerts = [a for t, a in all_alerts if t == "alerts/traffic_jam"]

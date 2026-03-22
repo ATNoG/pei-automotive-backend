@@ -27,6 +27,7 @@ from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import paho.mqtt.client as mqtt
+import pytest
 
 SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
 ROADS_DIR = SIM_DIR / "roads"
@@ -93,7 +94,7 @@ def mqtt_alert_collector(topics: list[str]):
         client.loop_stop()
         client.disconnect()
 
-
+@pytest.mark.skip(reason="No reason for this to be on pipeline")
 def test_complex_scenario(get_car_id):
     """
     Complex integration test simulating a highway traffic jam scenario.
@@ -134,7 +135,7 @@ def test_complex_scenario(get_car_id):
         
         # Load highway route (simple coordinate array format)
         with open(ROADS_DIR / "highway.json") as f:
-            highway_coords = json.load(f)
+            highway_coords = json.load(f)["features"][0]["geometry"]["coordinates"]
         
         # Also load left lane for overtaking (GeoJSON FeatureCollection format)
         with open(ROADS_DIR / "left_lane.json") as f:

@@ -380,6 +380,33 @@ class TrafficJamDetector:
             f"with {len(jam.car_ids)} vehicles"
         )
 
+    def _publish_jam_cleared(self, jam: TrafficJam, reason: str):
+        """Publish a jam-cleared event to let consumers clear stale UI alerts."""
+        event = {
+            "alert_type": "traffic_jam_cleared",
+            "jam_id": jam.jam_id,
+            "car_ids": list(jam.car_ids),
+            "severity": len(jam.car_ids),
+            "center_latitude": jam.center_latitude,
+            "center_longitude": jam.center_longitude,
+            "reason": reason,
+            "timestamp": time.time(),
+        }
+        self.mqtt.publish(self.alert_topic, json.dumps(event))
+
+    def _remove_jam_if_dissolved(self, jam_id: str, reason: str):
+        """Remove jam if it no longer meets minimum size and publish clear event."""
+        jam = self.active_jams.get(jam_id)
+        if jam is None:
+            return
+        if len(jam.car_ids) >= self.MIN_CARS_FOR_JAM:
+            return
+
+        jam.active = False
+        self._publish_jam_cleared(jam, reason)
+        del self.active_jams[jam_id]
+        logger.info(f"[JAM CLEARED] {jam_id} ({reason})")
+
     def _cleanup_old_jams(self):
         """Remove jams that haven't been updated recently."""
         now = time.time()
@@ -389,6 +416,7 @@ class TrafficJamDetector:
             if jam.active and (now - jam.last_updated > self.JAM_EXPIRY_S):
                 jam.active = False
                 jams_to_remove.append(jam_id)
+                self._publish_jam_cleared(jam, "expired")
                 logger.info(f"[JAM EXPIRED] {jam_id}")
         
         # Remove expired jams
@@ -491,10 +519,16 @@ class TrafficJamDetector:
             logger.info(f"[CLEANUP] Removed car state: {car_id}")
         
         # Remove car from any active jams
+        affected_jams = []
         for jam in self.active_jams.values():
             if car_id in jam.car_ids:
                 jam.car_ids.discard(car_id)
+                jam.last_updated = time.time()
+                affected_jams.append(jam.jam_id)
                 logger.info(f"[CLEANUP] Removed {car_id} from jam {jam.jam_id}")
+
+        for jam_id in affected_jams:
+            self._remove_jam_if_dissolved(jam_id, "test_cleanup")
 
     def run(self):
         logger.info("Starting Traffic Jam Detector...")
