@@ -457,22 +457,36 @@ class TrafficJamDetector:
             logger.error(f"Error processing car update: {e}")
             return
 
-        # Ignore updates without essential data
-        if update.speed_kmh is None or update.heading_deg is None:
+        # Ignore updates without speed; heading can be reused from last state.
+        if update.speed_kmh is None:
             return
 
         now = time.time()
         
-        # Update or create car state
+        # Update or create car state. Preserve last known heading/speed limit when
+        # position-processor cannot infer them for very small movements.
         if update.car_id in self.cars:
             state = self.cars[update.car_id]
+            heading = update.heading_deg if update.heading_deg is not None else state.heading_deg
+            speed_limit = (
+                update.speed_limit_kmh
+                if update.speed_limit_kmh is not None
+                else state.speed_limit_kmh
+            )
+
+            if heading is None:
+                return
+
             state.latitude = update.latitude
             state.longitude = update.longitude
             state.speed_kmh = update.speed_kmh
-            state.heading_deg = update.heading_deg
-            state.speed_limit_kmh = update.speed_limit_kmh
+            state.heading_deg = heading
+            state.speed_limit_kmh = speed_limit
             state.timestamp = now
         else:
+            if update.heading_deg is None or update.speed_limit_kmh is None:
+                return
+
             self.cars[update.car_id] = CarState(
                 car_id=update.car_id,
                 latitude=update.latitude,
