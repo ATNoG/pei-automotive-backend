@@ -39,6 +39,10 @@ jobs:
           WEATHER_API_URL: ${{ secrets.WEATHER_API_URL }}
           WEATHER_USER: ${{ secrets.WEATHER_USER }}
           WEATHER_PASS: ${{ secrets.WEATHER_PASS }}
+          KEYCLOAK_ADMIN: ${{ secrets.KEYCLOAK_ADMIN }}
+          KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+          KC_DB_USERNAME: ${{ secrets.KC_DB_USERNAME }}
+          KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
         run: |
           chmod +x make_env.sh
           ./make_env.sh
