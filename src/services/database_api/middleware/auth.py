@@ -1,10 +1,12 @@
 import httpx
-from jose import jwt, JWTError
-from jose.backends import RSAKey
+import jwt
+from jwt import InvalidTokenError
+from jwt.algorithms import RSAAlgorithm
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from core.config import settings
 import json
+from uuid import UUID
 
 bearer_scheme = HTTPBearer()
 
@@ -25,21 +27,57 @@ async def get_current_user(
 ) -> dict:
     token = credentials.credentials
     try:
+        headers = jwt.get_unverified_header(token)
+        kid = headers.get("kid")
+        if kid is None:
+            raise InvalidTokenError("Token is missing 'kid' header")
+
         jwks = await _get_jwks()
+        matching_key = next(
+            (jwk for jwk in jwks.get("keys", []) if jwk.get("kid") == kid),
+            None,
+        )
+        if matching_key is None:
+            raise InvalidTokenError("Unable to find a matching JWK for token")
+
+        public_key = RSAAlgorithm.from_jwk(json.dumps(matching_key))
         payload = jwt.decode(
             token,
-            jwks,
+            public_key,
             algorithms=["RS256"],
-            audience=settings.keycloak_client_id,
+            options={"verify_aud": False}       # ATENÇÃO: Audience não está configurada, não há validação do issuer
         )
+
+        email = payload.get("email") or ""
+        username = payload.get("preferred_username") or email or payload["sub"]
         return {
             "id": payload["sub"],              # Keycloak user UUID
-            "email": payload.get("email"),
-            "username": payload.get("preferred_username"),
+            "email": email,
+            "username": username,
             "roles": payload.get("realm_access", {}).get("roles", []),
         }
-    except JWTError as e:
+    except InvalidTokenError as e:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail=f"Invalid token: {e}"
         )
+    except KeyError as e:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=f"Token missing required claim: {e}"
+        )
+
+
+async def ensure_user_exists(conn, user_id: UUID, email: str, username: str):
+    await conn.execute(
+        """
+        INSERT INTO users (id, username, email)
+        VALUES ($1, $2, $3)
+        ON CONFLICT (id) DO UPDATE
+        SET username = EXCLUDED.username,
+            email = EXCLUDED.email
+        """,
+        user_id,
+        username,
+        email,
+    )

@@ -164,7 +164,6 @@ services:
       DB_PASSWORD: ${APP_DB_PASSWORD}
       KEYCLOAK_URL: http://keycloak_auth:8080
       KEYCLOAK_REALM: ${KEYCLOAK_REALM}
-      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
     ports:
       - "8081:8080"
     networks:

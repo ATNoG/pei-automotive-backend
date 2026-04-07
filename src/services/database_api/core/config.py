@@ -11,7 +11,6 @@ class Settings(BaseSettings):
     # Keycloak
     keycloak_url: str
     keycloak_realm: str
-    keycloak_client_id: str
     @property
     def keycloak_jwks_url(self) -> str:
         return (

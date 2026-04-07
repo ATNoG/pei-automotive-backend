@@ -1,15 +1,17 @@
+CREATE EXTENSION IF NOT EXISTS pgcrypto;
+
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     username VARCHAR(100) NOT NULL,
     email VARCHAR(250) NOT NULL,
-    created_at TIMESTAMPTZ DEFAULT NOW(),
+    created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 CREATE TABLE IF NOT EXISTS vehicles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     plate VARCHAR(20) UNIQUE NOT NULL,
-    alias VARCHAR(100),                          -- "My Car", "Work Van"
+    alias VARCHAR(100)                          -- "My Car", "Work Van"
 );
 
 CREATE INDEX idx_vehicles_user_id ON vehicles(user_id);
