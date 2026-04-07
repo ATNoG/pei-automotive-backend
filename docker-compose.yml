@@ -148,7 +148,7 @@ services:
     restart: unless-stopped
 
   database-api:
-    build: src/services/api_service
+    build: src/services/database_api
     container_name: database_api
     restart: unless-stopped
     depends_on:

@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from contextlib import asynccontextmanager
 from core.database import init_pool, close_pool
-from routers import events, preferences
+from routers import preferences
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -11,7 +11,6 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(title="AutomotiveOS API", lifespan=lifespan)
 
-app.include_router(events.router)
 app.include_router(preferences.router)
 
 @app.get("/health")
