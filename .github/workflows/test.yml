@@ -31,9 +31,9 @@ jobs:
 
       - name: Install/Update dependencies
         run: |
-          python -m pip install --upgrade pip
-          python -m pip install -r requirements.txt
-          python -m pip install -r requirements_database.txt
+          pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements_database.txt
           sleep 2
 
       - name: Generate .env file
