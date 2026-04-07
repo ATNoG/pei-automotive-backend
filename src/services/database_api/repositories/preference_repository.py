@@ -1,6 +1,6 @@
 import asyncpg
 from uuid import UUID
-from datetime import datetime, UTC
+from datetime import datetime, timezone
 from models.preference import (
     PreferencesResponse,
     UpdatePreferencesRequest,
@@ -90,7 +90,7 @@ class PreferenceRepository:
             # Nothing to update, return current state
             return await self.get_or_create_defaults(user_id)
 
-        fields["updated_at"] = datetime.now(UTC)
+        fields["updated_at"] = datetime.now(timezone.utc)
 
         set_clause = ", ".join(
             f"{col} = ${i + 2}" for i, col in enumerate(fields.keys())
