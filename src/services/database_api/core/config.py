@@ -1,0 +1,32 @@
+from pydantic_settings import BaseSettings
+
+class Settings(BaseSettings):
+    # App Database
+    db_host: str
+    db_port: int = 5432
+    db_name: str = "automotive_os"
+    db_user: str
+    db_password: str
+
+    # Keycloak
+    keycloak_url: str
+    keycloak_realm: str
+    keycloak_client_id: str
+    @property
+    def keycloak_jwks_url(self) -> str:
+        return (
+            f"{self.keycloak_url}/realms/{self.keycloak_realm}"
+            f"/protocol/openid-connect/certs"
+        )
+
+    @property
+    def db_dsn(self) -> str:
+        return (
+            f"postgresql://{self.db_user}:{self.db_password}"
+            f"@{self.db_host}:{self.db_port}/{self.db_name}"
+        )
+
+    class Config:
+        env_file = ".env"
+
+settings = Settings()

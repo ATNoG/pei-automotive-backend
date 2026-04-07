@@ -113,8 +113,10 @@ services:
       POSTGRES_PASSWORD: ${KC_DB_PASSWORD}
     volumes:
       - keycloak_db_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
     networks:
       - keycloak_net
+      - database_net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U keycloak"]
@@ -142,10 +144,36 @@ services:
         condition: service_healthy
     networks:
       - keycloak_net
+      - database_net
     restart: unless-stopped
+
+  database-api:
+    build: src/services/api_service
+    container_name: database_api
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: automotive_os
+      DB_USER: ${APP_DB_USER}
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+      KEYCLOAK_URL: http://keycloak_auth:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+    ports:
+      - "8081:8080"
+    networks:
+      - database_net
 
 networks:
   keycloak_net:
+    driver: bridge
+  database_net:
     driver: bridge
 
 volumes:
