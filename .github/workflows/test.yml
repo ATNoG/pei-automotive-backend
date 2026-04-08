@@ -45,6 +45,9 @@ jobs:
           KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
           KC_DB_USERNAME: ${{ secrets.KC_DB_USERNAME }}
           KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+          APP_DB_USER: ${{ secrets.APP_DB_USER }}
+          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+          KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
         run: |
           chmod +x make_env.sh
           ./make_env.sh
