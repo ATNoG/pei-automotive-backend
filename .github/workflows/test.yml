@@ -53,6 +53,12 @@ jobs:
           ./make_env.sh
           sleep 2
 
+      - name: Clean previous compose state
+        run: |
+          docker compose down -v --remove-orphans || true
+          docker volume prune -f || true
+          sleep 2
+
       - name: Start services
         run: |
           docker compose up --build -d
