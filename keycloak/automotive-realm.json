@@ -7,6 +7,7 @@
   "duplicateEmailsAllowed": false,
   "resetPasswordAllowed": false,
   "editUsernameAllowed": false,
+  "rememberMe": true,
   "bruteForceProtected": true,
   "permanentLockout": false,
   "maxFailureWaitSeconds": 900,
@@ -16,10 +17,13 @@
   "maxDeltaTimeSeconds": 43200,
   "failureFactor": 10,
   "accessTokenLifespan": 300,
-  "accessTokenLifespanForImplicitFlow": 900,
-  "ssoSessionIdleTimeout": 1800,
-  "ssoSessionMaxLifespan": 36000,
+  "ssoSessionIdleTimeout": 43200,
+  "ssoSessionMaxLifespan": 86400,
+  "ssoSessionIdleTimeoutRememberMe": 604800,
+  "ssoSessionMaxLifespanRememberMe": 2592000,
   "offlineSessionIdleTimeout": 2592000,
+  "offlineSessionMaxLifespanEnabled": false,
+  "offlineSessionMaxLifespan": 5184000,
   "oauth2DeviceCodeLifespan": 600,
   "oauth2DevicePollingInterval": 5,
   "clientScopes": [
@@ -28,19 +32,21 @@
       "description": "Exposes the car_id user attribute as a JWT claim",
       "protocol": "openid-connect",
       "attributes": {
-        "include.in.token.scope": "true",
+        "include.in.token.scope": "false",
         "display.on.consent.screen": "false"
       },
       "protocolMappers": [
         {
-          "name": "car_id mapper",
+          "name": "car_id",
           "protocol": "openid-connect",
           "protocolMapper": "oidc-usermodel-attribute-mapper",
           "consentRequired": false,
           "config": {
+            "introspection.token.claim": "true",
             "userinfo.token.claim": "true",
             "user.attribute": "car_id",
             "id.token.claim": "true",
+            "lightweight.claim": "false",
             "access.token.claim": "true",
             "claim.name": "car_id",
             "jsonType.label": "String"
@@ -61,7 +67,9 @@
       "serviceAccountsEnabled": false,
       "attributes": {
         "oauth2.device.authorization.grant.enabled": "true",
-        "oauth2.device.polling.interval": "5"
+        "oauth2.device.polling.interval": "5",
+        "backchannel.logout.session.required": "true",
+        "backchannel.logout.revoke.offline.tokens": "false"
       },
       "defaultClientScopes": [
         "openid",
@@ -69,7 +77,9 @@
         "email",
         "car_id"
       ],
-      "optionalClientScopes": []
+      "optionalClientScopes": [
+        "offline_access"
+      ]
     }
   ]
 }
