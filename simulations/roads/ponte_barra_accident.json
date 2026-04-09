@@ -4,7 +4,7 @@
     {
       "type": "Feature",
       "properties": {
-        "description": "Ponte da Barra - route for car that will have accident (driving West to East)"
+        "description": "Barra Bridge - route for car that will have accident (driving West to East)"
       },
       "geometry": {
         "coordinates": [

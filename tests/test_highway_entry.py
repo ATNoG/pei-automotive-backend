@@ -55,10 +55,10 @@ def test_highway_entry_unsafe(get_car_id):
     time.sleep(0.5)
 
     with open(ROADS_DIR / "highway.json") as f:
-        highway_route = json.load(f)
+        highway_route = json.load(f)["features"][0]["geometry"]["coordinates"]
     with open(ROADS_DIR / "entering.json") as f:
-        entering_route = json.load(f)
-
+        entering_route = json.load(f)["features"][0]["geometry"]["coordinates"]
+    
     merge_lat, merge_lon = entering_route[-1]
     merge_idx = _find_merge_index(highway_route, merge_lat, merge_lon)
     # start close to merge point so predicted distance is well below threshold (~7m vs 15m)
@@ -89,10 +89,12 @@ def test_highway_entry_safe(get_car_id):
     time.sleep(0.5)
 
     with open(ROADS_DIR / "highway.json") as f:
-        highway_route = json.load(f)
+        highway_route = json.load(f)["features"][0]["geometry"]["coordinates"]
+    
     with open(ROADS_DIR / "entering.json") as f:
-        entering_route = json.load(f)
-
+        entering_route = json.load(f)["features"][0]["geometry"]["coordinates"]
+    
+    # Find merge point and position highway car to be within detection range but safely behind
     merge_lat, merge_lon = entering_route[-1]
     merge_idx = _find_merge_index(highway_route, merge_lat, merge_lon)
     # start farther from merge point so predicted distance is safely above threshold (~35-45m vs 15m)
@@ -106,7 +108,6 @@ def test_highway_entry_safe(get_car_id):
     safe_alerts = [a for a in ALERTS if a.get("status") == "safe"]
     assert len(safe_alerts) > 0, f"expected safe alert but got: {ALERTS}"
 
-
 if __name__ == "__main__":
-    test_highway_entry_unsafe(standalone_get_car_id)
-    test_highway_entry_safe(standalone_get_car_id)
+    test_highway_entry_unsafe(standalone_car_id)
+    test_highway_entry_safe(standalone_car_id)

@@ -57,27 +57,39 @@ def _cleanup_test_cars(car_ids: List[str]) -> None:
         time.sleep(0.2)
 
         for car_id in car_ids:
-            client.publish(
-                f"test/cleanup/{car_id}",
-                json.dumps({"action": "cleanup", "car_id": car_id, "timestamp": time.time()}),
-                qos=1,
-            )
-            client.publish(
-                "cars/updates",
-                json.dumps({
-                    "car_id": car_id,
-                    "latitude": 0.0,
-                    "longitude": 0.0,
-                    "speed_kmh": None,
-                    "heading_deg": None,
-                    "speed_limit_kmh": 50.0,
-                    "emergency": False,
-                    "timestamp": time.time(),
-                    "_test_cleanup": True,
-                }),
-                qos=1,
-            )
+            # Send cleanup signal to all services
+            cleanup_msg = json.dumps({
+                "action": "cleanup",
+                "car_id": car_id,
+                "timestamp": time.time()
+            })
+            client.publish(f"test/cleanup/{car_id}", cleanup_msg, qos=1)
 
+            # Tell consumers to clear stale per-car traffic jam alerts.
+            clear_msg = json.dumps({
+                "notification_type": "traffic_jam_clear",
+                "target_car_id": car_id,
+                "reason": "test_cleanup",
+                "timestamp": time.time()
+            })
+            client.publish(f"alerts/traffic_jam/{car_id}", clear_msg, qos=1)
+            
+            # Also send a final position update with special marker to trigger state cleanup
+            # This ensures the car is removed from all service states
+            cleanup_update = json.dumps({
+                "car_id": car_id,
+                "latitude": 0.0,
+                "longitude": 0.0,
+                "speed_kmh": None,
+                "heading_deg": None,
+                "speed_limit_kmh": 50.0,
+                "emergency": False,
+                "timestamp": time.time(),
+                "_test_cleanup": True
+            })
+            client.publish("cars/updates", cleanup_update, qos=1)
+            
+        # Give services time to process cleanup messages
         time.sleep(0.3)
         client.loop_stop()
         client.disconnect()
