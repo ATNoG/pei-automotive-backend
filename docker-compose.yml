@@ -70,12 +70,11 @@ services:
         depends_on:
             - mosquitto_broker
             - position_processor
-            
+
     traffic_jam_detector:
         build:
             context: .
             dockerfile: src/services/traffic_jam_detector/Dockerfile
-        container_name: traffic_jam_detector
         restart: unless-stopped
         env_file:
             - .env
@@ -87,7 +86,6 @@ services:
         build:
             context: .
             dockerfile: src/services/meteo_consumer/Dockerfile
-        container_name: meteo_consumer
         restart: unless-stopped
         env_file:
             - .env
