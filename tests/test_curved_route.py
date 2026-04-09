@@ -1,93 +1,52 @@
 import json
 import time
-import subprocess
-import sys
-import uuid
-from pathlib import Path
 
 import paho.mqtt.client as mqtt
 
-SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
-ROADS_DIR = Path(__file__).resolve().parent.parent / "simulations/roads"
+from helpers import (
+    MQTT_HOST, MQTT_PORT, ROADS_DIR,
+    ensure_car_exists, send_position, standalone_get_car_id,
+)
+
 POSITION_UPDATES = []
 
 
-def ensure_car_exists(car_name: str) -> None:
-    meta = SIM_DIR / "devices" / f"{car_name}.json"
-    if not meta.exists():
-        subprocess.run(
-            [sys.executable, str(SIM_DIR / "create_car.py"), car_name],
-            check=True,
-        )
-
-
-def on_position_update(client, userdata, msg):
-    """Callback to capture position updates from the position processor."""
+def on_message(client, userdata, msg):
     try:
-        payload = json.loads(msg.payload.decode())
-        POSITION_UPDATES.append(payload)
+        POSITION_UPDATES.append(json.loads(msg.payload.decode()))
     except Exception as e:
-        print(f"Error processing message: {e}")
-
-
-def send_position(car_name: str, lat: float, lon: float) -> None:
-    """Send a position update for a specific car."""
-    subprocess.run([
-        sys.executable, str(SIM_DIR / "send_position.py"),
-        car_name, str(lat), str(lon)
-    ], check=True)
+        print(f"error processing message: {e}")
 
 
 def test_curved_route(get_car_id):
-    """Test vehicle navigation on a curved route with complex trajectory."""
     car = get_car_id("curved-route-car")
     ensure_car_exists(car)
 
-    # subscribe to position updates topic
-    client = mqtt.Client()
-    client.connect("localhost", 1884)
+    POSITION_UPDATES.clear()
+
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.on_message = on_message
+    client.connect(MQTT_HOST, MQTT_PORT)
     client.subscribe("cars/updates")
-    client.on_message = on_position_update
     client.loop_start()
 
-    # load curved route coordinates
     with open(ROADS_DIR / "route.json") as f:
         coords = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    print(f"Testing curved route with {len(coords)} points")
-
-    # send positions along the curved route
-    # Sample every 5th point to simulate realistic movement
     for i in range(0, len(coords), 3):
         lon, lat = coords[i]
         send_position(car, lat, lon)
-        time.sleep(0.02)  # simulate brief delay between updates
+        time.sleep(0.02)
 
-    # finish route at last coordinate
-    if (lon, lat) != coords[-1]:
-        lon, lat = coords[-1]
-        send_position(car, lat, lon)
+    # always send the last coordinate to complete the route
+    last_lon, last_lat = coords[-1]
+    send_position(car, last_lat, last_lon)
 
-    # wait for final messages to be processed
     time.sleep(0.2)
     client.loop_stop()
 
-
-    # verify that position updates were received
-    assert len(POSITION_UPDATES) > 0, "Expected position updates, got none"
-    print(f"Received {len(POSITION_UPDATES)} position updates")
-
-    # verify that positions follow the curved path
-    # Check that latitude decreases (moving south)
-    first_lat = POSITION_UPDATES[0].get("latitude") or POSITION_UPDATES[0].get("position", {}).get("latitude")
-    last_lat = POSITION_UPDATES[-1].get("latitude") or POSITION_UPDATES[-1].get("position", {}).get("latitude")
-
-    assert len(POSITION_UPDATES) > 0
-
-    print("Curved route test passed successfully!")
+    assert len(POSITION_UPDATES) > 0, "expected position updates, got none"
 
 
 if __name__ == "__main__":
-    def get_car_id(base_name: str) -> str:
-        return f"{base_name}-{str(uuid.uuid4())[:8]}"
-    test_curved_route(get_car_id)
+    test_curved_route(standalone_get_car_id)

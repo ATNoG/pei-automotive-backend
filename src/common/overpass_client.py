@@ -51,7 +51,7 @@ _MAX_MATCH_DISTANCE_M: float = 50.0
 _PRIORITY_MARGIN_M: float = 15.0   # prefer major road if within this margin
 _MIN_API_INTERVAL: float = 2.0
 _FAIL_RETRY_AFTER: float = 30.0
-_MAX_RETRIES: int = 3
+_MAX_RETRIES: int = 1
 _RETRY_BACKOFF_BASE: float = 3.0
 
 TileKey = Tuple[int, int]

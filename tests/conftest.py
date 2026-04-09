@@ -1,81 +1,61 @@
-"""Pytest configuration for test suite."""
+"""pytest configuration for test suite."""
 import json
-import os
 import time
 import uuid
-from pathlib import Path
 from typing import List
 
 import paho.mqtt.client as mqtt
 import pytest
 
-# Test configuration
-MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
-SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
+from helpers import MQTT_HOST, MQTT_PORT, SIM_DIR
 
 
 def pytest_addoption(parser):
-    """Add custom command-line options to pytest."""
     parser.addoption(
         "--fixed-ids",
         action="store_true",
         default=False,
-        help="Use fixed car IDs instead of random UUIDs (useful for frontend testing)",
+        help="use fixed car ids instead of random uuids (useful for frontend testing)",
     )
 
 
 @pytest.fixture(scope="session")
 def use_fixed_ids(request):
-    """Fixture that returns whether to use fixed car IDs."""
     return request.config.getoption("--fixed-ids")
 
 
 @pytest.fixture
 def test_car_registry():
-    """Track all cars created during a test for cleanup."""
+    """track all cars created during a test for cleanup."""
     car_ids = []
     yield car_ids
-    # Cleanup after test - happens even if test fails
     _cleanup_test_cars(car_ids)
 
 
 @pytest.fixture
 def get_car_id(use_fixed_ids, test_car_registry):
-    """Fixture that returns a function to generate car IDs and track them for cleanup."""
+    """return a function that generates car ids and tracks them for cleanup."""
     def _get_car_id(base_name: str) -> str:
-        """Generate car ID: random UUID by default, or fixed name with --fixed-ids flag."""
-        if use_fixed_ids:
-            car_id = base_name
-        else:
-            car_id = f"{base_name}-{str(uuid.uuid4())[:8]}"
-        
-        # Register for cleanup
+        car_id = base_name if use_fixed_ids else f"{base_name}-{uuid.uuid4().hex[:8]}"
         test_car_registry.append(car_id)
         return car_id
-    
+
     return _get_car_id
 
 
 def _cleanup_test_cars(car_ids: List[str]) -> None:
-    """
-    Comprehensive cleanup of test cars:
-    1. Send cleanup signals to services via MQTT
-    2. Remove local device files
-    3. Wait for services to process cleanup
-    """
+    """clean up test cars from services and local device files."""
     if not car_ids:
         return
-    
-    print(f"\n[CLEANUP] Removing {len(car_ids)} test cars from services...")
-    
-    # Send cleanup messages to services
+
+    print(f"\n[cleanup] removing {len(car_ids)} test cars...")
+
     try:
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         client.connect(MQTT_HOST, MQTT_PORT, keepalive=5)
         client.loop_start()
-        time.sleep(0.2)  # Ensure connection established
-        
+        time.sleep(0.2)
+
         for car_id in car_ids:
             # Send cleanup signal to all services
             cleanup_msg = json.dumps({
@@ -114,15 +94,14 @@ def _cleanup_test_cars(car_ids: List[str]) -> None:
         client.loop_stop()
         client.disconnect()
     except Exception as e:
-        print(f"[CLEANUP] Warning: MQTT cleanup failed: {e}")
-    
-    # Remove local device files
+        print(f"[cleanup] warning: mqtt cleanup failed: {e}")
+
     for car_id in car_ids:
         car_file = SIM_DIR / "devices" / f"{car_id}.json"
         if car_file.exists():
             try:
                 car_file.unlink()
             except Exception as e:
-                print(f"[CLEANUP] Warning: Failed to delete {car_file}: {e}")
-    
-    print(f"[CLEANUP] Cleanup complete for {len(car_ids)} cars")
+                print(f"[cleanup] warning: failed to delete {car_file}: {e}")
+
+    print(f"[cleanup] done for {len(car_ids)} cars")
