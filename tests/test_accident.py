@@ -19,8 +19,8 @@ ROADS_DIR = SIM_DIR / "roads"
 MQTT_HOST = os.getenv("TEST_MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("TEST_MQTT_PORT", "1884"))
 POSITION_INTERVAL = 0.05
-STEP_SIZE = 3  # Points to skip for higher speed
-PHASE1_PERCENTAGE = 0.75
+STEP_SIZE = 5  # Larger jumps ensure the car builds enough speed before stopping
+PHASE1_PERCENTAGE = 0.80
 ALERT_TIMEOUT = 3.0
 THREAD_TIMEOUT = 60.0 
 

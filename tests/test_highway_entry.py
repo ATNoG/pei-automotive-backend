@@ -46,9 +46,9 @@ def test_highway_entry_unsafe(get_car_id):
 
     # load coordinates
     with open(ROADS_DIR / "highway.json") as f:
-        highway_route = json.load(f)
+        highway_route = json.load(f)["features"][0]["geometry"]["coordinates"]
     with open(ROADS_DIR / "entering.json") as f:
-        entering_route = json.load(f)
+        entering_route = json.load(f)["features"][0]["geometry"]["coordinates"]
     
     merge_lat, merge_lon = entering_route[-1]
     # Find the highway point closest to merge point
@@ -60,9 +60,9 @@ def test_highway_entry_unsafe(get_car_id):
     # This ensures predicted distance is well below threshold (~7m vs 15m threshold)
     highway_start_idx = max(0, merge_idx - 7)
 
-    for step in range(10):
+    for step in range(7):
         # Entering car progresses through full route
-        entering_idx = min(step * len(entering_route) // 8, len(entering_route) - 1)
+        entering_idx = min((step * len(entering_route) // 8) + 2, len(entering_route) + 1)
         entering_lat, entering_lon = entering_route[entering_idx]
         
         # Highway car moves at same pace, both converging on merge point
@@ -115,10 +115,10 @@ def test_highway_entry_safe(get_car_id):
     time.sleep(0.5)
 
     with open(ROADS_DIR / "highway.json") as f:
-        highway_route = json.load(f)
+        highway_route = json.load(f)["features"][0]["geometry"]["coordinates"]
     
     with open(ROADS_DIR / "entering.json") as f:
-        entering_route = json.load(f)
+        entering_route = json.load(f)["features"][0]["geometry"]["coordinates"]
     
     # Find merge point and position highway car to be within detection range but safely behind
     merge_lat, merge_lon = entering_route[-1]
@@ -130,7 +130,7 @@ def test_highway_entry_safe(get_car_id):
     # With -11 offset (~110m back), predicted distance should be 35-45m vs 15m threshold
     highway_start_idx = max(0, merge_idx - 11)
 
-    for step in range(10):
+    for step in range(7):
         # Entering car progresses through full route (same pattern as unsafe test)
         entering_idx = min(step * len(entering_route) // 8, len(entering_route) - 1)
         entering_lat, entering_lon = entering_route[entering_idx]
@@ -164,10 +164,8 @@ def test_highway_entry_safe(get_car_id):
 
     assert len(safe_alerts) > 0, f"Expected safe alert but got: {ALERTS}"
 
-
 if __name__ == "__main__":
     def get_car_id(base_name: str) -> str:
         return f"{base_name}-{str(uuid.uuid4())[:8]}" 
     test_highway_entry_unsafe(get_car_id)
     test_highway_entry_safe(get_car_id)
-

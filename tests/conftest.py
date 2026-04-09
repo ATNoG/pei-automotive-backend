@@ -84,6 +84,15 @@ def _cleanup_test_cars(car_ids: List[str]) -> None:
                 "timestamp": time.time()
             })
             client.publish(f"test/cleanup/{car_id}", cleanup_msg, qos=1)
+
+            # Tell consumers to clear stale per-car traffic jam alerts.
+            clear_msg = json.dumps({
+                "notification_type": "traffic_jam_clear",
+                "target_car_id": car_id,
+                "reason": "test_cleanup",
+                "timestamp": time.time()
+            })
+            client.publish(f"alerts/traffic_jam/{car_id}", clear_msg, qos=1)
             
             # Also send a final position update with special marker to trigger state cleanup
             # This ensures the car is removed from all service states
