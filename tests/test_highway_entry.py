@@ -23,13 +23,30 @@ def _find_merge_index(highway_route, merge_lat, merge_lon):
     )
 
 
-def _simulate_merge(highway_car, entering_car, highway_start_idx, highway_route, entering_route):
-    """simulate both cars approaching the merge point over 10 steps."""
-    for step in range(10):
+def _simulate_merge_unsafe(highway_car, entering_car, highway_start_idx, highway_route, entering_route):
+    """simulate both cars approaching the merge point over 10 steps - unsafe version"""
+    for step in range(7):
+        entering_idx = min((step * len(entering_route) // 8) + 2, len(entering_route) + 1)
+        entering_lat, entering_lon = entering_route[entering_idx]
+
+        highway_idx = highway_start_idx + step
+        highway_idx = min(highway_idx, len(highway_route) - 1)
+        highway_lat, highway_lon = highway_route[highway_idx]
+
+        send_positions_parallel([
+            (entering_car, entering_lat, entering_lon),
+            (highway_car, highway_lat, highway_lon),
+        ])
+        time.sleep(0.1)
+
+def _simulate_merge_safe(highway_car, entering_car, highway_start_idx, highway_route, entering_route):
+    """simulate both cars approaching the merge point over 10 steps - safe version"""
+    for step in range(7):
         entering_idx = min(step * len(entering_route) // 8, len(entering_route) - 1)
         entering_lat, entering_lon = entering_route[entering_idx]
 
-        highway_idx = min(highway_start_idx + step, len(highway_route) - 1)
+        highway_idx = highway_start_idx + step
+        highway_idx = min(highway_idx, len(highway_route) - 1)
         highway_lat, highway_lon = highway_route[highway_idx]
 
         send_positions_parallel([
@@ -64,7 +81,7 @@ def test_highway_entry_unsafe(get_car_id):
     # start close to merge point so predicted distance is well below threshold (~7m vs 15m)
     highway_start_idx = max(0, merge_idx - 7)
 
-    _simulate_merge(highway_car, entering_car, highway_start_idx, highway_route, entering_route)
+    _simulate_merge_unsafe(highway_car, entering_car, highway_start_idx, highway_route, entering_route)
 
     time.sleep(2)
     client.loop_stop()
@@ -100,7 +117,7 @@ def test_highway_entry_safe(get_car_id):
     # start farther from merge point so predicted distance is safely above threshold (~35-45m vs 15m)
     highway_start_idx = max(0, merge_idx - 11)
 
-    _simulate_merge(highway_car, entering_car, highway_start_idx, highway_route, entering_route)
+    _simulate_merge_safe(highway_car, entering_car, highway_start_idx, highway_route, entering_route)
 
     time.sleep(3)
     client.loop_stop()
@@ -109,5 +126,5 @@ def test_highway_entry_safe(get_car_id):
     assert len(safe_alerts) > 0, f"expected safe alert but got: {ALERTS}"
 
 if __name__ == "__main__":
-    test_highway_entry_unsafe(standalone_car_id)
-    test_highway_entry_safe(standalone_car_id)
+    test_highway_entry_unsafe(standalone_get_car_id)
+    test_highway_entry_safe(standalone_get_car_id)
