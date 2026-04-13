@@ -164,7 +164,7 @@ def test_repository_creates_defaults_and_updates_fields(db_conn: PgConnectionAda
 
     request = UpdatePreferencesRequest.model_validate(
         {
-            "appearance": {"dark_mode": False, "colorblind_enabled": True},
+            "appearance": {"dark_mode": False, "colorblind_enabled": True, "language": "pt"},
             "alerts": {
                 "navigation": {"alert": False, "audio": False},
                 "traffic": {"alert": False, "audio": True},
@@ -180,6 +180,7 @@ def test_repository_creates_defaults_and_updates_fields(db_conn: PgConnectionAda
 
     assert updated.appearance.dark_mode is False
     assert updated.appearance.colorblind_enabled is True
+    assert updated.appearance.language == "pt"
     assert updated.alerts.navigation.alert is False
     assert updated.alerts.navigation.audio is False
     assert updated.alerts.traffic.alert is False
@@ -219,7 +220,7 @@ def test_patch_preferences_endpoint_updates_state(db_conn: PgConnectionAdapter):
     asyncio.run(PreferenceRepository(conn).get_or_create_defaults(user_id))
 
     patch_payload = {
-        "appearance": {"dark_mode": False, "colorblind_enabled": True},
+        "appearance": {"dark_mode": False, "colorblind_enabled": True, "language": "en"},
         "alerts": {
             "accident": {"alert": True, "audio": False},
             "weather": {"alert": False, "audio": False},
@@ -237,6 +238,7 @@ def test_patch_preferences_endpoint_updates_state(db_conn: PgConnectionAdapter):
     body = response.json()
     assert body["appearance"]["dark_mode"] is False
     assert body["appearance"]["colorblind_enabled"] is True
+    assert body["appearance"]["language"] == "en"
     assert body["alerts"]["accident"]["audio"] is False
     assert body["alerts"]["weather"]["alert"] is False
     assert body["weather"]["feels_like"] is True
