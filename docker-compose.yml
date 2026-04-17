@@ -119,6 +119,7 @@ services:
             - ./db/init:/docker-entrypoint-initdb.d
         networks:
             - keycloak_net
+            - database_net
         restart: unless-stopped
         healthcheck:
             test: ["CMD-SHELL", "pg_isready -U keycloak"]
@@ -176,10 +177,10 @@ services:
             DB_NAME: automotive_os
             DB_USER: ${APP_DB_USER}
             DB_PASSWORD: ${APP_DB_PASSWORD}
-            KEYCLOAK_URL: http://keycloak_auth:8080
+            KEYCLOAK_URL: http://keycloak:8080
             KEYCLOAK_REALM: ${KEYCLOAK_REALM}
         ports:
-        - "8081:8080"
+        - "8082:8080"
         networks:
         - database_net
 
