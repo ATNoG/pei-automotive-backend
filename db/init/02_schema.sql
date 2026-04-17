@@ -1,3 +1,5 @@
+\connect automotive_os
+
 CREATE EXTENSION IF NOT EXISTS pgcrypto;
 
 CREATE TABLE IF NOT EXISTS users (
@@ -22,6 +24,7 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     -- Appearance
     dark_mode BOOLEAN NOT NULL DEFAULT TRUE,
     colorblind_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+    language VARCHAR(10) NOT NULL DEFAULT 'en',
 
     -- Alert toggles
     alert_accident BOOLEAN NOT NULL DEFAULT TRUE,
@@ -51,3 +54,6 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO automotive_user;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO automotive_user;
