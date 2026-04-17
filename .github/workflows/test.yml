@@ -60,8 +60,8 @@ jobs:
 
             - name: Start services
               run: |
-                  docker compose up --build -d
-                  sleep 10
+                  docker compose up --build --wait -d
+                  sleep 30
 
             - name: Run tests
               run: |
