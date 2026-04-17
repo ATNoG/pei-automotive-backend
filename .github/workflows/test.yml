@@ -1,3 +1,6 @@
+## test workflow
+# must have python, pip, pytest and docker installed for the tests to run
+
 name: Test
 
 on:
