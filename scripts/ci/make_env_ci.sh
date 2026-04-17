@@ -1,0 +1,58 @@
+#!/usr/bin/env bash
+# This script creates the .env file using GitHub Secrets
+# This script is only used in test.yml
+
+set -e
+
+CERT_PATH=""
+
+echo "[INFO] Creating .env file for CI..."
+cat > .env << EOF
+# Ditto Configuration
+DITTO_WS_URL=ws://${HOST_IP}:${DITTO_PORT}/ws/2
+DITTO_API_URL=http://${HOST_IP}:${DITTO_PORT}
+DITTO_USER=${DITTO_USER}
+DITTO_PASS=${DITTO_PASS}
+
+# Hono Configuration
+HONO_API_URL=https://${HOST_IP}:${HONO_REG_PORT}
+HONO_USER=${HONO_USER}
+HONO_PASS=${HONO_PASS}
+HONO_TENANT=org.eclipse.packages.c2e
+CERT=${CERT_PATH}
+
+# MQTT Broker (internal Docker network)
+MQTT_BROKER_HOST=mosquitto_broker
+MQTT_BROKER_PORT=1883
+MQTT_BROKER_USER=
+MQTT_BROKER_PASSWORD=
+
+# Weather API
+WEATHER_API_URL=${WEATHER_API_URL}
+WEATHER_USER=${WEATHER_USER}
+WEATHER_PASS=${WEATHER_PASS}
+
+# Keycloak
+KC_PORT=${KC_PORT}
+KEYCLOAK_ADMIN=${KEYCLOAK_ADMIN}
+KEYCLOAK_ADMIN_PASSWORD=${KEYCLOAK_ADMIN_PASSWORD}
+KC_DB_USERNAME=${KC_DB_USERNAME}
+KC_DB_PASSWORD=${KC_DB_PASSWORD}
+KEYCLOAK_REALM=${KEYCLOAK_REALM}
+
+# Database API
+APP_DB_USER=${APP_DB_USER}
+APP_DB_PASSWORD=${APP_DB_PASSWORD}
+DATABASE_API_PORT=${DATABASE_API_PORT}
+
+# MQTT Topics
+MQTT_CAR_UPDATES_TOPIC=cars/updates
+MQTT_METEO_UPDATES_TOPIC=meteo/updates
+MQTT_STATION_ASSIGNMENT_TOPIC=cars/station
+
+# Hono MQTT Adapter
+MQTT_ADAPTER_IP=${HOST_IP}
+MQTT_ADAPTER_PORT_MQTTS=${HONO_MQTT_PORT}
+EOF
+
+echo "[INFO] .env created successfully"
