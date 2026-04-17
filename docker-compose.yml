@@ -180,15 +180,15 @@ services:
             KEYCLOAK_URL: http://keycloak:8080
             KEYCLOAK_REALM: ${KEYCLOAK_REALM}
         ports:
-        - "8082:8080"
+            - "${DATABASE_API_PORT:-8082}:8080"
         networks:
-        - database_net
+            - database_net
 
 networks:
-  keycloak_net:
-    driver: bridge
-  database_net:
-    driver: bridge
+    keycloak_net:
+        driver: bridge
+    database_net:
+        driver: bridge
 
 volumes:
     keycloak_db_data:

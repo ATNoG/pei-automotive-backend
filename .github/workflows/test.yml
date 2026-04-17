@@ -16,6 +16,7 @@ jobs:
             MQTT_PORT: "1885"
             TEST_MQTT_PORT: "1885"
             KC_PORT: "8082"
+            DATABASE_API_PORT: "8083"
             COMPOSE_PROJECT_NAME: "ci-test"
 
         steps:
