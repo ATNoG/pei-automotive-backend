@@ -1,3 +1,6 @@
+## test workflow
+# must have python, pip, pytest and docker installed for the tests to run
+
 name: Test
 
 on:
@@ -7,16 +10,12 @@ on:
 
 jobs:
     test:
-        runs-on: self-hosted
+        runs-on: [self-hosted, test-runner]
         permissions:
             contents: read
         timeout-minutes: 15
         env:
             CI: "true"
-            MQTT_PORT: "1885"
-            TEST_MQTT_PORT: "1885"
-            KC_PORT: "8082"
-            COMPOSE_PROJECT_NAME: "ci-test"
 
         steps:
             - uses: actions/checkout@v4
@@ -27,12 +26,6 @@ jobs:
                   echo "[INFO] Added tomastest.com to /etc/hosts"
                   cat /etc/hosts | grep tomastest.com
 
-            - name: Check if all C2E pods are up
-              run: |
-                  NOT_READY=$(kubectl get pods -n cloud2edge --no-headers 2>/dev/null | grep -vE 'Running|Completed' | wc -l)
-                  [ "$NOT_READY" -eq 0 ] || (echo "$NOT_READY pods not ready" && exit 1)
-                  sleep 2
-
             - name: Install/Update dependencies
               run: |
                   pip install -r requirements.txt
@@ -40,21 +33,33 @@ jobs:
 
             - name: Generate .env file
               env:
+                  HOST_IP: ${{ secrets.HOST_IP }}
                   WEATHER_API_URL: ${{ secrets.WEATHER_API_URL }}
                   WEATHER_USER: ${{ secrets.WEATHER_USER }}
                   WEATHER_PASS: ${{ secrets.WEATHER_PASS }}
                   KEYCLOAK_ADMIN: ${{ secrets.KEYCLOAK_ADMIN }}
                   KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+                  KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
                   KC_DB_USERNAME: ${{ secrets.KC_DB_USERNAME }}
                   KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+                  KC_PORT: ${{ secrets.KC_PORT }}
+                  APP_DB_USER: ${{ secrets.APP_DB_USER }}
+                  APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+                  DATABASE_API_PORT: ${{ secrets.DATABASE_API_PORT }}
+                  DITTO_PORT: ${{ secrets.DITTO_PORT }}
+                  DITTO_USER: ${{ secrets.DITTO_USER }}
+                  DITTO_PASS: ${{ secrets.DITTO_PASS }}
+                  HONO_REG_PORT: ${{ secrets.HONO_REG_PORT }}
+                  HONO_MQTT_PORT: ${{ secrets.HONO_MQTT_PORT }}
+                  HONO_USER: ${{ secrets.HONO_USER }}
+                  HONO_PASS: ${{ secrets.HONO_PASS }}
               run: |
-                  chmod +x make_env.sh
-                  ./make_env.sh
-                  sleep 2
+                  chmod +x scripts/ci/make_env_ci.sh
+                  ./scripts/ci/make_env_ci.sh
 
             - name: Start services
               run: |
-                  docker compose -p ci-test up --build -d
+                  docker compose up --build -d
                   sleep 10
 
             - name: Run tests
@@ -63,4 +68,4 @@ jobs:
 
             - name: Cleanup
               if: always()
-              run: docker compose -p ci-test down -v
+              run: docker compose down -v
