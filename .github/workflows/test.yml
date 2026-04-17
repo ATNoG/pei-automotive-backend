@@ -7,16 +7,12 @@ on:
 
 jobs:
     test:
-        runs-on: self-hosted
+        runs-on: [self-hosted, test-runner]
         permissions:
             contents: read
         timeout-minutes: 15
         env:
             CI: "true"
-            MQTT_PORT: "1885"
-            TEST_MQTT_PORT: "1885"
-            KC_PORT: "8082"
-            COMPOSE_PROJECT_NAME: "ci-test"
 
         steps:
             - uses: actions/checkout@v4
@@ -54,7 +50,7 @@ jobs:
 
             - name: Start services
               run: |
-                  docker compose -p ci-test up --build -d
+                  docker compose --build -d
                   sleep 10
 
             - name: Run tests
@@ -63,4 +59,4 @@ jobs:
 
             - name: Cleanup
               if: always()
-              run: docker compose -p ci-test down -v
+              run: docker compose down -v
