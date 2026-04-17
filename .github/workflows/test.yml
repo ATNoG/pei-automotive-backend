@@ -63,16 +63,6 @@ jobs:
                   docker compose up --build --wait -d
                   sleep 30
 
-            - name: Dump postgres logs on failure
-              if: failure()
-              run: |
-                  echo "=== postgres container logs ==="
-                  docker logs pei-automotive-backend-postgres-1 2>&1 || true
-                  echo "=== postgres container inspect ==="
-                  docker inspect pei-automotive-backend-postgres-1 2>&1 || true
-                  echo "=== all container statuses ==="
-                  docker compose ps -a
-
             - name: Run tests
               run: |
                   pytest -v
