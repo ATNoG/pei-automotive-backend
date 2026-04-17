@@ -1,41 +1,34 @@
 import json
 import time
-import subprocess
-import uuid
-from pathlib import Path
 from threading import Thread
+
 import paho.mqtt.client as mqtt
 
-SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
-ROADS_DIR = Path(__file__).resolve().parent.parent / "simulations/roads"
+from helpers import (
+    MQTT_HOST, MQTT_PORT, ROADS_DIR,
+    ensure_car_exists, send_position, standalone_get_car_id,
+)
+
 ALERTS = []
 
-def ensure_car_exists(car_name: str) -> None:
-    meta = SIM_DIR / "devices" / f"{car_name}.json"
-    if not meta.exists():
-        subprocess.run(["python3", str(SIM_DIR / "create_car.py"), car_name], check=True)
 
-def on_overtaking_alert(client, userdata, msg):
-    payload = json.loads(msg.payload.decode())
-    ALERTS.append(payload)
+def on_message(client, userdata, msg):
+    ALERTS.append(json.loads(msg.payload.decode()))
 
-def send_position(car_name: str, lat: float, lon: float) -> None:
-    subprocess.run([
-        "python3", str(SIM_DIR / "send_position.py"),
-        car_name, str(lat), str(lon)
-    ], check=True)
 
 def test_overtaking(get_car_id):
-    car_slow = get_car_id("overtaking-car-front") # victim
-    car_fast = get_car_id("overtaking-car-behind") # overtaker
+    car_slow = get_car_id("overtaking-car-front")   # victim
+    car_fast = get_car_id("overtaking-car-behind")  # overtaker
+
+    ALERTS.clear()
 
     ensure_car_exists(car_slow)
     ensure_car_exists(car_fast)
 
-    client = mqtt.Client()
-    client.connect("localhost", 1884)
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client.on_message = on_message
+    client.connect(MQTT_HOST, MQTT_PORT)
     client.subscribe("alerts/overtaking")
-    client.on_message = on_overtaking_alert
     client.loop_start()
 
     with open(ROADS_DIR / "right_lane.json") as f:
@@ -43,50 +36,40 @@ def test_overtaking(get_car_id):
     with open(ROADS_DIR / "left_lane.json") as f:
         left_lane = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-
-    for i in range(0, len(right_lane)-51, 3):
-        # slow car starts ahead (index + 4) but now moves 3 steps per iteration
+    for i in range(0, len(right_lane) - 51, 3):
         slow_idx = i + 4
-
-        # fast car starts behind (index 0)
-        fast_idx = round(i*1.6)
+        fast_idx = round(i * 1.6)
 
         if slow_idx >= len(right_lane) or fast_idx >= len(right_lane):
             break
 
         s_lon, s_lat = right_lane[slow_idx]
-
-        gap = slow_idx - fast_idx # positive = Slow car is ahead
+        gap = slow_idx - fast_idx
 
         if gap > 0.5:
-            # fast car is far behind -> Right Lane
+            # fast car is far behind — stay in right lane
             f_lon, f_lat = right_lane[fast_idx]
         elif gap > -7:
-            # fast car is passing -> Stay in Left Lane until clearly ahead
+            # fast car is passing — move to left lane
             f_lon, f_lat = left_lane[fast_idx]
         else:
-            # fast car is well ahead -> return to Right Lane
+            # fast car is well ahead — return to right lane
             f_lon, f_lat = right_lane[fast_idx]
 
-        # send positions in parallel using threads
-        thread_slow = Thread(target=send_position, args=(car_slow, s_lat, s_lon))
-        thread_fast = Thread(target=send_position, args=(car_fast, f_lat, f_lon))
-        
-        thread_slow.start()
-        thread_fast.start()
-        
-        thread_slow.join()
-        thread_fast.join()
-        
+        t_slow = Thread(target=send_position, args=(car_slow, s_lat, s_lon))
+        t_fast = Thread(target=send_position, args=(car_fast, f_lat, f_lon))
+        t_slow.start()
+        t_fast.start()
+        t_slow.join()
+        t_fast.join()
+
         time.sleep(0.02)
 
     time.sleep(2)
     client.loop_stop()
 
+    assert len(ALERTS) > 0, "expected at least one overtaking alert, got none"
 
-    assert len(ALERTS) > 0, "Expected at least one overtaking alert, got none"
 
 if __name__ == "__main__":
-    def get_car_id(base_name: str) -> str:
-        return f"{base_name}-{str(uuid.uuid4())[:8]}"
-    test_overtaking(get_car_id)
+    test_overtaking(standalone_get_car_id)

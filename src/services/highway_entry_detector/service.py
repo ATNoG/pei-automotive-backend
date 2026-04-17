@@ -29,7 +29,7 @@ class HighwayEntryDetector:
     # Detection parameters
     ENTRY_ZONE_M = 100  # distance to consider entry zone (meters)
     MERGE_POINT_DETECTION_M = 20  # distance to merge point to trigger analysis
-    COLLISION_THRESHOLD_M = 15  # minimum safe distance (meters) - increased for highway merge safety
+    COLLISION_THRESHOLD_M = 20  # minimum safe distance (meters)
     PREDICTION_TIME_S = 5  # time window for prediction (seconds)
     
     def __init__(self, config):
@@ -76,7 +76,8 @@ class HighwayEntryDetector:
         
         try:
             with open(route_file) as f:
-                coords = json.load(f)
+                data = json.load(f)
+                coords = data["features"][0]["geometry"]["coordinates"]
             # Convert to (lat, lon) tuples
             return [(lat, lon) for lat, lon in coords]
         except Exception as e:
