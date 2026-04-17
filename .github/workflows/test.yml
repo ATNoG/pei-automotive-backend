@@ -33,29 +33,28 @@ jobs:
                   [ "$NOT_READY" -eq 0 ] || (echo "$NOT_READY pods not ready" && exit 1)
                   sleep 2
 
-      - name: Install/Update dependencies
-        run: |
-          pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements_database.txt
-          sleep 2
+            - name: Install/Update dependencies
+              run: |
+                  pip install --upgrade pip
+                  pip install -r requirements.txt
+                  sleep 2
 
-      - name: Generate .env file
-        env:
-          WEATHER_API_URL: ${{ secrets.WEATHER_API_URL }}
-          WEATHER_USER: ${{ secrets.WEATHER_USER }}
-          WEATHER_PASS: ${{ secrets.WEATHER_PASS }}
-          KEYCLOAK_ADMIN: ${{ secrets.KEYCLOAK_ADMIN }}
-          KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
-          KC_DB_USERNAME: ${{ secrets.KC_DB_USERNAME }}
-          KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
-          APP_DB_USER: ${{ secrets.APP_DB_USER }}
-          APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
-          KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
-        run: |
-          chmod +x make_env.sh
-          ./make_env.sh
-          sleep 2
+            - name: Generate .env file
+              env:
+                  WEATHER_API_URL: ${{ secrets.WEATHER_API_URL }}
+                  WEATHER_USER: ${{ secrets.WEATHER_USER }}
+                  WEATHER_PASS: ${{ secrets.WEATHER_PASS }}
+                  KEYCLOAK_ADMIN: ${{ secrets.KEYCLOAK_ADMIN }}
+                  KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+                  KC_DB_USERNAME: ${{ secrets.KC_DB_USERNAME }}
+                  KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+                  APP_DB_USER: ${{ secrets.APP_DB_USER }}
+                  APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+                  KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
+              run: |
+                  chmod +x make_env.sh
+                  ./make_env.sh
+                  sleep 2
 
             - name: Start services
               run: |
