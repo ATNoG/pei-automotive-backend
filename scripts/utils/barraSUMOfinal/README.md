@@ -27,40 +27,6 @@ Run with Python (TraCI) to access a running sim:
 python3 simulation.py
 ```
 
-## Feeding the backend (`bridge.py`)
-
-`simulation.py` just prints vehicles to stdout. `bridge.py` is the integration
-with the rest of the stack: it runs SUMO via TraCI and PUTs every vehicle's
-GPS position directly to Eclipse Ditto (skipping Hono/MQTT for speed), which
-triggers the usual `position_processor` -> `cars/updates` -> detector pipeline.
-
-One-time setup (venv kept inside this folder so it's easy to throw away):
-
-``` bash
-python3 -m venv .venv
-.venv/bin/pip install eclipse-sumo traci sumolib requests python-dotenv
-```
-
-Run (requires the backend `.env` present two levels up and the services up):
-
-``` bash
-.venv/bin/python bridge.py --max-steps 120 --max-vehicles 40 --real-time --workers 24 --cleanup
-```
-
-Useful flags:
-- `--max-vehicles N` — publish at most N vehicles per step (default: no cap)
-- `--real-time` — pace sim to real wall-clock (otherwise floods Ditto)
-- `--workers N` — HTTP thread pool (default 16)
-- `--max-steps N` — wall-clock safety net
-- `--cleanup` — DELETE every simulated thing from Ditto on exit
-- `--gui` — launch sumo-gui instead of headless sumo
-
-Metrics line (printed every `--metrics-interval` seconds):
-
-```
-[step=S sim=Ts active=N seen=M | sent=X ok=X fail=E avg=... p50=... p95=...]
-```
-
 ## files
 
     barraSUMO/
