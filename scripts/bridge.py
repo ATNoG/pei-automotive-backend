@@ -38,8 +38,8 @@ from dotenv import load_dotenv
 import traci
 
 
-REPO_ROOT = Path(__file__).resolve().parents[3]
-SIM_DIR = Path(__file__).resolve().parent
+REPO_ROOT = Path(__file__).resolve().parents[1]
+SIM_DIR = REPO_ROOT / "simulations" / "barraSUMOfinal"
 
 
 def load_env() -> dict:
