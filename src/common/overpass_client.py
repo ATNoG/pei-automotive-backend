@@ -23,35 +23,51 @@ OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 DEFAULT_SPEED_LIMIT_KMH: float = 50.0
 
 ROAD_TYPE_SPEED_LIMITS: Dict[str, float] = {
-    "motorway": 120, "motorway_link": 80,
-    "trunk": 100,    "trunk_link": 60,
-    "primary": 90,   "primary_link": 50,
-    "secondary": 70, "secondary_link": 50,
-    "tertiary": 50,  "tertiary_link": 40,
-    "unclassified": 50, "residential": 50,
-    "living_street": 20, "service": 30, "track": 40,
+    "motorway": 120,
+    "motorway_link": 80,
+    "trunk": 100,
+    "trunk_link": 60,
+    "primary": 90,
+    "primary_link": 50,
+    "secondary": 70,
+    "secondary_link": 50,
+    "tertiary": 50,
+    "tertiary_link": 40,
+    "unclassified": 50,
+    "residential": 50,
+    "living_street": 20,
+    "service": 30,
+    "track": 40,
 }
 
 _DRIVEABLE_HIGHWAY_TYPES: Set[str] = set(ROAD_TYPE_SPEED_LIMITS.keys())
 
 # Priority tiers for road matching (lower = preferred when distances are close)
 _HIGHWAY_PRIORITY: Dict[str, int] = {
-    "motorway": 0, "trunk": 0,
-    "motorway_link": 1, "trunk_link": 1,
-    "primary": 2, "primary_link": 2,
-    "secondary": 3, "secondary_link": 3,
-    "tertiary": 4, "tertiary_link": 4,
-    "unclassified": 5, "residential": 5,
-    "living_street": 6, "service": 7, "track": 8,
+    "motorway": 0,
+    "trunk": 0,
+    "motorway_link": 1,
+    "trunk_link": 1,
+    "primary": 2,
+    "primary_link": 2,
+    "secondary": 3,
+    "secondary_link": 3,
+    "tertiary": 4,
+    "tertiary_link": 4,
+    "unclassified": 5,
+    "residential": 5,
+    "living_street": 6,
+    "service": 7,
+    "track": 8,
 }
 
-_TILE_SIZE: float = 0.005          # ~555 m lat × ~425 m lon at 40°N
-_TILE_TTL: float = 600.0           # 10 min
+_TILE_SIZE: float = 0.005  # ~555 m lat × ~425 m lon at 40°N
+_TILE_TTL: float = 600.0  # 10 min
 _MAX_MATCH_DISTANCE_M: float = 50.0
-_PRIORITY_MARGIN_M: float = 15.0   # prefer major road if within this margin
+_PRIORITY_MARGIN_M: float = 15.0  # prefer major road if within this margin
 _MIN_API_INTERVAL: float = 2.0
 _FAIL_RETRY_AFTER: float = 30.0
-_MAX_RETRIES: int = 1
+_MAX_RETRIES: int = 3
 _RETRY_BACKOFF_BASE: float = 3.0
 
 TileKey = Tuple[int, int]
@@ -62,7 +78,7 @@ class _RoadSegment:
     way_id: int
     speed_limit_kmh: float
     highway_type: str
-    geometry: Tuple[Tuple[float, float], ...]   # [(lat, lon), …]
+    geometry: Tuple[Tuple[float, float], ...]  # [(lat, lon), …]
 
 
 @dataclass(slots=True)
@@ -80,6 +96,7 @@ class _TileData:
 _tile_cache: Dict[TileKey, _TileData] = {}
 _cache_lock = threading.Lock()
 _last_api_time: float = 0.0
+_fetching_tiles: Set[TileKey] = set()
 
 
 def _tile_key(lat: float, lon: float) -> TileKey:
@@ -107,9 +124,12 @@ def _point_to_polyline_dist_m(plat, plon, geometry) -> float:
     best = float("inf")
     for i in range(len(geometry) - 1):
         d = _point_to_segment_dist_m(
-            plat, plon,
-            geometry[i][0], geometry[i][1],
-            geometry[i + 1][0], geometry[i + 1][1],
+            plat,
+            plon,
+            geometry[i][0],
+            geometry[i][1],
+            geometry[i + 1][0],
+            geometry[i + 1][1],
         )
         if d < best:
             best = d
@@ -143,14 +163,14 @@ def _fetch_tile_area(center: TileKey) -> List[_RoadSegment]:
     global _last_api_time
 
     south = (center[0] - 1) * _TILE_SIZE
-    west  = (center[1] - 1) * _TILE_SIZE
+    west = (center[1] - 1) * _TILE_SIZE
     north = (center[0] + 2) * _TILE_SIZE
-    east  = (center[1] + 2) * _TILE_SIZE
+    east = (center[1] + 2) * _TILE_SIZE
 
     query = (
-        f'[out:json][timeout:30];'
+        f"[out:json][timeout:30];"
         f'way["highway"]({south},{west},{north},{east});'
-        f'out body geom;'
+        f"out body geom;"
     )
 
     last_exc: Optional[Exception] = None
@@ -168,18 +188,26 @@ def _fetch_tile_area(center: TileKey) -> List[_RoadSegment]:
             resp.raise_for_status()
             data = resp.json()
             break
-        except (requests.exceptions.HTTPError,
-                requests.exceptions.ConnectionError,
-                requests.exceptions.Timeout) as exc:
+        except (
+            requests.exceptions.HTTPError,
+            requests.exceptions.ConnectionError,
+            requests.exceptions.Timeout,
+        ) as exc:
             last_exc = exc
             status = getattr(getattr(exc, "response", None), "status_code", 0)
-            retryable = isinstance(exc, (requests.exceptions.ConnectionError,
-                                         requests.exceptions.Timeout)) \
-                        or status in (429, 500, 502, 503, 504)
+            retryable = isinstance(
+                exc, (requests.exceptions.ConnectionError, requests.exceptions.Timeout)
+            ) or status in (429, 500, 502, 503, 504)
             if retryable and attempt < _MAX_RETRIES - 1:
-                backoff = _RETRY_BACKOFF_BASE * (2 ** attempt)
-                logger.warning("Overpass error for tile %s, retry %d/%d in %.0fs: %s",
-                               center, attempt + 1, _MAX_RETRIES, backoff, exc)
+                backoff = _RETRY_BACKOFF_BASE * (2**attempt)
+                logger.warning(
+                    "Overpass error for tile %s, retry %d/%d in %.0fs: %s",
+                    center,
+                    attempt + 1,
+                    _MAX_RETRIES,
+                    backoff,
+                    exc,
+                )
                 time.sleep(backoff)
                 continue
             raise
@@ -203,12 +231,14 @@ def _fetch_tile_area(center: TileKey) -> List[_RoadSegment]:
         if speed is None:
             speed = ROAD_TYPE_SPEED_LIMITS.get(hw, DEFAULT_SPEED_LIMIT_KMH)
 
-        segments.append(_RoadSegment(
-            way_id=el.get("id", 0),
-            speed_limit_kmh=speed,
-            highway_type=hw,
-            geometry=tuple((pt["lat"], pt["lon"]) for pt in raw_geom),
-        ))
+        segments.append(
+            _RoadSegment(
+                way_id=el.get("id", 0),
+                speed_limit_kmh=speed,
+                highway_type=hw,
+                geometry=tuple((pt["lat"], pt["lon"]) for pt in raw_geom),
+            )
+        )
     return segments
 
 
@@ -238,23 +268,32 @@ def _mark_tiles_failed(center: TileKey) -> None:
                 _tile_cache[tk] = _TileData(fetched_at=retry_at)
 
 
+def _async_fetch(tk: TileKey) -> None:
+    try:
+        segments = _fetch_tile_area(tk)
+        with _cache_lock:
+            _store_segments(segments, tk)
+            _fetching_tiles.discard(tk)
+        logger.info("Fetched %d road segments for tile %s", len(segments), tk)
+    except Exception:
+        logger.warning("Overpass fetch failed for tile %s", tk, exc_info=True)
+        with _cache_lock:
+            _mark_tiles_failed(tk)
+            _fetching_tiles.discard(tk)
+
+
 def _ensure_tiles(lat: float, lon: float) -> bool:
     tk = _tile_key(lat, lon)
     with _cache_lock:
         td = _tile_cache.get(tk)
         if td is not None and (time.time() - td.fetched_at < _TILE_TTL):
             return True
-    try:
-        segments = _fetch_tile_area(tk)
-        with _cache_lock:
-            _store_segments(segments, tk)
-        logger.info("Fetched %d road segments for tile %s", len(segments), tk)
-        return True
-    except Exception:
-        logger.warning("Overpass fetch failed for tile %s", tk, exc_info=True)
-        with _cache_lock:
-            _mark_tiles_failed(tk)
-        return False
+        if tk in _fetching_tiles:
+            return False
+        _fetching_tiles.add(tk)
+
+    threading.Thread(target=_async_fetch, args=(tk,), daemon=True).start()
+    return False
 
 
 def _find_nearest_road(lat: float, lon: float) -> Optional[_RoadSegment]:
