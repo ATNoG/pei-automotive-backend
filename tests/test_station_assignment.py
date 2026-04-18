@@ -5,7 +5,6 @@ from threading import Event
 import paho.mqtt.client as mqtt
 import pytest
 
-pytestmark = pytest.mark.skip(reason="station assignment tests skipped")
 from helpers import (
     MQTT_HOST,
     MQTT_PORT,
