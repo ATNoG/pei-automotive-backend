@@ -26,8 +26,12 @@ jobs:
                   WEATHER_PASS: ${{ secrets.WEATHER_PASS }}
                   KEYCLOAK_ADMIN: ${{ secrets.KEYCLOAK_ADMIN }}
                   KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+                  KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
                   KC_DB_USERNAME: ${{ secrets.KC_DB_USERNAME }}
                   KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+                  APP_DB_USER: ${{ secrets.APP_DB_USER }}
+                  APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+                  DATABASE_API_PORT: ${{ secrets.DATABASE_API_PORT }}
               run: |
                   cd ~/pei/pei-automotive-backend
                   chmod +x make_env.sh
