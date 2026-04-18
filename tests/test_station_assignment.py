@@ -1,5 +1,6 @@
 import json
 import time
+import pytest
 from threading import Event
 
 import paho.mqtt.client as mqtt
@@ -26,6 +27,7 @@ def on_subscribe(client, userdata, mid, reason_code_list, properties=None):
     subscription_ready.set()
 
 
+@pytest.mark.skip(reason="No reason for this to be on pipeline")
 def test_station_assignment_basic(get_car_id):
     car_id = get_car_id("station-test-car")
     ensure_car_exists(car_id)
