@@ -1,0 +1,7 @@
+#!/bin/bash
+set -e
+
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+    CREATE USER ${APP_DB_USER} WITH PASSWORD '${APP_DB_PASSWORD}';
+    CREATE DATABASE automotive_os OWNER ${APP_DB_USER};
+EOSQL

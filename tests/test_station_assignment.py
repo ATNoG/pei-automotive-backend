@@ -1,5 +1,6 @@
 import json
 import time
+import pytest
 from threading import Event
 
 import paho.mqtt.client as mqtt
@@ -105,7 +106,6 @@ def test_station_assignment_changes(get_car_id):
     finally:
         client.loop_stop()
         client.disconnect()
-
 
 def test_station_assignment_no_duplicate_on_same_station(get_car_id):
     car_id = get_car_id("station-test-stationary-car")

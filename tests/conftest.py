@@ -1,14 +1,21 @@
 """pytest configuration for test suite."""
 import json
+import os
+import socket
 import time
 import uuid
 from typing import List
 
 import paho.mqtt.client as mqtt
 import pytest
+import requests
+from requests.auth import HTTPBasicAuth
+from dotenv import load_dotenv
 
 from helpers import MQTT_HOST, MQTT_PORT, SIM_DIR
 
+# Load environment variables
+load_dotenv()
 
 def pytest_addoption(parser):
     parser.addoption(
@@ -17,6 +24,69 @@ def pytest_addoption(parser):
         default=False,
         help="use fixed car ids instead of random uuids (useful for frontend testing)",
     )
+
+
+def _check_connectivity(host="10.255.38.67", port=80, timeout=2):
+    """Check if meteorological station data is available."""
+    # First, check basic network connectivity
+    try:
+        socket.create_connection((host, port), timeout=timeout)
+    except (socket.timeout, socket.error):
+        return False
+    
+    # Then verify the actual weather API has meteo things
+    try:
+        weather_api_url = os.getenv("WEATHER_API_URL", "")
+        weather_user = os.getenv("WEATHER_USER", "")
+        weather_pass = os.getenv("WEATHER_PASS", "")
+        
+        if not all([weather_api_url, weather_user, weather_pass]):
+            return False
+        
+        # Try to fetch meteo things from Ditto API
+        api_url = weather_api_url.rstrip('/')
+        search_url = f"{api_url}/api/2/search/things"
+        params = {
+            'namespaces': 'meteo',
+            'option': 'size(1)'
+        }
+        
+        response = requests.get(
+            search_url,
+            params=params,
+            auth=HTTPBasicAuth(weather_user, weather_pass),
+            timeout=timeout
+        )
+        
+        if response.status_code == 200:
+            data = response.json()
+            # Check if we got at least one meteo thing
+            if isinstance(data, dict):
+                items = data.get('items', [])
+                return len(items) > 0
+            elif isinstance(data, list):
+                return len(data) > 0
+        
+        return False
+    except Exception:
+        return False
+
+
+@pytest.fixture(scope="session")
+def tomastest_available():
+    """fixture that indicates if tomastest.com is available."""
+    return _check_connectivity()
+
+
+def pytest_collection_modifyitems(config, items):
+    """skip station_assignment tests if stations not available."""
+    tomastest_ok = _check_connectivity()
+    
+    if not tomastest_ok:
+        skip_tomastest = pytest.mark.skip(reason="tomastest.com (10.255.38.67) is not reachable or has no meteo data")
+        for item in items:
+            if "test_station_assignment" in str(item.fspath):
+                item.add_marker(skip_tomastest)
 
 
 @pytest.fixture(scope="session")
