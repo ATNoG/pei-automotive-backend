@@ -1,0 +1,8 @@
+<routes>
+    <vTypeDistribution id="typedist">
+        <vType id="truck_truck" vClass="truck" probability="0.01"/>
+        <vType id="bus_bus" vClass="bus" probability="0.02"/>
+        <vType id="veh_passenger" vClass="passenger" probability="0.9"/>
+        <vType id="motorcycle_motorcycle" vClass="motorcycle" probability="0.07"/>
+    </vTypeDistribution>
+</routes>
