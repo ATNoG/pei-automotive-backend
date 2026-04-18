@@ -213,6 +213,8 @@ def run(args: argparse.Namespace) -> None:
         "-c", str(SIM_DIR / "osm.sumocfg"),
         "--step-length", str(args.step_length),
         "--no-warnings",
+        "--tripinfo-output", os.devnull,
+        "--statistic-output", os.devnull,
     ]
     if args.end_time is not None:
         sumo_cmd += ["--end", str(args.end_time)]

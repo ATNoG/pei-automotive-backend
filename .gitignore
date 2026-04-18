@@ -9,4 +9,4 @@ cloud2edge*
 
 venv/
 
-output/
+simulations/barraSUMOfinal/output/*.xml
