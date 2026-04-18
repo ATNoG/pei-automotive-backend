@@ -95,6 +95,19 @@ class PgConnectionAdapter:
         return await asyncio.to_thread(self._execute_sync, query, args)
 
 
+def _strip_psql_meta_commands(sql_text: str) -> str:
+    """Remove psql-only commands (e.g. \\connect) before SQL execution via drivers."""
+    cleaned_lines = [
+        line for line in sql_text.splitlines() if not line.lstrip().startswith("\\")
+    ]
+    return "\n".join(cleaned_lines)
+
+
+def _is_test_irrelevant_statement(statement: str) -> bool:
+    upper_stmt = statement.upper()
+    return upper_stmt.startswith("GRANT ")
+
+
 @pytest.fixture(scope="module")
 def db_conn() -> PgConnectionAdapter:
     with PostgresContainer("postgres:16") as postgres:
@@ -109,8 +122,11 @@ def db_conn() -> PgConnectionAdapter:
         )
         conn = PgConnectionAdapter(raw_conn)
         schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
+        schema_sql = _strip_psql_meta_commands(schema_sql)
         with raw_conn.cursor() as cur:
             for statement in [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]:
+                if _is_test_irrelevant_statement(statement):
+                    continue
                 cur.execute(statement)
         raw_conn.commit()
         try:
