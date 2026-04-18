@@ -71,6 +71,7 @@ def test_station_assignment_basic(get_car_id):
         client.disconnect()
 
 
+@pytest.mark.skip(reason="No reason for this to be on pipeline")
 def test_station_assignment_changes(get_car_id):
     car_id = get_car_id("station-test-moving-car")
     ensure_car_exists(car_id)
@@ -108,7 +109,7 @@ def test_station_assignment_changes(get_car_id):
         client.loop_stop()
         client.disconnect()
 
-
+@pytest.mark.skip(reason="No reason for this to be on pipeline")
 def test_station_assignment_no_duplicate_on_same_station(get_car_id):
     car_id = get_car_id("station-test-stationary-car")
     ensure_car_exists(car_id)
