@@ -5,3 +5,8 @@ pytest
 requests
 certifi
 geopy
+
+
+eclipse-sumo
+traci
+sumolib

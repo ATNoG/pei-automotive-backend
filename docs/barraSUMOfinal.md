@@ -33,9 +33,9 @@ Each SUMO vehicle `vid` becomes `org.acme:sumo-{vid}` in Ditto. One shared polic
 ## Setup (one-time)
 
 ```bash
-cd simulations/barraSUMOfinal
-python3 -m venv .venv
-.venv/bin/pip install eclipse-sumo traci sumolib requests python-dotenv
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
 ```
 
 Requires the backend `.env` at the repo root.
@@ -44,7 +44,7 @@ Requires the backend `.env` at the repo root.
 
 ```bash
 # From repo root:
-simulations/barraSUMOfinal/.venv/bin/python scripts/bridge.py \
+python scripts/bridge.py \
     --max-steps 120 \
     --max-vehicles 30 \
     --real-time \
@@ -56,15 +56,15 @@ Always use `--real-time` (prevents flooding Ditto) and `--cleanup` (deletes thin
 
 ## Flags
 
-| Flag | Default | Description |
-|---|---|---|
-| `--max-vehicles N` | — | Cap vehicles published per step |
-| `--max-steps N` | — | Stop after N steps |
-| `--workers N` | 16 | HTTP thread pool size |
-| `--real-time` | off | Pace sim to wall-clock time |
-| `--cleanup` | off | Delete all Ditto things on exit |
-| `--gui` | off | Launch `sumo-gui` instead of headless |
-| `--metrics-interval S` | 2.0 | Seconds between log lines |
+| Flag                   | Default | Description                           |
+| ---------------------- | ------- | ------------------------------------- |
+| `--max-vehicles N`     | —       | Cap vehicles published per step       |
+| `--max-steps N`        | —       | Stop after N steps                    |
+| `--workers N`          | 16      | HTTP thread pool size                 |
+| `--real-time`          | off     | Pace sim to wall-clock time           |
+| `--cleanup`            | off     | Delete all Ditto things on exit       |
+| `--gui`                | off     | Launch `sumo-gui` instead of headless |
+| `--metrics-interval S` | 2.0     | Seconds between log lines             |
 
 ## Regenerating traffic demand
 
