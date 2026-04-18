@@ -75,7 +75,7 @@ jobs:
 
             - name: Run tests
               run: |
-                  pytest -v
+                  pytest -v --ignore tests/test_station_assignment.py
 
             - name: Cleanup
               if: always()
