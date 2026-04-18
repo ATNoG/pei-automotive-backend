@@ -1,36 +1,17 @@
 #!/usr/bin/env python3
-"""
-SUMO -> Ditto bridge.
-
-Runs the SUMO simulation via TraCI and forwards every vehicle's GPS position
-straight to Eclipse Ditto via HTTP PUT /api/2/things/.../features. The
-position_processor service picks up the resulting WS event and the normal
-pipeline (speed/heading/speed_limit enrichment -> cars/updates -> detectors)
-runs unchanged.
-
-We bypass Hono entirely for the simulation because the per-call MQTT+TLS
-handshake + Python subprocess startup in simulations/send_position.py makes
-it impossible to drive more than a handful of cars in real time.
-
-Fast path per vehicle update:
-    1 HTTP PUT to Ditto (kept-alive session, pooled) ~50-250 ms over the VPN.
-    Run in parallel across a ThreadPoolExecutor so N cars/step fit inside the
-    sim step length.
-"""
+"""SUMO -> Ditto bridge: forwards vehicle GPS from TraCI to Ditto via HTTP PUT."""
 from __future__ import annotations
 
 import argparse
-import json
 import logging
 import os
-import queue
 import re
 import sys
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Dict, Optional, Set
+from typing import Set
 
 import requests
 from dotenv import load_dotenv
@@ -204,8 +185,7 @@ def run(args: argparse.Namespace) -> None:
     pub.ensure_shared_policy()
 
     binary_name = "sumo-gui" if args.gui else "sumo"
-    # Prefer the binary that ships with the active venv's eclipse-sumo wheel;
-    # fall back to PATH.
+    # prefer the venv's eclipse-sumo wheel binary, fall back to PATH
     venv_bin = Path(sys.executable).parent / binary_name
     sumo_binary = str(venv_bin) if venv_bin.exists() else binary_name
     sumo_cmd = [
@@ -237,7 +217,7 @@ def run(args: argparse.Namespace) -> None:
             sim_time = traci.simulation.getTime()
             vehicle_ids = traci.vehicle.getIDList()
 
-            # Cap the set of vehicles we publish (determinism: pick the first N).
+            # cap to first N for determinism
             if args.max_vehicles and len(vehicle_ids) > args.max_vehicles:
                 vehicle_ids_pub = vehicle_ids[: args.max_vehicles]
                 skipped_due_to_cap += len(vehicle_ids) - args.max_vehicles
@@ -254,7 +234,6 @@ def run(args: argparse.Namespace) -> None:
                 seen.add(vid)
                 executor.submit(pub.publish, vid, lat, lon, emergency)
 
-            # Real-time pacing (optional).
             if args.real_time:
                 elapsed = time.time() - loop_t0
                 remaining = args.step_length - elapsed
@@ -283,7 +262,7 @@ def run(args: argparse.Namespace) -> None:
             traci.close()
         except Exception:
             pass
-        logging.info("Shutting down executor (flush in-flight)...")
+        logging.info("Shutting down executor...")
         executor.shutdown(wait=True, cancel_futures=False)
         m = pub.metrics_snapshot()
         logging.info("Final: seen=%d max_concurrent=%d sent=%d ok=%d fail=%d",
