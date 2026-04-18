@@ -1,14 +1,15 @@
+import argparse
 import json
 import os
 import time
 from pathlib import Path
-import argparse
 
 import paho.mqtt.client as mqtt
 
 # Configuration
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
+
 
 def broadcast_cleanup_all():
     """
@@ -21,13 +22,12 @@ def broadcast_cleanup_all():
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
         client.connect(MQTT_HOST, MQTT_PORT, keepalive=5)
 
-        cleanup_msg = json.dumps({
-            "action": "cleanup_all",
-            "timestamp": time.time()
-        })
+        cleanup_msg = json.dumps({"action": "cleanup_all", "timestamp": time.time()})
 
         # Publish to a global cleanup topic that all services should subscribe to
-        client.publish("service/cleanup", cleanup_msg, qos=2) # Use QoS 2 for "exactly once"
+        client.publish(
+            "service/cleanup", cleanup_msg, qos=2
+        )  # Use QoS 2 for "exactly once"
 
         print("[CLEANUP] Signal sent. Services should now be clearing their states.")
         client.disconnect()
@@ -35,15 +35,18 @@ def broadcast_cleanup_all():
     except Exception as e:
         print(f"[CLEANUP] ERROR: MQTT broadcast failed: {e}")
 
+
 def delete_device_files():
     """Deletes all car device files from the simulations directory."""
 
-    # Get the absolute path to the directory where this script is located
-    script_dir = Path(__file__).resolve().parent
-    devices_dir = script_dir / "simulations" / "devices"
+    # Get the absolute path to the backend directory
+    backend_dir = Path(__file__).resolve().parent.parent
+    devices_dir = backend_dir / "simulations" / "devices"
 
     if not devices_dir.exists():
-        print(f"\nWarning: Devices directory not found at {devices_dir}, skipping file deletion.")
+        print(
+            f"\nWarning: Devices directory not found at {devices_dir}, skipping file deletion."
+        )
         return
 
     device_files = list(devices_dir.glob("*.json"))
