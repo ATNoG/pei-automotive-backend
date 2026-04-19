@@ -155,7 +155,6 @@ def _build_test_app(conn: PgConnectionAdapter, user_id: UUID) -> FastAPI:
     async def fake_current_user():
         return {
             "id": str(user_id),
-            "email": "driver@example.com",
             "username": "driver",
             "roles": ["user"],
         }

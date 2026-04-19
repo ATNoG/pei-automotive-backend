@@ -21,7 +21,6 @@ async def get_preferences(
         await ensure_user_exists(
             conn,
             user_id,
-            current_user.get("email") or "",
             current_user.get("username") or "",
         )
         repo = PreferenceRepository(conn)
@@ -43,7 +42,6 @@ async def update_preferences(
         await ensure_user_exists(
             conn,
             user_id,
-            current_user.get("email") or "",
             current_user.get("username") or "",
         )
         repo = PreferenceRepository(conn)

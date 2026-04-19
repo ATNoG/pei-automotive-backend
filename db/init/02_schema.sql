@@ -5,7 +5,6 @@ CREATE EXTENSION IF NOT EXISTS pgcrypto;
 CREATE TABLE IF NOT EXISTS users (
     id UUID PRIMARY KEY,
     username VARCHAR(100) NOT NULL,
-    email VARCHAR(250) NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
@@ -54,3 +53,29 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
+
+\getenv app_db_user APP_DB_USER
+
+SELECT format('GRANT USAGE ON SCHEMA public TO %I;', :'app_db_user')
+\gexec
+
+SELECT format(
+    'GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO %I;',
+    :'app_db_user'
+)
+\gexec
+
+SELECT format('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO %I;', :'app_db_user')
+\gexec
+
+SELECT format(
+    'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT SELECT, INSERT, UPDATE, DELETE ON TABLES TO %I;',
+    :'app_db_user'
+)
+\gexec
+
+SELECT format(
+    'ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT USAGE, SELECT ON SEQUENCES TO %I;',
+    :'app_db_user'
+)
+\gexec
