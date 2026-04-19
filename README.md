@@ -16,10 +16,10 @@ Be sure that the machine where you will deploy this meets the necessary hardware
 
 If you follow instructions, you will be able to deploy the cloud2edge environment, start the services and run tests locally.
 
-**Warnings:** 
+**Warnings:**
 
 Due to the fact that some images on c2e are outdated (see [issue](https://github.com/eclipse/packages/issues/553)) we had to manually update them and automate this process. And even though it worked on our machines, you might encounter some new issues when deploying the cloud2edge environment, if that happens, please refer to the [issues](https://github.com/eclipse/packages/issues) page.
- 
+
 ### 1. Clone this repo
 
 ```bash
@@ -30,12 +30,13 @@ cd pei-automotive-backend
 ### 2. Run the deployment script
 
 This script will:
- - Install all the necessary tools ([k3s](https://k3s.io/) and [helm](https://helm.sh/)) in case they aren't installed.
- - Clone the cloud2edge repo and update it's Chart referenced versions. 
- - Create the custom values.yaml file.
- - Install the cloud2edge package with the custom versions and the custom values.yaml file, using helm.
- - Confirm all the pods are running like it's supposed to.
- - Make a .env file with the necessary variables for the backend services.
+
+- Install all the necessary tools ([k3s](https://k3s.io/) and [helm](https://helm.sh/)) in case they aren't installed.
+- Clone the cloud2edge repo and update it's Chart referenced versions.
+- Create the custom values.yaml file.
+- Install the cloud2edge package with the custom versions and the custom values.yaml file, using helm.
+- Confirm all the pods are running like it's supposed to.
+- Make a .env file with the necessary variables for the backend services.
 
 ```bash
 chmod +x deploy.sh
@@ -51,10 +52,10 @@ docker compose up --build
 ```
 
 This will start:
+
 - **Position Processor**
-- **Speed Detector** service
-- **Overtaking Detector** service
 - **Mosquitto MQTT Broker** (message broker)
+- And all our multiple **Event Detection Services**
 
 And that's it! The cloud2edge is deployed and the backend services are running. You can now start using the system with tests and/or even build the [frontend](https://github.com/ATNoG/pei-automotive-frontend).
 
@@ -70,9 +71,10 @@ python3 create_car.py <car_name>
 ```
 
 This will:
- - Register the device in Eclipse Hono
- - Create a digital twin in Eclipse Ditto
- - Generate metadata file in `simulations/devices/<car_name>.json`
+
+- Register the device in Eclipse Hono
+- Create a digital twin in Eclipse Ditto
+- Generate metadata file in `simulations/devices/<car_name>.json`
 
 ### Sending Position Updates
 
@@ -101,12 +103,9 @@ pytest tests/test_overtaking.py
 
 # Test route with curves
 pytest tests/test_curved_route.py
-```
 
-Check latency on our system:
-```bash
-cd timing
-python3 measure_latency.py <car_name>
+# ...
+# You can run all the other tests
 ```
 
 ## License

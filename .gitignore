@@ -7,7 +7,6 @@ devices/
 ditto-helm-chart/
 cloud2edge*
 
-timing_results*
 venv/
 
-utils/recordings
+simulations/barraSUMOfinal/output/*.xml

@@ -5,6 +5,9 @@ pytest==8.3.5
 requests
 certifi
 geopy
+eclipse-sumo
+traci
+sumolib
 fastapi==0.115.0
 uvicorn[standard]==0.30.0
 pydantic==2.7.0
