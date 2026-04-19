@@ -54,6 +54,3 @@ CREATE TABLE IF NOT EXISTS user_preferences (
 
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO automotive_user;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO automotive_user;
