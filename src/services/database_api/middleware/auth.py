@@ -44,9 +44,9 @@ async def ensure_user_exists(conn, user_id: UUID, username: str):
     await conn.execute(
         """
         INSERT INTO users (id, username)
-        VALUES ($1, $2, $3)
+        VALUES ($1, $2)
         ON CONFLICT (id) DO UPDATE
-        SET username = EXCLUDED.username,
+        SET username = EXCLUDED.username;
         """,
         user_id,
         username
