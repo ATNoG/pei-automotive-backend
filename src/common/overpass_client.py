@@ -2,8 +2,9 @@
 # overpass_client.py
 # snapshot-first speed-limit resolver.
 #
-# at import time we load src/common/offline_roads.json (built incrementally by
-# scripts/build_offline_roads.py + the daily cron) into a flat list of road
+# at import time we load data/offline_roads/offline_roads.json (built
+# incrementally by scripts/build_offline_roads.py + the daily cron) into a flat
+# list of road
 # segments. lookups scan that list and return the nearest road's maxspeed.
 #
 # if a point falls outside the snapshot's covered tiles we make a single live
@@ -49,7 +50,12 @@ _DRIVEABLE_HIGHWAY_TYPES: Set[str] = set(ROAD_TYPE_SPEED_LIMITS.keys())
 
 _MAX_MATCH_DISTANCE_M: float = 25.0
 _LIVE_FETCH_HALFSIDE_DEG: float = 0.003  # ~330 m half-side bbox around the point
-_SNAPSHOT_PATH: Path = Path(__file__).resolve().parent / "offline_roads.json"
+_SNAPSHOT_PATH: Path = (
+    Path(__file__).resolve().parent.parent.parent
+    / "data"
+    / "offline_roads"
+    / "offline_roads.json"
+)
 
 
 @dataclass(frozen=True, slots=True)

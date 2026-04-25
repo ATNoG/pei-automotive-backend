@@ -3,7 +3,8 @@
 #
 # Resumable builder for the offline road snapshot covering the entirety of
 # Distrito de Aveiro (admin_level=6 in OSM). The result is written to
-# src/common/offline_roads.json, which overpass_client.py loads at import time.
+# data/offline_roads/offline_roads.json, which overpass_client.py loads at
+# import time.
 #
 # How it works:
 #   1. On first run we fetch the Aveiro district relation + its full polygon
@@ -35,8 +36,8 @@ from typing import Dict, List, Optional, Tuple
 import requests
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-OUTPUT_PATH = REPO_ROOT / "src" / "common" / "offline_roads.json"
-MANIFEST_PATH = REPO_ROOT / "scripts" / "offline_roads_manifest.json"
+OUTPUT_PATH = REPO_ROOT / "data" / "offline_roads" / "offline_roads.json"
+MANIFEST_PATH = REPO_ROOT / "data" / "offline_roads" / "offline_roads_manifest.json"
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
 USER_AGENT = "pei-automotive-backend/offline-roads-builder"
@@ -47,18 +48,29 @@ DISTRICT_ADMIN_LEVEL = "6"  # Portugal: admin_level=6 == distrito
 SNAPSHOT_VERSION = 2
 MANIFEST_VERSION = 2
 
-TILE_SIZE_DEG = 0.04          # ~4 km square tiles, uniform (no edge clipping)
-MAX_TILES_PER_RUN = 30        # soft cap so one run never burns all rate limit
+TILE_SIZE_DEG = 0.04  # ~4 km square tiles, uniform (no edge clipping)
+MAX_TILES_PER_RUN = 30  # soft cap so one run never burns all rate limit
 SLEEP_BETWEEN_CALLS_S = 4.0
-REFRESH_AFTER_DAYS = 7        # re-fetch tiles older than this
-PER_QUERY_TIMEOUT = 60        # Overpass [timeout:N]
+REFRESH_AFTER_DAYS = 7  # re-fetch tiles older than this
+PER_QUERY_TIMEOUT = 60  # Overpass [timeout:N]
 
 # keep in sync with overpass_client.ROAD_TYPE_SPEED_LIMITS
 DRIVEABLE_HIGHWAY_TYPES = {
-    "motorway", "motorway_link", "trunk", "trunk_link",
-    "primary", "primary_link", "secondary", "secondary_link",
-    "tertiary", "tertiary_link", "unclassified", "residential",
-    "living_street", "service", "track",
+    "motorway",
+    "motorway_link",
+    "trunk",
+    "trunk_link",
+    "primary",
+    "primary_link",
+    "secondary",
+    "secondary_link",
+    "tertiary",
+    "tertiary_link",
+    "unclassified",
+    "residential",
+    "living_street",
+    "service",
+    "track",
 }
 
 
@@ -120,11 +132,15 @@ def fetch_district_relation(rel_query_extra: str = "") -> dict:
         raise RuntimeError(
             f"Could not find Distrito de {DISTRICT_NAME} (admin_level={DISTRICT_ADMIN_LEVEL})"
         )
-    pt = [r for r in rels if str(r.get("tags", {}).get("ISO3166-2", "")).startswith("PT")]
+    pt = [
+        r for r in rels if str(r.get("tags", {}).get("ISO3166-2", "")).startswith("PT")
+    ]
     return (pt or rels)[0]
 
 
-def assemble_rings(lines: List[List[Tuple[float, float]]]) -> List[List[Tuple[float, float]]]:
+def assemble_rings(
+    lines: List[List[Tuple[float, float]]],
+) -> List[List[Tuple[float, float]]]:
     """Stitch unordered line segments into closed rings by matching endpoints."""
     rings: List[List[Tuple[float, float]]] = []
     remaining = [list(line) for line in lines]
@@ -135,13 +151,25 @@ def assemble_rings(lines: List[List[Tuple[float, float]]]) -> List[List[Tuple[fl
             progress = False
             for i, line in enumerate(remaining):
                 if current[-1] == line[0]:
-                    current.extend(line[1:]); remaining.pop(i); progress = True; break
+                    current.extend(line[1:])
+                    remaining.pop(i)
+                    progress = True
+                    break
                 if current[-1] == line[-1]:
-                    current.extend(reversed(line[:-1])); remaining.pop(i); progress = True; break
+                    current.extend(reversed(line[:-1]))
+                    remaining.pop(i)
+                    progress = True
+                    break
                 if current[0] == line[-1]:
-                    current = line[:-1] + current; remaining.pop(i); progress = True; break
+                    current = line[:-1] + current
+                    remaining.pop(i)
+                    progress = True
+                    break
                 if current[0] == line[0]:
-                    current = list(reversed(line))[1:] + current; remaining.pop(i); progress = True; break
+                    current = list(reversed(line))[1:] + current
+                    remaining.pop(i)
+                    progress = True
+                    break
         if len(current) >= 3:
             rings.append(current)
     return rings
@@ -161,7 +189,9 @@ def extract_outer_rings(relation: dict) -> List[List[Tuple[float, float]]]:
 
 
 # Geometry: point-in-polygon, tile-vs-polygon
-def point_in_rings(lat: float, lon: float, rings: List[List[Tuple[float, float]]]) -> bool:
+def point_in_rings(
+    lat: float, lon: float, rings: List[List[Tuple[float, float]]]
+) -> bool:
     """Even-odd ray casting across the union of rings (handles multipolygon holes)."""
     inside = False
     for ring in rings:
@@ -184,8 +214,9 @@ def point_in_rings(lat: float, lon: float, rings: List[List[Tuple[float, float]]
     return inside
 
 
-def tile_overlaps_rings(s: float, w: float, n: float, e: float,
-                        rings: List[List[Tuple[float, float]]]) -> bool:
+def tile_overlaps_rings(
+    s: float, w: float, n: float, e: float, rings: List[List[Tuple[float, float]]]
+) -> bool:
     """Sample a 4x4 grid of points inside the tile; True if any is in the polygon."""
     for i in range(4):
         for j in range(4):
@@ -268,12 +299,14 @@ def extract_segments(elements: List[dict]) -> List[dict]:
         raw_geom = el.get("geometry", [])
         if len(raw_geom) < 2:
             continue
-        out.append({
-            "id": el.get("id", 0),
-            "maxspeed": parse_maxspeed(tags),
-            "highway": hw,
-            "geom": [[round(p["lat"], 6), round(p["lon"], 6)] for p in raw_geom],
-        })
+        out.append(
+            {
+                "id": el.get("id", 0),
+                "maxspeed": parse_maxspeed(tags),
+                "highway": hw,
+                "geom": [[round(p["lat"], 6), round(p["lon"], 6)] for p in raw_geom],
+            }
+        )
     return out
 
 
@@ -285,7 +318,9 @@ def load_manifest() -> Optional[dict]:
         with MANIFEST_PATH.open() as f:
             return json.load(f)
     except (OSError, json.JSONDecodeError) as exc:
-        print(f"warning: failed to read manifest ({exc}), starting fresh", file=sys.stderr)
+        print(
+            f"warning: failed to read manifest ({exc}), starting fresh", file=sys.stderr
+        )
         return None
 
 
@@ -356,8 +391,10 @@ def bootstrap_manifest(now: datetime, sleep: float) -> dict:
     if not bb:
         raise RuntimeError("District relation returned without bounds")
     district_bbox = (
-        float(bb["minlat"]), float(bb["minlon"]),
-        float(bb["maxlat"]), float(bb["maxlon"]),
+        float(bb["minlat"]),
+        float(bb["minlon"]),
+        float(bb["maxlat"]),
+        float(bb["maxlon"]),
     )
     rings = extract_outer_rings(relation)
     if not rings:
@@ -409,14 +446,28 @@ def apply_user_tile_selection(manifest: dict, selection_path: Path) -> dict:
 
 
 def run() -> int:
-    parser = argparse.ArgumentParser(description="Resumable Aveiro-district road snapshot builder.")
-    parser.add_argument("--max-tiles", type=int, default=MAX_TILES_PER_RUN,
-                        help=f"max tiles to process this run (default: {MAX_TILES_PER_RUN})")
-    parser.add_argument("--use-tiles", type=str, default=None,
-                        help="path to a tile-selection JSON exported by roads_viewer.html. "
-                             "Replaces the manifest's tile list with the user's selection.")
-    parser.add_argument("--sleep", type=float, default=SLEEP_BETWEEN_CALLS_S,
-                        help=f"seconds to sleep between Overpass calls (default: {SLEEP_BETWEEN_CALLS_S})")
+    parser = argparse.ArgumentParser(
+        description="Resumable Aveiro-district road snapshot builder."
+    )
+    parser.add_argument(
+        "--max-tiles",
+        type=int,
+        default=MAX_TILES_PER_RUN,
+        help=f"max tiles to process this run (default: {MAX_TILES_PER_RUN})",
+    )
+    parser.add_argument(
+        "--use-tiles",
+        type=str,
+        default=None,
+        help="path to a tile-selection JSON exported by roads_viewer.html. "
+        "Replaces the manifest's tile list with the user's selection.",
+    )
+    parser.add_argument(
+        "--sleep",
+        type=float,
+        default=SLEEP_BETWEEN_CALLS_S,
+        help=f"seconds to sleep between Overpass calls (default: {SLEEP_BETWEEN_CALLS_S})",
+    )
     args = parser.parse_args()
 
     now = datetime.now(timezone.utc)
@@ -426,14 +477,19 @@ def run() -> int:
         try:
             manifest = bootstrap_manifest(now, args.sleep)
         except RateLimited as exc:
-            print(f"rate limited during bootstrap ({exc}); try again later", file=sys.stderr)
+            print(
+                f"rate limited during bootstrap ({exc}); try again later",
+                file=sys.stderr,
+            )
             return 0
         save_manifest(manifest)
 
     if args.use_tiles:
         manifest = apply_user_tile_selection(manifest, Path(args.use_tiles))
         save_manifest(manifest)
-        print(f"Applied user tile selection from {args.use_tiles}: {len(manifest['tiles'])} tiles")
+        print(
+            f"Applied user tile selection from {args.use_tiles}: {len(manifest['tiles'])} tiles"
+        )
 
     area_id = 3_600_000_000 + int(manifest["district_relation_id"])
     segments = load_snapshot_segments()
@@ -441,7 +497,8 @@ def run() -> int:
 
     tile_keys = pick_tiles_to_fetch(manifest, now, args.max_tiles)
     total_pending = sum(
-        1 for t in manifest["tiles"].values()
+        1
+        for t in manifest["tiles"].values()
         if t["status"] != "done" or is_stale(t, now)
     )
     print(f"this run: {len(tile_keys)} tiles (of {total_pending} pending/stale)")
@@ -453,7 +510,10 @@ def run() -> int:
         try:
             elements = fetch_tile_roads(area_id, bbox)
         except RateLimited as exc:
-            print(f"  rate limited at tile {key} ({exc}); saving and exiting", file=sys.stderr)
+            print(
+                f"  rate limited at tile {key} ({exc}); saving and exiting",
+                file=sys.stderr,
+            )
             tile["status"] = "rate_limited"
             tile["error"] = str(exc)
             break
@@ -480,7 +540,9 @@ def run() -> int:
         tile["last_fetched_at"] = now.isoformat()
         tile["road_count"] = len(new_segments)
         processed += 1
-        print(f"  {key} {bbox} -> {len(new_segments)} ways (total cached: {len(segments)})")
+        print(
+            f"  {key} {bbox} -> {len(new_segments)} ways (total cached: {len(segments)})"
+        )
 
         if processed < len(tile_keys):
             time.sleep(args.sleep)

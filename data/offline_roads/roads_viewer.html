@@ -56,7 +56,7 @@
     <span id="selCount" class="count">0 selected</span>
   </div>
   <div style="font-size:11px; color:#666; margin-top:4px">
-    Then run: <code>python3 scripts/build_offline_roads.py --use-tiles selection.json</code>
+    Then run: <code>python3 scripts/build_offline_roads.py --use-tiles data/offline_roads/selection.json</code>
   </div>
 </div>
 
@@ -350,7 +350,7 @@ document.getElementById("exportSel").addEventListener("click", () => {
 });
 
 // best-effort auto-load when served from a directory next to the data
-fetch("../src/common/offline_roads.json")
+fetch("./offline_roads.json")
   .then(r => r.ok ? r.json() : null)
   .then(d => { if (d) loadSnapshot(d); })
   .catch(() => {});
