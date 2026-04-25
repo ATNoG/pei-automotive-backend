@@ -106,8 +106,8 @@ let tileLayerByKey = new Map();
 
 const map = L.map("map", { preferCanvas: true }).setView([40.64, -8.65], 10);
 const lightBase = L.tileLayer(
-  "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-  { maxZoom: 19, attribution: "&copy; OSM &copy; CARTO", subdomains: "abcd" }
+  "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+  { maxZoom: 19, attribution: "&copy; OpenStreetMap contributors" }
 );
 const darkBase = L.tileLayer(
   "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
@@ -191,9 +191,9 @@ function renderTileEditor() {
 }
 
 function styleForTile(isDone, isSelected) {
-  if (isSelected) return { color: "#ff6a00", weight: 2.5, fillColor: "#ff6a00", fillOpacity: 0.25 };
-  if (isDone)     return { color: "#0066ff", weight: 1.5, fillColor: "#0066ff", fillOpacity: 0.05, dashArray: "4,4" };
-  return            { color: "#888",    weight: 1,   fillColor: "#888",    fillOpacity: 0.03, dashArray: "2,4" };
+  if (isSelected) return { color: "#ff6a00", weight: 2, fillColor: "#ff6a00", fillOpacity: 0.08 };
+  if (isDone)     return { color: "#0066ff", weight: 1.2, fillColor: "#0066ff", fillOpacity: 0.015, dashArray: "4,4" };
+  return            { color: "#666",    weight: 1,   fillColor: "#666",    fillOpacity: 0.01, dashArray: "2,4" };
 }
 
 function toggleTileSelection(key) {
