@@ -8,47 +8,73 @@
 <style>
   html, body { height:100%; margin:0; font-family: system-ui, sans-serif; }
   #map { position:absolute; inset:0; background:#222; }
-  #panel {
-    position:absolute; top:12px; left:12px; z-index:1000;
+  .panel {
+    position:absolute; z-index:1000;
     background:rgba(255,255,255,.97); padding:10px 12px; border-radius:8px;
-    box-shadow:0 2px 8px rgba(0,0,0,.2); max-width:320px; font-size:13px;
+    box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:13px; line-height:1.4;
   }
-  #panel h1 { font-size:14px; margin:0 0 8px; }
-  #panel input[type=file] { font-size:12px; }
-  #stats { margin-top:8px; color:#444; line-height:1.4; }
-  .legend { margin-top:8px; }
-  .legend div { display:flex; align-items:center; gap:6px; margin:2px 0; }
-  .swatch { width:22px; height:5px; border-radius:2px; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
-  #info {
-    position:absolute; bottom:12px; left:12px; z-index:1000;
-    background:rgba(255,255,255,.97); padding:8px 12px; border-radius:8px;
-    box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:13px; display:none;
-    max-width:340px; line-height:1.5;
-  }
+  #left { top:12px; left:12px; max-width:300px; }
+  #right { top:12px; right:12px; max-width:240px; max-height:calc(100vh - 24px); overflow-y:auto; }
+  #info { bottom:12px; left:12px; display:none; max-width:340px; }
+  h1 { font-size:14px; margin:0 0 8px; }
+  h2 { font-size:12px; margin:10px 0 4px; text-transform:uppercase; color:#555; letter-spacing:.4px; }
+  .row { display:flex; align-items:center; gap:6px; margin:2px 0; }
+  .swatch { width:22px; height:5px; border-radius:2px; box-shadow:0 0 0 1px rgba(0,0,0,.3); flex-shrink:0; }
+  .count { color:#888; font-size:11px; margin-left:auto; }
+  button { font:inherit; padding:4px 10px; border:1px solid #aaa; background:#fff; border-radius:4px; cursor:pointer; }
+  button:hover { background:#f0f0f0; }
+  button.primary { background:#0066ff; color:#fff; border-color:#0066ff; }
+  button.primary:hover { background:#0055dd; }
+  button:disabled { opacity:.5; cursor:not-allowed; }
   .road-line { stroke-linecap: round; stroke-linejoin: round; }
+  #stats { color:#444; font-size:12px; margin-bottom:8px; }
+  label { user-select:none; }
+  input[type=file] { font-size:11px; }
+  details > summary { cursor:pointer; font-weight:600; font-size:12px; padding:4px 0; }
 </style>
 </head>
 <body>
 <div id="map"></div>
-<div id="panel">
+
+<div id="left" class="panel">
   <h1>Offline roads viewer</h1>
-  <input id="file" type="file" accept=".json,application/json">
-  <div id="stats">Load <code>src/common/offline_roads.json</code> to begin.</div>
-  <label style="display:block;margin-top:8px;font-size:12px;">
-    <input id="showCoverage" type="checkbox" checked> show covered tiles
-  </label>
-  <label style="display:block;font-size:12px;">
-    <input id="darkBase" type="checkbox"> dark base map
-  </label>
-  <div class="legend" id="legend"></div>
+  <div id="stats">No data loaded.</div>
+  <input id="file" type="file" accept=".json,application/json"><br>
+  <label class="row" style="margin-top:8px"><input id="darkBase" type="checkbox"> dark base map</label>
+  <label class="row"><input id="showCoverage" type="checkbox" checked> show covered tiles</label>
+
+  <h2>Tile editor</h2>
+  <label class="row"><input id="tileMode" type="checkbox"> selection mode (click tiles)</label>
+  <input id="manifestFile" type="file" accept=".json,application/json" style="margin-top:4px" title="Optionally load offline_roads_manifest.json"><br>
+  <div class="row" style="margin-top:6px">
+    <button id="selectAll">all</button>
+    <button id="selectNone">none</button>
+    <button id="invertSel">invert</button>
+  </div>
+  <div class="row" style="margin-top:4px">
+    <button id="exportSel" class="primary">Export selection</button>
+    <span id="selCount" class="count">0 selected</span>
+  </div>
+  <div style="font-size:11px; color:#666; margin-top:4px">
+    Then run: <code>python3 scripts/build_offline_roads.py --use-tiles selection.json</code>
+  </div>
 </div>
-<div id="info"></div>
+
+<div id="right" class="panel">
+  <h2 style="margin-top:0">Speed limit (km/h)</h2>
+  <div id="legend"></div>
+  <h2>Highway types</h2>
+  <div class="row" style="margin-bottom:6px">
+    <button id="hwAll">all</button>
+    <button id="hwReal">real roads only</button>
+  </div>
+  <div id="hwTypes"></div>
+</div>
+
+<div id="info" class="panel"></div>
 
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <script>
-// Saturated, high-contrast palette: each entry is {fill, casing}.
-// Casing is a darker outline drawn underneath the bright fill so roads stay
-// readable on both light and dark base maps.
 const SPEED_BUCKETS = [
   { max: 20,  fill: "#00d26a", casing: "#003a1d", label: "≤ 20" },
   { max: 30,  fill: "#7cff3e", casing: "#1f4a00", label: "21-30" },
@@ -64,9 +90,21 @@ const DEFAULT_SPEED_BY_HW = {
   tertiary:50, tertiary_link:40, unclassified:50, residential:50,
   living_street:20, service:30, track:40,
 };
+// "Real" road types — excludes service/track which are often parking
+// lanes, driveways, alleys, farm tracks rather than public roads.
+const REAL_ROAD_TYPES = new Set([
+  "motorway","motorway_link","trunk","trunk_link",
+  "primary","primary_link","secondary","secondary_link",
+  "tertiary","tertiary_link","unclassified","residential","living_street",
+]);
+
+let payload = null;          // loaded snapshot JSON
+let manifest = null;         // loaded manifest JSON (optional)
+let enabledTypes = new Set();
+let selectedTiles = new Set();
+let tileLayerByKey = new Map();
 
 const map = L.map("map", { preferCanvas: true }).setView([40.64, -8.65], 10);
-
 const lightBase = L.tileLayer(
   "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
   { maxZoom: 19, attribution: "&copy; OSM &copy; CARTO", subdomains: "abcd" }
@@ -80,40 +118,36 @@ lightBase.addTo(map);
 const casingLayer = L.layerGroup().addTo(map);
 const fillLayer = L.layerGroup().addTo(map);
 const coverageLayer = L.layerGroup().addTo(map);
+const tileEditorLayer = L.layerGroup();   // only added when tile mode is on
 
 function bucketFor(speed) {
   for (const b of SPEED_BUCKETS) if (speed <= b.max) return b;
   return SPEED_BUCKETS[SPEED_BUCKETS.length - 1];
 }
-
-function buildLegend() {
-  const el = document.getElementById("legend");
-  el.innerHTML = "<b>Speed limit (km/h)</b>" +
-    SPEED_BUCKETS.map(b =>
-      `<div><span class="swatch" style="background:${b.fill}"></span>${b.label}</div>`
-    ).join("");
-}
-buildLegend();
-
 function speedOf(seg) {
   if (typeof seg.maxspeed === "number") return { value: seg.maxspeed, source: "OSM tag" };
   const fb = DEFAULT_SPEED_BY_HW[seg.highway] ?? 50;
   return { value: fb, source: "default for " + seg.highway };
 }
 
-function render(payload) {
+function buildLegend() {
+  document.getElementById("legend").innerHTML = SPEED_BUCKETS.map(b =>
+    `<div class="row"><span class="swatch" style="background:${b.fill}"></span>${b.label}</div>`
+  ).join("");
+}
+buildLegend();
+
+// Renderers
+function renderRoads() {
   casingLayer.clearLayers();
   fillLayer.clearLayers();
-  coverageLayer.clearLayers();
-
+  if (!payload) return;
   const segs = payload.segments || [];
-  const bboxes = payload.bboxes || [];
-  const counts = { tagged: 0, defaulted: 0 };
-
+  let shown = 0;
   for (const s of segs) {
     if (!s.geom || s.geom.length < 2) continue;
+    if (!enabledTypes.has(s.highway)) continue;
     const sp = speedOf(s);
-    if (s.maxspeed != null) counts.tagged++; else counts.defaulted++;
     const bucket = bucketFor(sp.value);
     L.polyline(s.geom, {
       color: bucket.casing, weight: 6, opacity: 0.95, className: "road-line",
@@ -123,26 +157,105 @@ function render(payload) {
     });
     fill.on("click", () => showInfo(s, sp));
     fill.addTo(fillLayer);
+    shown++;
   }
+  updateStats(shown);
+}
 
-  for (const bb of bboxes) {
+function renderCoverage() {
+  coverageLayer.clearLayers();
+  if (!payload) return;
+  for (const bb of payload.bboxes || []) {
     const [s, w, n, e] = bb;
     L.rectangle([[s, w], [n, e]], {
       color: "#0066ff", weight: 1.5, opacity: 0.9, dashArray: "4,4",
-      fill: true, fillColor: "#0066ff", fillOpacity: 0.05,
+      fill: false,
     }).addTo(coverageLayer);
   }
+}
 
-  document.getElementById("stats").innerHTML =
-    `<b>${segs.length}</b> roads — ${counts.tagged} OSM-tagged, ${counts.defaulted} defaulted by type<br>` +
-    `<b>${bboxes.length}</b> covered tiles<br>` +
-    `Generated: ${payload.generated_at || "?"}`;
-
-  if (segs.length) {
-    const all = [];
-    for (const s of segs) for (const p of s.geom) all.push(p);
-    map.fitBounds(L.latLngBounds(all));
+function renderTileEditor() {
+  tileEditorLayer.clearLayers();
+  tileLayerByKey.clear();
+  if (!manifest || !manifest.tiles) return;
+  for (const [key, tile] of Object.entries(manifest.tiles)) {
+    const [s, w, n, e] = tile.bbox;
+    const isDone = tile.status === "done";
+    const isSelected = selectedTiles.has(key);
+    const rect = L.rectangle([[s, w], [n, e]], styleForTile(isDone, isSelected));
+    rect.on("click", () => toggleTileSelection(key));
+    rect.bindTooltip(`${key}<br>status: ${tile.status}<br>roads: ${tile.road_count}`);
+    rect.addTo(tileEditorLayer);
+    tileLayerByKey.set(key, rect);
   }
+}
+
+function styleForTile(isDone, isSelected) {
+  if (isSelected) return { color: "#ff6a00", weight: 2.5, fillColor: "#ff6a00", fillOpacity: 0.25 };
+  if (isDone)     return { color: "#0066ff", weight: 1.5, fillColor: "#0066ff", fillOpacity: 0.05, dashArray: "4,4" };
+  return            { color: "#888",    weight: 1,   fillColor: "#888",    fillOpacity: 0.03, dashArray: "2,4" };
+}
+
+function toggleTileSelection(key) {
+  if (selectedTiles.has(key)) selectedTiles.delete(key);
+  else selectedTiles.add(key);
+  const rect = tileLayerByKey.get(key);
+  if (rect) {
+    const tile = manifest.tiles[key];
+    rect.setStyle(styleForTile(tile.status === "done", selectedTiles.has(key)));
+  }
+  updateSelCount();
+}
+
+function updateSelCount() {
+  document.getElementById("selCount").textContent =
+    `${selectedTiles.size} selected`;
+}
+
+function rebuildHighwayTypes() {
+  const counts = {};
+  if (payload) for (const s of (payload.segments || [])) {
+    counts[s.highway] = (counts[s.highway] || 0) + 1;
+  }
+  const types = Object.keys(counts).sort((a,b) => counts[b]-counts[a]);
+  enabledTypes = new Set(types);
+  const el = document.getElementById("hwTypes");
+  el.innerHTML = types.map(t =>
+    `<label class="row">
+       <input type="checkbox" data-hw="${t}" checked>
+       <span>${t}</span>
+       <span class="count">${counts[t]}</span>
+     </label>`
+  ).join("");
+  el.querySelectorAll("input[type=checkbox]").forEach(cb => {
+    cb.addEventListener("change", e => {
+      const hw = e.target.dataset.hw;
+      if (e.target.checked) enabledTypes.add(hw); else enabledTypes.delete(hw);
+      renderRoads();
+    });
+  });
+}
+
+function setHighwayTypes(filterFn) {
+  document.querySelectorAll("#hwTypes input[type=checkbox]").forEach(cb => {
+    const want = filterFn(cb.dataset.hw);
+    cb.checked = want;
+    if (want) enabledTypes.add(cb.dataset.hw); else enabledTypes.delete(cb.dataset.hw);
+  });
+  renderRoads();
+}
+
+function updateStats(roadsShown) {
+  if (!payload) return;
+  const total = (payload.segments || []).length;
+  const tagged = (payload.segments || []).filter(s => s.maxspeed != null).length;
+  const tilesText = manifest
+    ? `, ${Object.values(manifest.tiles).filter(t=>t.status==="done").length}/${Object.keys(manifest.tiles).length} tiles done`
+    : ` (no manifest)`;
+  document.getElementById("stats").innerHTML =
+    `<b>${roadsShown ?? total}</b> / ${total} roads shown<br>` +
+    `${tagged} OSM-tagged, ${total - tagged} defaulted by type${tilesText}<br>` +
+    `Generated: ${payload.generated_at || "?"}`;
 }
 
 function showInfo(seg, sp) {
@@ -154,31 +267,96 @@ function showInfo(seg, sp) {
   el.style.display = "block";
 }
 
+function fitToData() {
+  const all = [];
+  if (payload) for (const s of (payload.segments || [])) for (const p of s.geom) all.push(p);
+  else if (manifest) for (const t of Object.values(manifest.tiles)) {
+    const [s, w, n, e] = t.bbox;
+    all.push([s,w], [n,e]);
+  }
+  if (all.length) map.fitBounds(L.latLngBounds(all));
+}
+
+function loadSnapshot(p) {
+  payload = p;
+  rebuildHighwayTypes();
+  renderRoads();
+  renderCoverage();
+  fitToData();
+}
+
+function loadManifest(m) {
+  manifest = m;
+  selectedTiles.clear();
+  updateSelCount();
+  renderTileEditor();
+  updateStats();
+}
+
+// Wire-up
 document.getElementById("file").addEventListener("change", ev => {
-  const f = ev.target.files[0];
-  if (!f) return;
+  const f = ev.target.files[0]; if (!f) return;
   const r = new FileReader();
-  r.onload = () => {
-    try { render(JSON.parse(r.result)); }
-    catch (e) { alert("Failed to parse JSON: " + e.message); }
-  };
+  r.onload = () => { try { loadSnapshot(JSON.parse(r.result)); } catch (e) { alert(e.message); } };
   r.readAsText(f);
 });
-
-document.getElementById("showCoverage").addEventListener("change", ev => {
-  if (ev.target.checked) coverageLayer.addTo(map);
-  else coverageLayer.remove();
+document.getElementById("manifestFile").addEventListener("change", ev => {
+  const f = ev.target.files[0]; if (!f) return;
+  const r = new FileReader();
+  r.onload = () => { try { loadManifest(JSON.parse(r.result)); } catch (e) { alert(e.message); } };
+  r.readAsText(f);
 });
-
+document.getElementById("showCoverage").addEventListener("change", ev => {
+  if (ev.target.checked) coverageLayer.addTo(map); else coverageLayer.remove();
+});
 document.getElementById("darkBase").addEventListener("change", ev => {
   if (ev.target.checked) { lightBase.remove(); darkBase.addTo(map); }
   else { darkBase.remove(); lightBase.addTo(map); }
 });
+document.getElementById("tileMode").addEventListener("change", ev => {
+  if (ev.target.checked) tileEditorLayer.addTo(map); else tileEditorLayer.remove();
+});
+document.getElementById("hwAll").addEventListener("click", () => setHighwayTypes(_ => true));
+document.getElementById("hwReal").addEventListener("click", () => setHighwayTypes(t => REAL_ROAD_TYPES.has(t)));
+document.getElementById("selectAll").addEventListener("click", () => {
+  if (!manifest) return;
+  for (const k of Object.keys(manifest.tiles)) selectedTiles.add(k);
+  renderTileEditor(); updateSelCount();
+});
+document.getElementById("selectNone").addEventListener("click", () => {
+  selectedTiles.clear(); renderTileEditor(); updateSelCount();
+});
+document.getElementById("invertSel").addEventListener("click", () => {
+  if (!manifest) return;
+  for (const k of Object.keys(manifest.tiles)) {
+    if (selectedTiles.has(k)) selectedTiles.delete(k); else selectedTiles.add(k);
+  }
+  renderTileEditor(); updateSelCount();
+});
+document.getElementById("exportSel").addEventListener("click", () => {
+  if (!manifest) { alert("Load a manifest first"); return; }
+  if (selectedTiles.size === 0) { alert("No tiles selected"); return; }
+  const out = {
+    exported_at: new Date().toISOString(),
+    tile_size_deg: manifest.tile_size_deg,
+    tiles: [...selectedTiles].sort().map(key => ({ key, bbox: manifest.tiles[key].bbox })),
+  };
+  const blob = new Blob([JSON.stringify(out, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "selection.json";
+  document.body.appendChild(a); a.click(); a.remove();
+  URL.revokeObjectURL(url);
+});
 
-// auto-load when served from a directory next to the JSON
+// best-effort auto-load when served from a directory next to the data
 fetch("../src/common/offline_roads.json")
   .then(r => r.ok ? r.json() : null)
-  .then(d => { if (d) render(d); })
+  .then(d => { if (d) loadSnapshot(d); })
+  .catch(() => {});
+fetch("./offline_roads_manifest.json")
+  .then(r => r.ok ? r.json() : null)
+  .then(d => { if (d) loadManifest(d); })
   .catch(() => {});
 </script>
 </body>

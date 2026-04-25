@@ -377,10 +377,44 @@ def bootstrap_manifest(now: datetime, sleep: float) -> dict:
     }
 
 
+def apply_user_tile_selection(manifest: dict, selection_path: Path) -> dict:
+    """Replace the manifest's tile list with a user-curated selection.
+
+    Expected JSON shape (matches what the viewer's "Export selected tiles"
+    button produces):
+        { "tiles": [ { "key": "12_5", "bbox": [s, w, n, e] }, ... ] }
+    or a bare list of those entries.
+    """
+    with selection_path.open() as f:
+        data = json.load(f)
+    entries = data.get("tiles", data) if isinstance(data, dict) else data
+    if not isinstance(entries, list) or not entries:
+        raise RuntimeError(f"{selection_path} contains no tile entries")
+
+    existing = manifest.get("tiles", {})
+    new_tiles: Dict[str, Dict] = {}
+    for entry in entries:
+        key = entry["key"]
+        bbox = entry["bbox"]
+        prev = existing.get(key, {})
+        new_tiles[key] = {
+            "bbox": bbox,
+            "status": prev.get("status", "pending"),
+            "last_fetched_at": prev.get("last_fetched_at"),
+            "road_count": prev.get("road_count", 0),
+            "error": prev.get("error"),
+        }
+    manifest["tiles"] = new_tiles
+    return manifest
+
+
 def run() -> int:
     parser = argparse.ArgumentParser(description="Resumable Aveiro-district road snapshot builder.")
     parser.add_argument("--max-tiles", type=int, default=MAX_TILES_PER_RUN,
                         help=f"max tiles to process this run (default: {MAX_TILES_PER_RUN})")
+    parser.add_argument("--use-tiles", type=str, default=None,
+                        help="path to a tile-selection JSON exported by roads_viewer.html. "
+                             "Replaces the manifest's tile list with the user's selection.")
     parser.add_argument("--sleep", type=float, default=SLEEP_BETWEEN_CALLS_S,
                         help=f"seconds to sleep between Overpass calls (default: {SLEEP_BETWEEN_CALLS_S})")
     args = parser.parse_args()
@@ -395,6 +429,11 @@ def run() -> int:
             print(f"rate limited during bootstrap ({exc}); try again later", file=sys.stderr)
             return 0
         save_manifest(manifest)
+
+    if args.use_tiles:
+        manifest = apply_user_tile_selection(manifest, Path(args.use_tiles))
+        save_manifest(manifest)
+        print(f"Applied user tile selection from {args.use_tiles}: {len(manifest['tiles'])} tiles")
 
     area_id = 3_600_000_000 + int(manifest["district_relation_id"])
     segments = load_snapshot_segments()
