@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Offline roads viewer</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+  html, body { height:100%; margin:0; font-family: system-ui, sans-serif; }
+  #map { position:absolute; inset:0; background:#222; }
+  #panel {
+    position:absolute; top:12px; left:12px; z-index:1000;
+    background:rgba(255,255,255,.97); padding:10px 12px; border-radius:8px;
+    box-shadow:0 2px 8px rgba(0,0,0,.2); max-width:320px; font-size:13px;
+  }
+  #panel h1 { font-size:14px; margin:0 0 8px; }
+  #panel input[type=file] { font-size:12px; }
+  #stats { margin-top:8px; color:#444; line-height:1.4; }
+  .legend { margin-top:8px; }
+  .legend div { display:flex; align-items:center; gap:6px; margin:2px 0; }
+  .swatch { width:22px; height:5px; border-radius:2px; box-shadow:0 0 0 1px rgba(0,0,0,.3); }
+  #info {
+    position:absolute; bottom:12px; left:12px; z-index:1000;
+    background:rgba(255,255,255,.97); padding:8px 12px; border-radius:8px;
+    box-shadow:0 2px 8px rgba(0,0,0,.2); font-size:13px; display:none;
+    max-width:340px; line-height:1.5;
+  }
+  .road-line { stroke-linecap: round; stroke-linejoin: round; }
+</style>
+</head>
+<body>
+<div id="map"></div>
+<div id="panel">
+  <h1>Offline roads viewer</h1>
+  <input id="file" type="file" accept=".json,application/json">
+  <div id="stats">Load <code>src/common/offline_roads.json</code> to begin.</div>
+  <label style="display:block;margin-top:8px;font-size:12px;">
+    <input id="showCoverage" type="checkbox" checked> show covered tiles
+  </label>
+  <label style="display:block;font-size:12px;">
+    <input id="darkBase" type="checkbox"> dark base map
+  </label>
+  <div class="legend" id="legend"></div>
+</div>
+<div id="info"></div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// Saturated, high-contrast palette: each entry is {fill, casing}.
+// Casing is a darker outline drawn underneath the bright fill so roads stay
+// readable on both light and dark base maps.
+const SPEED_BUCKETS = [
+  { max: 20,  fill: "#00d26a", casing: "#003a1d", label: "≤ 20" },
+  { max: 30,  fill: "#7cff3e", casing: "#1f4a00", label: "21-30" },
+  { max: 50,  fill: "#ffd600", casing: "#4a3d00", label: "31-50" },
+  { max: 70,  fill: "#ff8a00", casing: "#4a2700", label: "51-70" },
+  { max: 90,  fill: "#ff3d3d", casing: "#4a0000", label: "71-90" },
+  { max: 110, fill: "#ff00aa", casing: "#4a002b", label: "91-110" },
+  { max: 999, fill: "#a020ff", casing: "#250048", label: "> 110" },
+];
+const DEFAULT_SPEED_BY_HW = {
+  motorway:120, motorway_link:80, trunk:100, trunk_link:60,
+  primary:90, primary_link:50, secondary:70, secondary_link:50,
+  tertiary:50, tertiary_link:40, unclassified:50, residential:50,
+  living_street:20, service:30, track:40,
+};
+
+const map = L.map("map", { preferCanvas: true }).setView([40.64, -8.65], 10);
+
+const lightBase = L.tileLayer(
+  "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+  { maxZoom: 19, attribution: "&copy; OSM &copy; CARTO", subdomains: "abcd" }
+);
+const darkBase = L.tileLayer(
+  "https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png",
+  { maxZoom: 19, attribution: "&copy; OSM &copy; CARTO", subdomains: "abcd" }
+);
+lightBase.addTo(map);
+
+const casingLayer = L.layerGroup().addTo(map);
+const fillLayer = L.layerGroup().addTo(map);
+const coverageLayer = L.layerGroup().addTo(map);
+
+function bucketFor(speed) {
+  for (const b of SPEED_BUCKETS) if (speed <= b.max) return b;
+  return SPEED_BUCKETS[SPEED_BUCKETS.length - 1];
+}
+
+function buildLegend() {
+  const el = document.getElementById("legend");
+  el.innerHTML = "<b>Speed limit (km/h)</b>" +
+    SPEED_BUCKETS.map(b =>
+      `<div><span class="swatch" style="background:${b.fill}"></span>${b.label}</div>`
+    ).join("");
+}
+buildLegend();
+
+function speedOf(seg) {
+  if (typeof seg.maxspeed === "number") return { value: seg.maxspeed, source: "OSM tag" };
+  const fb = DEFAULT_SPEED_BY_HW[seg.highway] ?? 50;
+  return { value: fb, source: "default for " + seg.highway };
+}
+
+function render(payload) {
+  casingLayer.clearLayers();
+  fillLayer.clearLayers();
+  coverageLayer.clearLayers();
+
+  const segs = payload.segments || [];
+  const bboxes = payload.bboxes || [];
+  const counts = { tagged: 0, defaulted: 0 };
+
+  for (const s of segs) {
+    if (!s.geom || s.geom.length < 2) continue;
+    const sp = speedOf(s);
+    if (s.maxspeed != null) counts.tagged++; else counts.defaulted++;
+    const bucket = bucketFor(sp.value);
+    L.polyline(s.geom, {
+      color: bucket.casing, weight: 6, opacity: 0.95, className: "road-line",
+    }).addTo(casingLayer);
+    const fill = L.polyline(s.geom, {
+      color: bucket.fill, weight: 3.5, opacity: 1, className: "road-line",
+    });
+    fill.on("click", () => showInfo(s, sp));
+    fill.addTo(fillLayer);
+  }
+
+  for (const bb of bboxes) {
+    const [s, w, n, e] = bb;
+    L.rectangle([[s, w], [n, e]], {
+      color: "#0066ff", weight: 1.5, opacity: 0.9, dashArray: "4,4",
+      fill: true, fillColor: "#0066ff", fillOpacity: 0.05,
+    }).addTo(coverageLayer);
+  }
+
+  document.getElementById("stats").innerHTML =
+    `<b>${segs.length}</b> roads — ${counts.tagged} OSM-tagged, ${counts.defaulted} defaulted by type<br>` +
+    `<b>${bboxes.length}</b> covered tiles<br>` +
+    `Generated: ${payload.generated_at || "?"}`;
+
+  if (segs.length) {
+    const all = [];
+    for (const s of segs) for (const p of s.geom) all.push(p);
+    map.fitBounds(L.latLngBounds(all));
+  }
+}
+
+function showInfo(seg, sp) {
+  const el = document.getElementById("info");
+  el.innerHTML =
+    `<b>way ${seg.id}</b> — <code>${seg.highway}</code><br>` +
+    `speed limit: <b>${sp.value} km/h</b> <span style="color:#888">(${sp.source})</span><br>` +
+    `${seg.geom.length} geometry points`;
+  el.style.display = "block";
+}
+
+document.getElementById("file").addEventListener("change", ev => {
+  const f = ev.target.files[0];
+  if (!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try { render(JSON.parse(r.result)); }
+    catch (e) { alert("Failed to parse JSON: " + e.message); }
+  };
+  r.readAsText(f);
+});
+
+document.getElementById("showCoverage").addEventListener("change", ev => {
+  if (ev.target.checked) coverageLayer.addTo(map);
+  else coverageLayer.remove();
+});
+
+document.getElementById("darkBase").addEventListener("change", ev => {
+  if (ev.target.checked) { lightBase.remove(); darkBase.addTo(map); }
+  else { darkBase.remove(); lightBase.addTo(map); }
+});
+
+// auto-load when served from a directory next to the JSON
+fetch("../src/common/offline_roads.json")
+  .then(r => r.ok ? r.json() : null)
+  .then(d => { if (d) render(d); })
+  .catch(() => {});
+</script>
+</body>
+</html>

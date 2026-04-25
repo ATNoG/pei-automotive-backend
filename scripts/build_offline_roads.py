@@ -5,10 +5,19 @@
 # Distrito de Aveiro (admin_level=6 in OSM). The result is written to
 # src/common/offline_roads.json, which overpass_client.py loads at import time.
 #
-# Each run does as much as Overpass lets us before sleeping. Progress is kept
-# in scripts/offline_roads_manifest.json so the next invocation resumes
-# exactly where this one stopped. A daily cron drives this — see
-# .github/workflows/refresh-offline-roads.yml.
+# How it works:
+#   1. On first run we fetch the Aveiro district relation + its full polygon
+#      from Overpass and use that to:
+#        a. compute the bounding box,
+#        b. prefilter the tile grid so only tiles that actually overlap the
+#           district polygon are scheduled (no wasted Overpass calls on the
+#           Atlantic, the Coimbra/Viseu sides of the bbox, etc.).
+#   2. Each run picks a small batch of pending/stale tiles (deterministic
+#      pseudo-random order, so successive runs spread coverage across the
+#      district instead of crawling row-by-row), queries Overpass for the
+#      driveable highways inside each tile that are also inside the district
+#      area, and writes the merged snapshot + manifest.
+#   3. Bails out cleanly on Overpass rate limits — the next cron run resumes.
 #
 # Usage (manual):
 #   python3 scripts/build_offline_roads.py
@@ -36,9 +45,9 @@ DISTRICT_NAME = "Aveiro"
 DISTRICT_ADMIN_LEVEL = "6"  # Portugal: admin_level=6 == distrito
 
 SNAPSHOT_VERSION = 2
-MANIFEST_VERSION = 1
+MANIFEST_VERSION = 2
 
-TILE_SIZE_DEG = 0.04          # ~4 km square tiles
+TILE_SIZE_DEG = 0.04          # ~4 km square tiles, uniform (no edge clipping)
 MAX_TILES_PER_RUN = 30        # soft cap so one run never burns all rate limit
 SLEEP_BETWEEN_CALLS_S = 4.0
 REFRESH_AFTER_DAYS = 7        # re-fetch tiles older than this
@@ -88,68 +97,153 @@ def overpass_get(query: str) -> dict:
     if resp.status_code in (429, 504):
         raise RateLimited(f"HTTP {resp.status_code}")
     resp.raise_for_status()
-    return resp.json()
+    body = resp.json()
+    # Overpass occasionally returns 200 with {"remark": "rate_limited..."}
+    remark = (body.get("remark") or "").lower()
+    if "rate_limited" in remark or "too many requests" in remark:
+        raise RateLimited(remark)
+    return body
 
 
-# District lookup
-def fetch_district_info() -> Tuple[int, Tuple[float, float, float, float]]:
-    """Return (relation_id, (south, west, north, east)) for Distrito de Aveiro."""
+# District polygon
+def fetch_district_relation(rel_query_extra: str = "") -> dict:
     query = (
         f"[out:json][timeout:{PER_QUERY_TIMEOUT}];"
         f'relation["boundary"="administrative"]'
         f'["admin_level"="{DISTRICT_ADMIN_LEVEL}"]'
-        f'["name"="{DISTRICT_NAME}"];'
-        f"out bb tags;"
+        f'["name"="{DISTRICT_NAME}"]{rel_query_extra};'
+        f"out geom;"
     )
     data = overpass_get(query)
-    elements = [el for el in data.get("elements", []) if el.get("type") == "relation"]
-    if not elements:
+    rels = [el for el in data.get("elements", []) if el.get("type") == "relation"]
+    if not rels:
         raise RuntimeError(
             f"Could not find Distrito de {DISTRICT_NAME} (admin_level={DISTRICT_ADMIN_LEVEL})"
         )
-    # Disambiguate: Portugal districts have ISO3166-2 like "PT-01". Prefer those.
-    pt_districts = [
-        el for el in elements
-        if str(el.get("tags", {}).get("ISO3166-2", "")).startswith("PT")
-    ]
-    chosen = (pt_districts or elements)[0]
-    rel_id = int(chosen["id"])
-    bb = chosen.get("bounds")
-    if not bb:
-        raise RuntimeError("District relation returned without bounds")
-    return rel_id, (
-        float(bb["minlat"]), float(bb["minlon"]),
-        float(bb["maxlat"]), float(bb["maxlon"]),
-    )
+    pt = [r for r in rels if str(r.get("tags", {}).get("ISO3166-2", "")).startswith("PT")]
+    return (pt or rels)[0]
 
 
-# Tile grid
+def assemble_rings(lines: List[List[Tuple[float, float]]]) -> List[List[Tuple[float, float]]]:
+    """Stitch unordered line segments into closed rings by matching endpoints."""
+    rings: List[List[Tuple[float, float]]] = []
+    remaining = [list(line) for line in lines]
+    while remaining:
+        current = remaining.pop(0)
+        progress = True
+        while progress and current[0] != current[-1] and remaining:
+            progress = False
+            for i, line in enumerate(remaining):
+                if current[-1] == line[0]:
+                    current.extend(line[1:]); remaining.pop(i); progress = True; break
+                if current[-1] == line[-1]:
+                    current.extend(reversed(line[:-1])); remaining.pop(i); progress = True; break
+                if current[0] == line[-1]:
+                    current = line[:-1] + current; remaining.pop(i); progress = True; break
+                if current[0] == line[0]:
+                    current = list(reversed(line))[1:] + current; remaining.pop(i); progress = True; break
+        if len(current) >= 3:
+            rings.append(current)
+    return rings
+
+
+def extract_outer_rings(relation: dict) -> List[List[Tuple[float, float]]]:
+    outer_lines: List[List[Tuple[float, float]]] = []
+    for m in relation.get("members", []):
+        if m.get("type") != "way":
+            continue
+        if m.get("role") not in ("outer", ""):
+            continue
+        geom = m.get("geometry") or []
+        if len(geom) >= 2:
+            outer_lines.append([(p["lat"], p["lon"]) for p in geom])
+    return assemble_rings(outer_lines)
+
+
+# Geometry: point-in-polygon, tile-vs-polygon
+def point_in_rings(lat: float, lon: float, rings: List[List[Tuple[float, float]]]) -> bool:
+    """Even-odd ray casting across the union of rings (handles multipolygon holes)."""
+    inside = False
+    for ring in rings:
+        c = False
+        n = len(ring)
+        if n < 3:
+            continue
+        j = n - 1
+        for i in range(n):
+            yi, xi = ring[i]
+            yj, xj = ring[j]
+            if (yi > lat) != (yj > lat):
+                denom = (yj - yi) or 1e-12
+                x_at = (xj - xi) * (lat - yi) / denom + xi
+                if lon < x_at:
+                    c = not c
+            j = i
+        if c:
+            inside = not inside
+    return inside
+
+
+def tile_overlaps_rings(s: float, w: float, n: float, e: float,
+                        rings: List[List[Tuple[float, float]]]) -> bool:
+    """Sample a 4x4 grid of points inside the tile; True if any is in the polygon."""
+    for i in range(4):
+        for j in range(4):
+            lat = s + (n - s) * i / 3
+            lon = w + (e - w) * j / 3
+            if point_in_rings(lat, lon, rings):
+                return True
+    return False
+
+
+# Tile grid (uniform tiles, polygon-prefiltered, deterministic spread order)
 def build_tile_grid(
-    bbox: Tuple[float, float, float, float], size_deg: float
+    bbox: Tuple[float, float, float, float],
+    size_deg: float,
+    rings: List[List[Tuple[float, float]]],
 ) -> Dict[str, Dict]:
     south, west, north, east = bbox
-    tiles: Dict[str, Dict] = {}
     rows = int((north - south) / size_deg) + 1
     cols = int((east - west) / size_deg) + 1
+
+    keys: List[Tuple[str, List[float]]] = []
     for r in range(rows):
         for c in range(cols):
-            s = south + r * size_deg
-            w = west + c * size_deg
-            n = min(south + (r + 1) * size_deg, north)
-            e = min(west + (c + 1) * size_deg, east)
-            if n <= s or e <= w:
+            s = round(south + r * size_deg, 6)
+            w = round(west + c * size_deg, 6)
+            n = round(s + size_deg, 6)
+            e = round(w + size_deg, 6)
+            if not tile_overlaps_rings(s, w, n, e, rings):
                 continue
-            tiles[f"{r}_{c}"] = {
-                "bbox": [round(s, 6), round(w, 6), round(n, 6), round(e, 6)],
-                "status": "pending",
-                "last_fetched_at": None,
-                "road_count": 0,
-                "error": None,
-            }
-    return tiles
+            keys.append((f"{r}_{c}", [s, w, n, e]))
+
+    # Bayer-style bit-reversal of the flat tile index: each successive tile
+    # lands in a different sub-region, so the first 30 tiles cover the whole
+    # district instead of one row.
+    n_bits = max(1, (len(keys) - 1).bit_length())
+
+    def _bit_reverse(idx: int) -> int:
+        out = 0
+        for _ in range(n_bits):
+            out = (out << 1) | (idx & 1)
+            idx >>= 1
+        return out
+
+    keys = [keys[i] for i in sorted(range(len(keys)), key=_bit_reverse)]
+
+    return {
+        k: {
+            "bbox": bbox,
+            "status": "pending",
+            "last_fetched_at": None,
+            "road_count": 0,
+            "error": None,
+        }
+        for k, bbox in keys
+    }
 
 
-# Per-tile fetch
+# Per-tile road fetch
 def fetch_tile_roads(area_id: int, tile_bbox: List[float]) -> List[dict]:
     s, w, n, e = tile_bbox
     query = (
@@ -196,9 +290,11 @@ def load_manifest() -> Optional[dict]:
 
 
 def save_manifest(manifest: dict) -> None:
+    """Preserves tile insertion order so the spatial-spread tile sequence
+    survives reloads — do NOT use sort_keys here."""
     MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
     with MANIFEST_PATH.open("w") as f:
-        json.dump(manifest, f, indent=2, sort_keys=True)
+        json.dump(manifest, f, indent=2)
 
 
 def load_snapshot_segments() -> Dict[int, dict]:
@@ -225,10 +321,7 @@ def save_snapshot(segments: Dict[int, dict], covered_bboxes: List[List[float]]) 
 
 
 def covered_bboxes(manifest: dict) -> List[List[float]]:
-    return [
-        t["bbox"] for t in manifest["tiles"].values()
-        if t["status"] == "done"
-    ]
+    return [t["bbox"] for t in manifest["tiles"].values() if t["status"] == "done"]
 
 
 # Tile selection
@@ -244,16 +337,46 @@ def is_stale(tile: dict, now: datetime) -> bool:
 
 
 def pick_tiles_to_fetch(manifest: dict, now: datetime, cap: int) -> List[str]:
-    pending: List[Tuple[str, str]] = []  # (key, last_fetched_at or "")
+    """Never-fetched tiles first (in manifest insertion order, which is already
+    a deterministic pseudo-random spread). Then stale ones, oldest first."""
+    pending: List[Tuple[str, str]] = []
     for key, tile in manifest["tiles"].items():
         if tile["status"] != "done" or is_stale(tile, now):
             pending.append((key, tile.get("last_fetched_at") or ""))
-    # oldest first (empty string sorts before any ISO timestamp -> never-fetched first)
-    pending.sort(key=lambda kv: kv[1])
+    pending.sort(key=lambda kv: kv[1])  # "" < any iso timestamp
     return [k for k, _ in pending[:cap]]
 
 
 # Driver
+def bootstrap_manifest(now: datetime, sleep: float) -> dict:
+    print("Bootstrapping manifest: fetching Aveiro district relation + polygon...")
+    relation = fetch_district_relation()
+    rel_id = int(relation["id"])
+    bb = relation.get("bounds")
+    if not bb:
+        raise RuntimeError("District relation returned without bounds")
+    district_bbox = (
+        float(bb["minlat"]), float(bb["minlon"]),
+        float(bb["maxlat"]), float(bb["maxlon"]),
+    )
+    rings = extract_outer_rings(relation)
+    if not rings:
+        raise RuntimeError("Could not assemble district polygon from relation members")
+    print(f"  relation_id={rel_id}, bbox={district_bbox}, outer_rings={len(rings)}")
+
+    time.sleep(sleep)
+    tiles = build_tile_grid(district_bbox, TILE_SIZE_DEG, rings)
+    print(f"  scheduled {len(tiles)} tiles overlapping the district polygon")
+    return {
+        "version": MANIFEST_VERSION,
+        "district_relation_id": rel_id,
+        "district_bbox": list(district_bbox),
+        "tile_size_deg": TILE_SIZE_DEG,
+        "created_at": now.isoformat(),
+        "tiles": tiles,
+    }
+
+
 def run() -> int:
     parser = argparse.ArgumentParser(description="Resumable Aveiro-district road snapshot builder.")
     parser.add_argument("--max-tiles", type=int, default=MAX_TILES_PER_RUN,
@@ -266,20 +389,12 @@ def run() -> int:
     manifest = load_manifest()
 
     if manifest is None or manifest.get("version") != MANIFEST_VERSION:
-        print("Bootstrapping manifest: fetching Aveiro district boundary...")
-        rel_id, district_bbox = fetch_district_info()
-        time.sleep(args.sleep)
-        tiles = build_tile_grid(district_bbox, TILE_SIZE_DEG)
-        manifest = {
-            "version": MANIFEST_VERSION,
-            "district_relation_id": rel_id,
-            "district_bbox": list(district_bbox),
-            "tile_size_deg": TILE_SIZE_DEG,
-            "created_at": now.isoformat(),
-            "tiles": tiles,
-        }
+        try:
+            manifest = bootstrap_manifest(now, args.sleep)
+        except RateLimited as exc:
+            print(f"rate limited during bootstrap ({exc}); try again later", file=sys.stderr)
+            return 0
         save_manifest(manifest)
-        print(f"  relation_id={rel_id}, bbox={district_bbox}, tiles={len(tiles)}")
 
     area_id = 3_600_000_000 + int(manifest["district_relation_id"])
     segments = load_snapshot_segments()
