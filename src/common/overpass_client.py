@@ -46,7 +46,21 @@ ROAD_TYPE_SPEED_LIMITS: Dict[str, float] = {
     "track": 40,
 }
 
-_DRIVEABLE_HIGHWAY_TYPES: Set[str] = set(ROAD_TYPE_SPEED_LIMITS.keys())
+_DRIVEABLE_HIGHWAY_TYPES: Set[str] = {
+    "motorway",
+    "motorway_link",
+    "trunk",
+    "trunk_link",
+    "primary",
+    "primary_link",
+    "secondary",
+    "secondary_link",
+    "tertiary",
+    "tertiary_link",
+    "unclassified",
+    "residential",
+    "living_street",
+}
 
 _MAX_MATCH_DISTANCE_M: float = 25.0
 _LIVE_FETCH_HALFSIDE_DEG: float = 0.003  # ~330 m half-side bbox around the point
