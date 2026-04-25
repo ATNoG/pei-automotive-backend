@@ -2,17 +2,13 @@
 # overpass_client.py
 # snapshot-first speed-limit resolver.
 #
-# at import time we load src/common/offline_roads.json (built by
-# scripts/utils/build_offline_roads.py) into a flat list of road segments.
-# every lookup scans that list.
+# at import time we load src/common/offline_roads.json (built incrementally by
+# scripts/build_offline_roads.py + the daily cron) into a flat list of road
+# segments. lookups scan that list and return the nearest road's maxspeed.
 #
-# for a point that falls outside the snapshot's boxes we do one synchronous
-# Overpass call to pull roads for that area, merge them in, and return.
-#
-# TODO: the single-call fallback is a stopgap. if the call fails or Overpass
-# rate-limits us, lookups in that area return the default 50 km/h until the
-# process is restarted. for wider production coverage replace this with a
-# persistent disk cache or extend the offline snapshot's bboxes.
+# if a point falls outside the snapshot's covered tiles we make a single live
+# Overpass call as a fallback. that result is kept only in-memory (not
+# persisted) — the cron is expected to fill in the snapshot over time.
 #
 from __future__ import annotations
 
@@ -51,27 +47,7 @@ ROAD_TYPE_SPEED_LIMITS: Dict[str, float] = {
 
 _DRIVEABLE_HIGHWAY_TYPES: Set[str] = set(ROAD_TYPE_SPEED_LIMITS.keys())
 
-# lower = preferred when distances are close
-_HIGHWAY_PRIORITY: Dict[str, int] = {
-    "motorway": 0,
-    "trunk": 0,
-    "motorway_link": 1,
-    "trunk_link": 1,
-    "primary": 2,
-    "primary_link": 2,
-    "secondary": 3,
-    "secondary_link": 3,
-    "tertiary": 4,
-    "tertiary_link": 4,
-    "unclassified": 5,
-    "residential": 5,
-    "living_street": 6,
-    "service": 7,
-    "track": 8,
-}
-
-_MAX_MATCH_DISTANCE_M: float = 50.0
-_PRIORITY_MARGIN_M: float = 15.0  # prefer major road if within this margin
+_MAX_MATCH_DISTANCE_M: float = 25.0
 _LIVE_FETCH_HALFSIDE_DEG: float = 0.003  # ~330 m half-side bbox around the point
 _SNAPSHOT_PATH: Path = Path(__file__).resolve().parent / "offline_roads.json"
 
@@ -192,7 +168,7 @@ def _load_offline_snapshot(path: Path = _SNAPSHOT_PATH) -> None:
             _snapshot_bboxes.append(tuple(bbox))  # type: ignore[arg-type]
 
     logger.info(
-        "Loaded offline roads snapshot: %d segments, %d bboxes",
+        "Loaded offline roads snapshot: %d segments, %d covered bboxes",
         len(new_segments),
         len(_snapshot_bboxes),
     )
@@ -205,7 +181,7 @@ def _point_in_snapshot(lat: float, lon: float) -> bool:
     return False
 
 
-# Live Overpass fallback (one-shot, see module header TODO)
+# Live Overpass fallback (in-memory only, see module header)
 def _live_key(lat: float, lon: float) -> Tuple[int, int]:
     """coarse grid so we don't refetch the same ~330 m bbox for every point."""
     step = _LIVE_FETCH_HALFSIDE_DEG
@@ -270,33 +246,14 @@ def _find_nearest_road(lat: float, lon: float) -> Optional[_RoadSegment]:
 
     best_seg: Optional[_RoadSegment] = None
     best_dist: float = _MAX_MATCH_DISTANCE_M
-    scored: List[Tuple[_RoadSegment, float]] = []
 
     for seg in candidates:
         d = _point_to_polyline_dist_m(lat, lon, seg.geometry)
-        if d < _MAX_MATCH_DISTANCE_M:
-            scored.append((seg, d))
         if d < best_dist:
             best_dist = d
             best_seg = seg
 
-    if best_seg is None:
-        return None
-
-    # among roads within _PRIORITY_MARGIN_M of the closest, prefer major ones
-    threshold = best_dist + _PRIORITY_MARGIN_M
-    winner = best_seg
-    winner_prio = _HIGHWAY_PRIORITY.get(best_seg.highway_type, 99)
-    winner_dist = best_dist
-
-    for seg, d in scored:
-        if d > threshold:
-            continue
-        prio = _HIGHWAY_PRIORITY.get(seg.highway_type, 99)
-        if prio < winner_prio or (prio == winner_prio and d < winner_dist):
-            winner, winner_prio, winner_dist = seg, prio, d
-
-    return winner
+    return best_seg
 
 
 def _ensure_live_if_outside_snapshot(lat: float, lon: float) -> None:
