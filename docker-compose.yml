@@ -164,7 +164,9 @@ services:
         restart: unless-stopped
 
     database-api:
-        build: src/services/database_api
+        build:
+            context: .
+            dockerfile: src/services/database_api/Dockerfile
         restart: unless-stopped
         depends_on:
             postgres:
