@@ -1,12 +1,20 @@
 #
 # build_offline_roads.py
 #
-# fetches driveable roads for the test areas from Overpass once and
-# dumps them to src/common/offline_roads.json, which overpass_client.py
-# loads at import time so tests never hit Overpass.
+# Resumable builder for the offline road snapshot from operator-provided tile
+# selections in data/offline_roads/selection/*.json. The result is written to
+# data/offline_roads/offline_roads.json, which overpass_client.py loads at
+# import time.
 #
-# run manually when OSM data for the test regions changes:
-#   python3 scripts/utils/build_offline_roads.py
+# How it works:
+#   1. Reads all tile-selection JSON files under data/offline_roads/selection/.
+#   2. Builds/updates the manifest tile list from those selections.
+#   3. Processes all pending/stale tiles (no per-run tile cap), querying
+#      Overpass for driveable highways inside each tile bbox.
+#   4. Stops on the first API error, saving progress for resume.
+#
+# Usage (manual):
+#   python3 scripts/build_offline_roads.py
 #
 from __future__ import annotations
 
@@ -14,38 +22,54 @@ import argparse
 import json
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 import requests
 
-REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-OUTPUT_PATH = REPO_ROOT / "src" / "common" / "offline_roads.json"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+OUTPUT_PATH = REPO_ROOT / "data" / "offline_roads" / "offline_roads.json"
+MANIFEST_PATH = REPO_ROOT / "data" / "offline_roads" / "offline_roads_manifest.json"
+SELECTION_DIR = REPO_ROOT / "data" / "offline_roads" / "selection"
+LEGACY_SELECTION_DIR = REPO_ROOT / "data" / "offline_roads" / "selections"
 
 OVERPASS_URL = "https://overpass-api.de/api/interpreter"
-SNAPSHOT_VERSION = 1
+USER_AGENT = "pei-automotive-backend/offline-roads-builder"
 
-# (name, south, west, north, east) — covers all test road files with a buffer.
-# aveiro_west   -> right_lane, left_lane, right_lane_speeding, highway, entering
-# ponte_barra   -> ponte_barra_{accident,ahead,behind}
-# aveiro_east   -> route.json
-BBOXES: List[Tuple[str, float, float, float, float]] = [
-    ("aveiro_west",  40.622, -8.750, 40.637, -8.724),
-    ("ponte_barra",  40.600, -8.690, 40.613, -8.673),
-    ("aveiro_east",  40.620, -8.660, 40.638, -8.644),
-]
+SNAPSHOT_VERSION = 2
+MANIFEST_VERSION = 2
 
-# keep in sync with overpass_client.ROAD_TYPE_SPEED_LIMITS
+TILE_SIZE_DEG = 0.04  # ~4 km square tiles, uniform (no edge clipping)
+SLEEP_BETWEEN_CALLS_S = 4.0
+REFRESH_AFTER_DAYS = 7  # re-fetch tiles older than this
+PER_QUERY_TIMEOUT = 60  # Overpass [timeout:N]
+
+# keep in sync with overpass_client._DRIVEABLE_HIGHWAY_TYPES
 DRIVEABLE_HIGHWAY_TYPES = {
-    "motorway", "motorway_link", "trunk", "trunk_link",
-    "primary", "primary_link", "secondary", "secondary_link",
-    "tertiary", "tertiary_link", "unclassified", "residential",
-    "living_street", "service", "track",
+    "motorway",
+    "motorway_link",
+    "trunk",
+    "trunk_link",
+    "primary",
+    "primary_link",
+    "secondary",
+    "secondary_link",
+    "tertiary",
+    "tertiary_link",
+    "unclassified",
+    "residential",
+    "living_street",
 }
 
 
-def parse_maxspeed(tags: Dict) -> float | None:
+# Sentinel raised when Overpass tells us to back off. The driver catches it,
+# saves progress, and exits cleanly — the next cron run resumes.
+class RateLimited(Exception):
+    pass
+
+
+def parse_maxspeed(tags: Dict) -> Optional[float]:
     for key in ("maxspeed", "maxspeed:forward", "maxspeed:backward"):
         raw = tags.get(key)
         if not raw:
@@ -64,36 +88,87 @@ def parse_maxspeed(tags: Dict) -> float | None:
     return None
 
 
-def fetch_bbox(south: float, west: float, north: float, east: float) -> List[dict]:
+def overpass_get(query: str) -> dict:
+    resp = requests.get(
+        OVERPASS_URL,
+        params={"data": query},
+        timeout=PER_QUERY_TIMEOUT + 10,
+        headers={"User-Agent": USER_AGENT},
+    )
+    if resp.status_code in (429, 504):
+        raise RateLimited(f"HTTP {resp.status_code}")
+    resp.raise_for_status()
+    body = resp.json()
+    # Overpass occasionally returns 200 with {"remark": "rate_limited..."}
+    remark = (body.get("remark") or "").lower()
+    if "rate_limited" in remark or "too many requests" in remark:
+        raise RateLimited(remark)
+    return body
+
+
+def load_selection_entries(selection_dir: Path = SELECTION_DIR) -> List[dict]:
+    selection_dirs = [selection_dir]
+    if LEGACY_SELECTION_DIR != selection_dir:
+        selection_dirs.append(LEGACY_SELECTION_DIR)
+
+    files: List[Path] = []
+    for d in selection_dirs:
+        if d.exists():
+            files.extend(sorted(d.glob("*.json")))
+
+    if not files:
+        raise RuntimeError(
+            "No selection JSON files found in "
+            f"{selection_dir} (or legacy {LEGACY_SELECTION_DIR})"
+        )
+
+    entries: List[dict] = []
+    for path in files:
+        with path.open() as f:
+            data = json.load(f)
+        rows = data.get("tiles", data) if isinstance(data, dict) else data
+        if not isinstance(rows, list):
+            raise RuntimeError(f"{path} must contain a tile list or a 'tiles' list")
+        for entry in rows:
+            key = entry.get("key")
+            bbox = entry.get("bbox")
+            if not key or not isinstance(bbox, list) or len(bbox) != 4:
+                raise RuntimeError(f"Invalid tile entry in {path}: {entry}")
+            entries.append({"key": str(key), "bbox": [float(v) for v in bbox]})
+    return entries
+
+
+def build_manifest_tiles_from_selections(entries: List[dict]) -> Dict[str, Dict]:
+    ordered_unique: Dict[str, List[float]] = {}
+    for entry in entries:
+        ordered_unique[entry["key"]] = entry["bbox"]
+
+    return {
+        key: {
+            "bbox": bbox,
+            "status": "pending",
+            "last_fetched_at": None,
+            "road_count": 0,
+            "error": None,
+        }
+        for key, bbox in ordered_unique.items()
+    }
+
+
+# Per-tile road fetch
+def fetch_tile_roads(tile_bbox: List[float]) -> List[dict]:
+    s, w, n, e = tile_bbox
     query = (
-        f"[out:json][timeout:60];"
-        f'way["highway"]({south},{west},{north},{east});'
+        f"[out:json][timeout:{PER_QUERY_TIMEOUT}];"
+        f'way["highway"]({s},{w},{n},{e});'
         f"out body geom;"
     )
-    for attempt in range(4):
-        try:
-            resp = requests.get(
-                OVERPASS_URL,
-                params={"data": query},
-                timeout=60,
-                headers={"User-Agent": "pei-automotive-backend/offline-roads-builder"},
-            )
-            if resp.status_code == 429:
-                wait = 15 * (attempt + 1)
-                print(f"  rate limited, sleeping {wait}s...", file=sys.stderr)
-                time.sleep(wait)
-                continue
-            resp.raise_for_status()
-            return resp.json().get("elements", [])
-        except requests.exceptions.RequestException as exc:
-            wait = 5 * (attempt + 1)
-            print(f"  fetch failed ({exc}), retrying in {wait}s...", file=sys.stderr)
-            time.sleep(wait)
-    raise RuntimeError("overpass fetch failed after retries")
+    data = overpass_get(query)
+    return data.get("elements", [])
 
 
 def extract_segments(elements: List[dict]) -> List[dict]:
-    segments: List[dict] = []
+    out: List[dict] = []
     for el in elements:
         if el.get("type") != "way":
             continue
@@ -104,52 +179,212 @@ def extract_segments(elements: List[dict]) -> List[dict]:
         raw_geom = el.get("geometry", [])
         if len(raw_geom) < 2:
             continue
-        maxspeed = parse_maxspeed(tags)  # None -> overpass_client fills default from hw type
-        segments.append({
-            "id": el.get("id", 0),
-            "maxspeed": maxspeed,
-            "highway": hw,
-            "geom": [[round(p["lat"], 6), round(p["lon"], 6)] for p in raw_geom],
-        })
-    return segments
+        out.append(
+            {
+                "id": el.get("id", 0),
+                "maxspeed": parse_maxspeed(tags),
+                "highway": hw,
+                "geom": [[round(p["lat"], 6), round(p["lon"], 6)] for p in raw_geom],
+            }
+        )
+    return out
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Build offline road snapshot for tests.")
-    parser.add_argument(
-        "--output", default=str(OUTPUT_PATH),
-        help=f"output path (default: {OUTPUT_PATH})",
-    )
-    args = parser.parse_args()
+# Manifest + snapshot persistence
+def load_manifest() -> Optional[dict]:
+    if not MANIFEST_PATH.exists():
+        return None
+    try:
+        with MANIFEST_PATH.open() as f:
+            return json.load(f)
+    except (OSError, json.JSONDecodeError) as exc:
+        print(
+            f"warning: failed to read manifest ({exc}), starting fresh", file=sys.stderr
+        )
+        return None
 
-    all_segments: Dict[int, dict] = {}
-    serialized_bboxes: List[List[float]] = []
 
-    for name, s, w, n, e in BBOXES:
-        print(f"fetching {name}: ({s},{w},{n},{e})")
-        elements = fetch_bbox(s, w, n, e)
-        segments = extract_segments(elements)
-        print(f"  got {len(segments)} driveable ways")
-        for seg in segments:
-            all_segments[seg["id"]] = seg  # dedupe overlapping ways
-        serialized_bboxes.append([s, w, n, e])
-        time.sleep(2)  # be polite between bbox calls
+def save_manifest(manifest: dict) -> None:
+    """Preserves tile insertion order so the spatial-spread tile sequence
+    survives reloads — do NOT use sort_keys here."""
+    MANIFEST_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with MANIFEST_PATH.open("w") as f:
+        json.dump(manifest, f, indent=2)
 
+
+def load_snapshot_segments() -> Dict[int, dict]:
+    if not OUTPUT_PATH.exists():
+        return {}
+    try:
+        with OUTPUT_PATH.open() as f:
+            payload = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return {
+        int(s["id"]): s
+        for s in payload.get("segments", [])
+        if "id" in s and s.get("highway") in DRIVEABLE_HIGHWAY_TYPES
+    }
+
+
+def save_snapshot(segments: Dict[int, dict], covered_bboxes: List[List[float]]) -> None:
     payload = {
         "version": SNAPSHOT_VERSION,
         "generated_at": datetime.now(timezone.utc).isoformat(),
-        "bboxes": serialized_bboxes,
-        "segments": sorted(all_segments.values(), key=lambda s: s["id"]),
+        "bboxes": covered_bboxes,
+        "segments": sorted(segments.values(), key=lambda s: s["id"]),
     }
-
-    out = Path(args.output)
-    out.parent.mkdir(parents=True, exist_ok=True)
-    with out.open("w") as f:
+    OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with OUTPUT_PATH.open("w") as f:
         json.dump(payload, f, separators=(",", ":"))
 
-    size_kb = out.stat().st_size / 1024
-    print(f"wrote {len(payload['segments'])} segments -> {out} ({size_kb:.1f} KB)")
+
+def covered_bboxes(manifest: dict) -> List[List[float]]:
+    return [t["bbox"] for t in manifest["tiles"].values() if t["status"] == "done"]
+
+
+# Tile selection
+def is_stale(tile: dict, now: datetime) -> bool:
+    ts = tile.get("last_fetched_at")
+    if not ts:
+        return True
+    try:
+        last = datetime.fromisoformat(ts)
+    except ValueError:
+        return True
+    return (now - last) > timedelta(days=REFRESH_AFTER_DAYS)
+
+
+def pick_tiles_to_fetch(manifest: dict, now: datetime) -> List[str]:
+    """Never-fetched tiles first (in manifest insertion order, which is already
+    a deterministic pseudo-random spread). Then stale ones, oldest first."""
+    pending: List[Tuple[str, str]] = []
+    for key, tile in manifest["tiles"].items():
+        if tile["status"] != "done" or is_stale(tile, now):
+            pending.append((key, tile.get("last_fetched_at") or ""))
+    pending.sort(key=lambda kv: kv[1])  # "" < any iso timestamp
+    return [k for k, _ in pending]
+
+
+# Driver
+def bootstrap_manifest(now: datetime, entries: List[dict]) -> dict:
+    tiles = build_manifest_tiles_from_selections(entries)
+    print(f"Bootstrapping manifest from selections: {len(tiles)} tiles")
+    return {
+        "version": MANIFEST_VERSION,
+        "selection_dir": str(SELECTION_DIR.relative_to(REPO_ROOT)),
+        "district_relation_id": None,
+        "district_bbox": None,
+        "tile_size_deg": TILE_SIZE_DEG,
+        "created_at": now.isoformat(),
+        "tiles": tiles,
+    }
+
+
+def sync_manifest_tiles(manifest: dict, entries: List[dict]) -> dict:
+    existing = manifest.get("tiles", {})
+    refreshed = build_manifest_tiles_from_selections(entries)
+    for key, tile in refreshed.items():
+        prev = existing.get(key, {})
+        tile["status"] = prev.get("status", "pending")
+        tile["last_fetched_at"] = prev.get("last_fetched_at")
+        tile["road_count"] = prev.get("road_count", 0)
+        tile["error"] = prev.get("error")
+    manifest["tiles"] = refreshed
+    manifest["selection_dir"] = str(SELECTION_DIR.relative_to(REPO_ROOT))
+    return manifest
+
+
+def run() -> int:
+    parser = argparse.ArgumentParser(
+        description="Build offline road snapshot from data/offline_roads/selection/*.json"
+    )
+    parser.add_argument(
+        "--sleep",
+        type=float,
+        default=SLEEP_BETWEEN_CALLS_S,
+        help=f"seconds to sleep between Overpass calls (default: {SLEEP_BETWEEN_CALLS_S})",
+    )
+    args = parser.parse_args()
+
+    now = datetime.now(timezone.utc)
+    entries = load_selection_entries(SELECTION_DIR)
+    manifest = load_manifest()
+
+    if manifest is None or manifest.get("version") != MANIFEST_VERSION:
+        manifest = bootstrap_manifest(now, entries)
+        save_manifest(manifest)
+    else:
+        manifest = sync_manifest_tiles(manifest, entries)
+        save_manifest(manifest)
+        print(f"Synced manifest from selections: {len(manifest['tiles'])} tiles")
+
+    segments = load_snapshot_segments()
+    initial_segment_count = len(segments)
+
+    tile_keys = pick_tiles_to_fetch(manifest, now)
+    total_pending = sum(
+        1
+        for t in manifest["tiles"].values()
+        if t["status"] != "done" or is_stale(t, now)
+    )
+    print(f"this run: {len(tile_keys)} tiles (of {total_pending} pending/stale)")
+
+    processed = 0
+    for key in tile_keys:
+        tile = manifest["tiles"][key]
+        bbox = tile["bbox"]
+        try:
+            elements = fetch_tile_roads(bbox)
+        except RateLimited as exc:
+            print(
+                f"  rate limited at tile {key} ({exc}); saving and exiting",
+                file=sys.stderr,
+            )
+            tile["status"] = "rate_limited"
+            tile["error"] = str(exc)
+            break
+        except requests.exceptions.RequestException as exc:
+            print(f"  tile {key} failed: {exc}", file=sys.stderr)
+            tile["status"] = "failed"
+            tile["error"] = str(exc)
+            tile["last_fetched_at"] = now.isoformat()
+            break
+        except Exception as exc:  # noqa: BLE001
+            print(f"  tile {key} unexpected error: {exc}", file=sys.stderr)
+            tile["status"] = "failed"
+            tile["error"] = str(exc)
+            tile["last_fetched_at"] = now.isoformat()
+            break
+
+        new_segments = extract_segments(elements)
+        for seg in new_segments:
+            segments[seg["id"]] = seg
+        tile["status"] = "done"
+        tile["error"] = None
+        tile["last_fetched_at"] = now.isoformat()
+        tile["road_count"] = len(new_segments)
+        processed += 1
+        print(
+            f"  {key} {bbox} -> {len(new_segments)} ways (total cached: {len(segments)})"
+        )
+
+        if processed < len(tile_keys):
+            time.sleep(args.sleep)
+
+    save_manifest(manifest)
+    save_snapshot(segments, covered_bboxes(manifest))
+
+    done_count = sum(1 for t in manifest["tiles"].values() if t["status"] == "done")
+    total_count = len(manifest["tiles"])
+    new_segments_count = len(segments) - initial_segment_count
+    size_kb = OUTPUT_PATH.stat().st_size / 1024
+    print(
+        f"done: processed {processed} tiles, +{new_segments_count} new roads. "
+        f"Coverage: {done_count}/{total_count} tiles. Snapshot {size_kb:.1f} KB."
+    )
+    return 0
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(run())
