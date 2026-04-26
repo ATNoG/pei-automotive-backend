@@ -45,7 +45,7 @@ chmod +x deploy.sh
 
 If you want to stop the containers running and remove the namespace, you can run the `stop.sh` script.
 
-### 3. Start Docker containers
+### 3. Start Docker Containers
 
 ```bash
 docker compose up --build
