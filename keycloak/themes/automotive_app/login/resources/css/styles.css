@@ -25,8 +25,8 @@ div[class*="login-pf"] {
   background-color: #ffffff !important;
 }
 
-html, body {
-  min-height: 100%;
+html {
+  height: 100%; /* Must be strict height for percentage calculations to work */
 }
 
 body {
@@ -35,7 +35,7 @@ body {
   line-height: 1.5;
   color: #111111;
   background-color: #ffffff !important;
-  min-height: 100vh;
+  min-height: 100vh; /* 100vh guarantees it fills the exact viewport height */
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -49,7 +49,8 @@ body {
 .login-pf-page {
   background: #ffffff !important;
   background-image: none !important;
-  flex: 1 0 auto;
+  flex-grow: 0.5;
+  width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -340,7 +341,7 @@ a#forgot-password:hover {
   margin-top: 20px;
 }
 
-/* ---------- Submit button ---------- */
+/* ---------- Submit & Action Buttons ---------- */
 .pf-c-button.pf-m-primary,
 input[type="submit"].btn-primary,
 #kc-login {
@@ -381,6 +382,30 @@ input[type="submit"].btn-primary:disabled,
   background: #aaaaaa;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+/* Secondary "No" / Cancel Button */
+#kc-cancel {
+  display: block;
+  width: 100%;
+  height: 46px;
+  padding: 0 20px;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  color: #111111;
+  background: #ffffff;
+  border: 1.5px solid #d8d8d8;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+  margin-top: 12px; /* Adds space between Yes and No */
+}
+
+#kc-cancel:hover {
+  background: #f8f8f8;
+  border-color: #111111;
 }
 
 /* ---------- Social / identity providers ---------- */
@@ -504,13 +529,37 @@ input[type="submit"].btn-primary:disabled,
 
 .kcLocaleListItemClass a:hover { background: #f3f3f3; }
 
+/* ---------- Consent / OAuth Page ---------- */
+#kc-oauth h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #111111;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+#kc-oauth ul {
+  list-style: none;
+  margin-bottom: 24px;
+  background: #fafafa;
+  border: 1.5px solid #d8d8d8;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+#kc-oauth ul li {
+  font-size: 0.9rem;
+  color: #444444;
+  font-weight: 500;
+}
+
 /* ---------- Footer ---------- */
 .kc-login-footer {
   padding: 20px 16px;
   text-align: center;
   flex-shrink: 0;
   background: #ffffff;
-  margin-top: auto;
+  width: 100%;
 }
 
 .kc-footer-links {
