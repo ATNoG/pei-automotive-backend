@@ -1,6 +1,10 @@
 {
   "realm": "automotive-app",
   "enabled": true,
+  "loginTheme": "automotive_app",
+  "accountTheme": "base",
+  "adminTheme": "base",
+  "emailTheme": "base",
   "sslRequired": "none",
   "registrationAllowed": true,
   "loginWithEmailAllowed": true,
