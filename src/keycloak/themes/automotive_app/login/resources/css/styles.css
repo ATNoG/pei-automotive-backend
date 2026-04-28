@@ -71,10 +71,10 @@ body {
 /* ---------- Logo + App name row ---------- */
 .kc-logo-wrapper {
   display: flex;
-  flex-direction: row;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-  gap: 14px;
+  gap: 12px;
   margin-bottom: 24px;
   margin-top: auto;
 }
@@ -90,11 +90,12 @@ body {
 
 .kc-app-name {
   font-family: 'Inter', sans-serif;
-  font-size: 1.25rem;
+  font-size: 1.95rem;
   font-weight: 700;
-  color: #111111;
+  color: #396aba;
   letter-spacing: -0.3px;
   white-space: nowrap;
+  text-align: center;
 }
 
 /* ---------- Card ---------- */
@@ -594,7 +595,7 @@ input[type="submit"].btn-primary:disabled,
   }
 
   .kc-app-name {
-    font-size: 1.1rem;
+    font-size: 1.5rem;
   }
 
   #kc-page-title { font-size: 1.15rem; margin-bottom: 18px; }
