@@ -141,7 +141,8 @@ services:
             KC_CACHE: local
             KC_LOG_LEVEL: INFO
         volumes:
-            - ./keycloak/automotive-realm.json:/opt/keycloak/data/import/automotive-realm.json:ro
+            - ./src/keycloak/automotive-realm.json:/opt/keycloak/data/import/automotive-realm.json:ro
+            - ./src/keycloak/themes:/opt/keycloak/themes
         ports:
             - "${KC_PORT:-8081}:8080"
         command: start --import-realm
