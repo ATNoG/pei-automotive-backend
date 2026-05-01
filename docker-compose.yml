@@ -140,12 +140,14 @@ services:
             KC_HTTP_ENABLED: "true"
             KC_CACHE: local
             KC_LOG_LEVEL: INFO
+            KC_THEME_CACHE_THEMES: "false"
+            KC_THEME_CACHE_TEMPLATES: "false"
         volumes:
             - ./src/keycloak/automotive-realm.json:/opt/keycloak/data/import/automotive-realm.json:ro
             - ./src/keycloak/themes:/opt/keycloak/themes
         ports:
             - "${KC_PORT:-8081}:8080"
-        command: start --import-realm
+        command: start-dev --import-realm
         depends_on:
             postgres:
                 condition: service_healthy
