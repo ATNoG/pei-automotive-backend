@@ -54,8 +54,6 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO automotive_app;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO automotive_app;
 \getenv app_db_user APP_DB_USER
 
 SELECT format('GRANT USAGE ON SCHEMA public TO %I;', :'app_db_user')
