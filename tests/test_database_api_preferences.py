@@ -40,6 +40,19 @@ from repositories.preference_repository import PreferenceRepository
 from routers import preferences as preferences_router
 
 
+async def _ensure_user_exists_for_test(conn, user_id: UUID, username: str):
+    await conn.execute(
+        """
+        INSERT INTO users (id, username)
+        VALUES ($1, $2)
+        ON CONFLICT (id) DO UPDATE
+        SET username = EXCLUDED.username
+        """,
+        user_id,
+        username,
+    )
+
+
 class PgConnectionAdapter:
     """Expose asyncpg-like async methods on top of a psycopg connection."""
 
@@ -105,7 +118,52 @@ def _strip_psql_meta_commands(sql_text: str) -> str:
 
 def _is_test_irrelevant_statement(statement: str) -> bool:
     upper_stmt = statement.upper()
-    return upper_stmt.startswith("GRANT ")
+    return (
+        upper_stmt.startswith("GRANT ")
+        or upper_stmt.startswith("ALTER DEFAULT PRIVILEGES")
+        or "SELECT FORMAT(" in upper_stmt
+        or "APP_DB_USER" in upper_stmt
+    )
+
+
+def _split_sql_statements(sql_text: str) -> list[str]:
+    """Split SQL text into statements while preserving semicolons inside quotes."""
+    statements: list[str] = []
+    chunk: list[str] = []
+    in_single_quote = False
+    i = 0
+
+    while i < len(sql_text):
+        ch = sql_text[i]
+
+        if ch == "'":
+            # Handle escaped single quote in SQL strings: ''
+            if in_single_quote and i + 1 < len(sql_text) and sql_text[i + 1] == "'":
+                chunk.append(ch)
+                chunk.append(sql_text[i + 1])
+                i += 2
+                continue
+            in_single_quote = not in_single_quote
+            chunk.append(ch)
+            i += 1
+            continue
+
+        if ch == ";" and not in_single_quote:
+            statement = "".join(chunk).strip()
+            if statement:
+                statements.append(statement)
+            chunk = []
+            i += 1
+            continue
+
+        chunk.append(ch)
+        i += 1
+
+    tail = "".join(chunk).strip()
+    if tail:
+        statements.append(tail)
+
+    return statements
 
 
 @pytest.fixture(scope="module")
@@ -124,7 +182,7 @@ def db_conn() -> PgConnectionAdapter:
         schema_sql = SCHEMA_PATH.read_text(encoding="utf-8")
         schema_sql = _strip_psql_meta_commands(schema_sql)
         with raw_conn.cursor() as cur:
-            for statement in [stmt.strip() for stmt in schema_sql.split(";") if stmt.strip()]:
+            for statement in _split_sql_statements(schema_sql):
                 if _is_test_irrelevant_statement(statement):
                     continue
                 cur.execute(statement)
@@ -155,13 +213,13 @@ def _build_test_app(conn: PgConnectionAdapter, user_id: UUID) -> FastAPI:
     async def fake_current_user():
         return {
             "id": str(user_id),
-            "email": "driver@example.com",
             "username": "driver",
             "roles": ["user"],
         }
 
     # Patch module-level dependency used directly by router functions.
     preferences_router.get_connection = lambda: _real_get_connection(conn)
+    preferences_router.ensure_user_exists = _ensure_user_exists_for_test
     app.dependency_overrides[preferences_router.get_current_user] = fake_current_user
     return app
 
@@ -171,7 +229,7 @@ def test_repository_creates_defaults_and_updates_fields(db_conn: PgConnectionAda
     repo = PreferenceRepository(conn)
     user_id = uuid4()
 
-    asyncio.run(ensure_user_exists(conn, user_id, "driver@example.com", "driver"))
+    asyncio.run(_ensure_user_exists_for_test(conn, user_id, "driver"))
 
     created = asyncio.run(repo.get_or_create_defaults(user_id))
     assert created.user_id == user_id
@@ -232,7 +290,7 @@ def test_patch_preferences_endpoint_updates_state(db_conn: PgConnectionAdapter):
     user_id = uuid4()
     app = _build_test_app(conn, user_id)
 
-    asyncio.run(ensure_user_exists(conn, user_id, "driver@example.com", "driver"))
+    asyncio.run(_ensure_user_exists_for_test(conn, user_id, "driver"))
     asyncio.run(PreferenceRepository(conn).get_or_create_defaults(user_id))
 
     patch_payload = {

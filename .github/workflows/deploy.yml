@@ -12,15 +12,27 @@ jobs:
         permissions:
             contents: read
         timeout-minutes: 15
+        env:
+            CI: "true"
 
         steps:
-            - name: Pull latest code
-              run: |
-                  cd ~/pei/pei-automotive-backend
-                  git pull origin main
+            - uses: actions/checkout@v4
 
-            - name: Regenerate .env
+            - name: Add production Ditto to /etc/hosts
+              run: |
+                  echo "10.255.38.67 tomastest.com" | sudo tee -a /etc/hosts
+                  echo "[INFO] Added tomastest.com to /etc/hosts"
+                  cat /etc/hosts | grep tomastest.com
+
+            - name: Install/Update dependencies
+              run: |
+                  pip install --upgrade pip
+                  pip install -r requirements.txt
+                  sleep 2
+
+            - name: Generate .env file
               env:
+                  HOST_IP: ${{ secrets.HOST_IP }}
                   WEATHER_API_URL: ${{ secrets.WEATHER_API_URL }}
                   WEATHER_USER: ${{ secrets.WEATHER_USER }}
                   WEATHER_PASS: ${{ secrets.WEATHER_PASS }}
@@ -29,15 +41,39 @@ jobs:
                   KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
                   KC_DB_USERNAME: ${{ secrets.KC_DB_USERNAME }}
                   KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+                  KC_PORT: ${{ secrets.KC_PORT }}
                   APP_DB_USER: ${{ secrets.APP_DB_USER }}
                   APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
                   DATABASE_API_PORT: ${{ secrets.DATABASE_API_PORT }}
+                  DITTO_PORT: ${{ secrets.DITTO_PORT }}
+                  DITTO_USER: ${{ secrets.DITTO_USER }}
+                  DITTO_PASS: ${{ secrets.DITTO_PASS }}
+                  HONO_REG_PORT: ${{ secrets.HONO_REG_PORT }}
+                  HONO_MQTT_PORT: ${{ secrets.HONO_MQTT_PORT }}
+                  HONO_USER: ${{ secrets.HONO_USER }}
+                  HONO_PASS: ${{ secrets.HONO_PASS }}
               run: |
-                  cd ~/pei/pei-automotive-backend
-                  chmod +x make_env.sh
-                  ./make_env.sh
+                  chmod +x scripts/ci/make_env_ci.sh
+                  ./scripts/ci/make_env_ci.sh
 
             - name: Redeploy containers
               run: |
-                  cd ~/pei/pei-automotive-backend
                   docker compose up --build -d
+                  sleep 10
+
+            - name: Verify deployment
+              run: |
+                  echo "[INFO] Checking container status..."
+                  docker compose ps -a
+
+            - name: Dump logs on failure
+              if: failure()
+              run: |
+                  echo "=== docker compose ps ==="
+                  docker compose ps -a 2>&1 || true
+                  echo "=== container logs ==="
+                  docker compose logs --tail=50 2>&1 || true
+                  echo "=== disk usage ==="
+                  df -h 2>&1 || true
+                  echo "=== memory usage ==="
+                  free -h 2>&1 || true
