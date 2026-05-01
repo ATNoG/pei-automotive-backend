@@ -612,16 +612,33 @@ input[type="submit"].btn-primary:disabled,
 }
 
 .aaos-device-input {
-    font-family: 'Monospace', monospace;
-    font-size: 2.5rem !important; /* Large for easy reading */
-    letter-spacing: 0.2rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+
+    font-size: 1.6rem !important;   /* IMPORTANT: reduce from 2.5rem */
+    line-height: 1 !important;
+
+    letter-spacing: 0 !important;   /* CRITICAL FIX */
+    text-indent: 0 !important;
+
     text-align: center;
+
     text-transform: uppercase;
+
     width: 100%;
-    padding: 15px !important;
-    border: 2px solid #005fb8; /* Match your brand color */
+    max-width: 260px;
+
+    padding: 10px 12px !important;
+
+    border: 2px solid #005fb8;
     border-radius: 12px;
+
     background-color: #f8f9fa;
+
+    overflow: visible !important;
+
+    box-sizing: border-box;
+
+    display: block;
 }
 
 .instruction {
