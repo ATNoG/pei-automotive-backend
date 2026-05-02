@@ -17,7 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
-from common.models import CarUpdate
+from common.models import CarUpdate, AlertPriority, AlertMetadata
 from common.utils import haversine_distance_m, bearing_deg
 
 logger = logging.getLogger(__name__)
@@ -93,6 +93,9 @@ class EVDetector:
                     "car_latitude": other.latitude,
                     "car_longitude": other.longitude,
                     "timestamp": time.time(),
+                    # Priority-based event aggregation
+                    "priority": int(AlertPriority.HIGH),
+                    "expiration_s": 3,  # Alert valid for 3 seconds
                 }
                 self.mqtt.publish(self.alert_topic, json.dumps(alert))
                 logger.warning(

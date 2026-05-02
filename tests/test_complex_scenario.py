@@ -94,7 +94,7 @@ def mqtt_alert_collector(topics: list[str]):
         client.loop_stop()
         client.disconnect()
 
-@pytest.mark.skip(reason="No reason for this to be on pipeline")
+#@pytest.mark.skip(reason="No reason for this to be on pipeline")
 def test_complex_scenario(get_car_id):
     """
     Complex integration test simulating a highway traffic jam scenario.
