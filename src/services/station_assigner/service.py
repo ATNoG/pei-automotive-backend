@@ -9,7 +9,7 @@ import logging
 import sys
 import time
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict
 
 # add parent dir
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))

@@ -7,8 +7,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY src/services/database_api .
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY docker_requirements.txt database_requirements.txt ./
+RUN pip install --no-cache-dir -r database_requirements.txt
 
 EXPOSE 8080
 

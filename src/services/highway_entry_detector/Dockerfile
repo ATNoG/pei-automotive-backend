@@ -9,7 +9,7 @@ COPY src/common ./common
 COPY src/services/highway_entry_detector/service.py .
 COPY simulations/roads ./roads
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY docker_requirements.txt .
+RUN pip install --no-cache-dir -r docker_requirements.txt
 
 CMD ["python", "service.py"]

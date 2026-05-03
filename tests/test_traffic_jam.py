@@ -89,7 +89,7 @@ def test_traffic_jam(get_car_id):
     2. Lead car stops suddenly
     3. 5 cars behind slow down dramatically due to lead stopping
     4. Traffic jam should be detected (5+ cars below speed threshold)
-    
+
     This is a simpler version compared to complex scenarios,
     testing only traffic jam detection without accident, overtaking, or emergency vehicle.
     """
@@ -113,7 +113,7 @@ def test_traffic_jam(get_car_id):
         with open(ROADS_DIR / "highway.json") as f:
             highway_coords = json.load(f)["features"][0]["geometry"]["coordinates"]
         
-        # Keep the simulation focused on the useful window (~30s runtime with subprocess overhead).
+        # Phase 1: Cars moving
         phase1_iterations = 6
         for iteration in range(phase1_iterations):
             positions = []
@@ -138,32 +138,23 @@ def test_traffic_jam(get_car_id):
         final_lead_idx = (phase1_iterations - 1) * 3 + 20
         accident_lat, accident_lon = highway_coords[final_lead_idx]
         
-        phase2_iterations = 5
+        # Phase 2: Cars stopped
+        phase2_iterations = 8
         for iteration in range(phase2_iterations):
             positions = []
             
             # Lead car STOPPED
             positions.append((lead_car, accident_lat, accident_lon))
             
-            # Jam cars approaching accident and slowing down
+            # Jam cars STOPPED (maintain exact spacing from end of phase 1)
             for i, car in enumerate(jam_cars):
-                # Slow progression toward accident (forming jam)
-                progress_factor = 0.2 - (iteration * 0.01)  # Getting slower
-                if progress_factor < 0.02:
-                    progress_factor = 0.02  # Minimum crawl speed
-                
-                car_idx = final_lead_idx - (len(jam_cars) - i) * 2 + int(iteration * progress_factor * 3)
-                
-                # Don't pass the accident
-                if car_idx > final_lead_idx - 6:
-                    car_idx = final_lead_idx - 6 - (len(jam_cars) - i) * 2
-                
+                car_idx = final_lead_idx - (i + 1) * 2
                 if 0 <= car_idx < len(highway_coords):
                     lat, lon = highway_coords[car_idx]
                     positions.append((car, lat, lon))
             
             send_positions_parallel(positions)
-            time.sleep(0.08)
+            time.sleep(0.5)
     
     # Verify traffic jam was detected
     jam_alerts = [a for t, a in all_alerts if t == "alerts/traffic_jam"]
