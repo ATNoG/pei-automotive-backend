@@ -87,9 +87,9 @@ class PositionProcessor:
                     del self.states[car_id]
                     logger.info(f"[CLEANUP] Removed car state: {car_id}")
             return
-        
+
         now = time.time()
-        
+
         # Thread-safe state access
         with self.states_lock:
             last = self.states.get(car_id)
@@ -136,9 +136,11 @@ class PositionProcessor:
             car_id, lat, lon, speed_kmh, heading, speed_limit,
         )
 
-        # publish to MQTT
+        # Publish to the raw topic. The proximity_filter service enriches
+        # each update with tile metadata before forwarding it to the
+        # detector-facing car_updates_topic.
         self.mqtt.publish(
-            topic=self.config.car_updates_topic,
+            topic=self.config.raw_car_updates_topic,
             payload=update.to_json(),
             qos=1,
         )
