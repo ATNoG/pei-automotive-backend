@@ -16,6 +16,17 @@ services:
         depends_on:
             - mosquitto_broker
 
+    proximity_filter:
+        build:
+            context: .
+            dockerfile: src/services/proximity_filter/Dockerfile
+        restart: unless-stopped
+        env_file:
+            - .env
+        depends_on:
+            - mosquitto_broker
+            - position_processor
+
     speed_detector:
         build:
             context: .
@@ -26,6 +37,7 @@ services:
         depends_on:
             - mosquitto_broker
             - position_processor
+            - proximity_filter
 
     overtaking_detector:
         build:
@@ -37,6 +49,7 @@ services:
         depends_on:
             - mosquitto_broker
             - position_processor
+            - proximity_filter
 
     emergency_vehicle_detector:
         build:
@@ -48,6 +61,7 @@ services:
         depends_on:
             - mosquitto_broker
             - position_processor
+            - proximity_filter
 
     highway_entry_detector:
         build:
@@ -59,6 +73,7 @@ services:
         depends_on:
             - mosquitto_broker
             - position_processor
+            - proximity_filter
 
     accident_detector:
         build:
@@ -70,6 +85,7 @@ services:
         depends_on:
             - mosquitto_broker
             - position_processor
+            - proximity_filter
 
     traffic_jam_detector:
         build:
@@ -81,6 +97,7 @@ services:
         depends_on:
             - mosquitto_broker
             - position_processor
+            - proximity_filter
 
     meteo_consumer:
         build:
@@ -104,6 +121,7 @@ services:
         depends_on:
             - mosquitto_broker
             - position_processor
+            - proximity_filter
             - meteo_consumer
 
     postgres:
