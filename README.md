@@ -108,6 +108,23 @@ pytest tests/test_curved_route.py
 # You can run all the other tests
 ```
 
+## Third-Party Data and Component Attribution
+
+### Weather Data
+This application utilizes weather data provided by **OpenWeatherMap**, which is made available under the **Open Database License (ODbL)**. To ensure compliance with ODbL requirements, all weather information is properly credited to the provider. The application maintains data integrity by keeping proprietary sensor data distinct from OpenWeatherMap data through a user interface toggle, which prevents unintended data mingling and satisfies Share-Alike clauses. And link to the **OpenWeatherMap** website can be accessed below.
+
+[OpenWeatherMap](https://openweathermap.org/)
+
+### Open Source Libraries & Compatibility
+In addition to the core application code, this project incorporates several open-source libraries to ensure a robust and interoperable architecture:
+* **Eclipse Suite (SUMO, Ditto, Hono, Mosquitto):** Utilized under the **Eclipse Public License 2.0 (EPL 2.0)**.
+* **Identity Management (KeyCloak):** Provided under the **Apache 2.0** license.
+
+These libraries are integrated as separate components, ensuring there are no license conflicts with the core MIT-licensed application logic or potential App Store deployment.
+
+## Conclusion
+The project is released under the MIT License to facilitate future academic iteration and research within the **Aveiro Telecommunications and Networking Group (ATNoG)**. This structure ensures the app does not violate the rules of any utilized tools, remains compatible with App Store deployment, and is ready for further future development.
+
 ## License
 
 See [LICENSE](LICENSE) file for details.
