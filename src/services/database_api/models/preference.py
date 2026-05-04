@@ -66,7 +66,6 @@ class WeatherPreferences(BaseModel):
 class AppearancePreferences(BaseModel):
     dark_mode: bool = True
     colorblind_enabled: bool = False
-    language: str = "en"
 
 
 # What the Frontend sends on update (all fields optional — partial update)

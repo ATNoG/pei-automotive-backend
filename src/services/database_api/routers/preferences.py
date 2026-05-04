@@ -35,7 +35,7 @@ async def update_preferences(
     """
     Partial update — Only needs to send the changed section.
     Example body (only updating appearance):
-    { "appearance": { "dark_mode": true, "colorblind_enabled": false, "language": "en" } }
+    { "appearance": { "dark_mode": true, "colorblind_enabled": false } }
     """
     async with get_connection() as conn:
         user_id = UUID(current_user["id"])
