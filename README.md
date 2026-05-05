@@ -118,7 +118,7 @@ This application utilizes weather data provided by **OpenWeatherMap**, which is 
 ### Map  Display
 This application utilizes a map provided by **MapTiler**, which is made available under the **Open Database License (ODbL)**. To ensure compliance with ODbL requirements, the map displayed is properly credited to the provider. A link to the **MapTiler** website can be accessed below.
 
-[MapTiler](www.maptiler.com)
+[MapTiler](https://www.maptiler.com/)
 
 
 ### Open Source Libraries & Compatibility
