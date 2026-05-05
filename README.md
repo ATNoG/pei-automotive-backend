@@ -125,6 +125,7 @@ This application utilizes a map provided by **MapTiler**, which is made availabl
 In addition to the core application code, this project incorporates several open-source libraries to ensure a robust and interoperable architecture:
 * **Eclipse Suite (SUMO, Ditto, Hono, Mosquitto):** Utilized under the **Eclipse Public License 2.0 (EPL 2.0)**.
 * **Identity Management (KeyCloak):** Provided under the **Apache 2.0** license.
+* **Cached Database (PostgreSQL):** Provided under Postgre's own **PostgreSQL License**.
 
 These libraries are integrated as separate components, ensuring there are no license conflicts with the core MIT-licensed application logic or potential App Store deployment.
 
