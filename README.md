@@ -115,6 +115,12 @@ This application utilizes weather data provided by **OpenWeatherMap**, which is 
 
 [OpenWeatherMap](https://openweathermap.org/)
 
+### Map  Display
+This application utilizes a map provided by **MapTiler**, which is made available under the **Open Database License (ODbL)**. To ensure compliance with ODbL requirements, the map displayed is properly credited to the provider. A link to the **MapTiler** website can be accessed below.
+
+[MapTiler](www.maptiler.com)
+
+
 ### Open Source Libraries & Compatibility
 In addition to the core application code, this project incorporates several open-source libraries to ensure a robust and interoperable architecture:
 * **Eclipse Suite (SUMO, Ditto, Hono, Mosquitto):** Utilized under the **Eclipse Public License 2.0 (EPL 2.0)**.
