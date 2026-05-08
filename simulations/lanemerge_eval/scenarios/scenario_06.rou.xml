@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 06 — UNSAFE: same speed (80 km/h), small gap (30 m)
+Both cars travel at 80 km/h (22.22 m/s).  The highway car is 30 m
+before the merge.  At the moment the merging car reaches the merge
+point (~2.8 s), the highway car is only ~5 m ahead — well within
+COLLISION_THRESHOLD_M = 20 m.
+Expected: lane_merge_unsafe.
+-->
+<routes>
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"/>
+
+    <vehicle id="merging_car" type="car" depart="0.0"
+             departLane="0" departPos="0" departSpeed="22.22">
+        <route edges="entering highway_out"/>
+    </vehicle>
+
+    <!-- 30 m before merge: highway_in_length(182.5) - 30 = 152.5 -->
+    <vehicle id="main_car" type="car" depart="0.0"
+             departLane="0" departPos="152.5" departSpeed="22.22">
+        <route edges="highway_in highway_out"/>
+    </vehicle>
+</routes>

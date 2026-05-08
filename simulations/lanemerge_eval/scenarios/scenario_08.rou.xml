@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 08 — UNSAFE: main-lane car right at the merge point (5 m)
+The highway car is essentially at the merge point when the merging car
+arrives.  Current distance is already < COLLISION_THRESHOLD_M = 20 m,
+so _predict_collision returns True immediately at t=0.
+Expected: lane_merge_unsafe.
+-->
+<routes>
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"/>
+
+    <vehicle id="merging_car" type="car" depart="0.0"
+             departLane="0" departPos="0" departSpeed="16.67">
+        <route edges="entering highway_out"/>
+    </vehicle>
+
+    <!-- 5 m before the merge; 182.5 - 5 = 177.5 -->
+    <vehicle id="main_car" type="car" depart="0.0"
+             departLane="0" departPos="177.5" departSpeed="16.67">
+        <route edges="highway_in highway_out"/>
+    </vehicle>
+</routes>
