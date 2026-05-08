@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Node definitions for the lane-merge evaluation network.
+Coordinates are geographic (lon, lat) — netconvert reprojects to UTM 29N.
+
+Geometry is derived from simulations/roads/highway.json and entering.json:
+  - MERGE  : end of entering ramp / merge point on highway
+  - H_START: start of highway segment (approaching from east)
+  - H_END  : end of highway segment (continuing north-west)
+  - E_START : start of entering ramp
+-->
+<nodes>
+    <node id="H_START" x="-8.730434" y="40.627244"/>
+    <node id="MERGE"   x="-8.732348" y="40.628003" type="zipper"/>
+    <node id="H_END"   x="-8.734500" y="40.628800"/>
+    <node id="E_START" x="-8.731600" y="40.628041"/>
+</nodes>
