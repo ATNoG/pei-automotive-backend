@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 01 — SAFE: no main-lane traffic
+The merging car enters the ramp alone; no highway car is present.
+Expected: LaneMergeDetector fires lane_merge_safe (no traffic in zone).
+-->
+<routes>
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"/>
+
+    <vehicle id="merging_car" type="car" depart="0.0"
+             departLane="0" departPos="0" departSpeed="16.67">
+        <route edges="entering highway_out"/>
+    </vehicle>
+</routes>
