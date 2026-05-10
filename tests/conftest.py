@@ -157,7 +157,7 @@ def _cleanup_test_cars(car_ids: List[str]) -> None:
                 "timestamp": time.time(),
                 "_test_cleanup": True
             })
-            client.publish("cars/updates", cleanup_update, qos=1)
+            client.publish(f"cars/updates/{car_id}", cleanup_update, qos=1)
             
         # Give services time to process cleanup messages
         time.sleep(0.3)

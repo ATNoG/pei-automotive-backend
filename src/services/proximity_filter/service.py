@@ -70,7 +70,12 @@ class ProximityFilter:
                 )
                 data["tile_zoom"] = self.proximity_zoom
 
-        self.mqtt.publish(self.config.car_updates_topic, json.dumps(data))
+        car_id = data.get("car_id")
+        if not car_id:
+            logger.warning("Dropping update without car_id: %s", payload[:120])
+            return
+
+        self.mqtt.publish(f"{self.config.car_updates_topic}/{car_id}", json.dumps(data))
 
     def run(self):
         logger.info(

@@ -155,7 +155,7 @@ class OvertakingDetector:
     def run(self):
         logger.info("Starting Overtaking Detector...")
         self.mqtt.connect()
-        self.mqtt.subscribe(self.config.car_updates_topic, self._on_car_update)
+        self.mqtt.subscribe(f"{self.config.car_updates_topic}/+", self._on_car_update)
         self.mqtt.loop_forever()
 
 

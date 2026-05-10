@@ -144,7 +144,7 @@ def test_proximity_filter_injects_tile_quadkey():
 
     assert len(pf.mqtt.published) == 1
     topic, out_payload = pf.mqtt.published[0]
-    assert topic == "cars/updates"
+    assert topic == "cars/updates/x"
     parsed = json.loads(out_payload)
     assert parsed["tile_zoom"] == 15
     assert parsed["tile_quadkey"] == get_quadkey(LAT, LON, 15)
@@ -259,9 +259,9 @@ def test_proximity_filter_end_to_end(get_car_id):
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.message_callback_add("alerts/overtaking/+", _on_overtake_message)
-    client.message_callback_add("cars/updates", _on_car_update_message)
+    client.message_callback_add("cars/updates/+", _on_car_update_message)
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe([("alerts/overtaking/+", 1), ("cars/updates", 1)])
+    client.subscribe([("alerts/overtaking/+", 1), ("cars/updates/+", 1)])
     client.loop_start()
 
     # Drive both pairs in parallel.
