@@ -13,6 +13,7 @@ import sys
 import time
 import math
 from pathlib import Path
+from collections import defaultdict
 from typing import Dict, Tuple
 
 # add parent dir
@@ -43,6 +44,11 @@ class OvertakingDetector:
         )
 
         self.cars: Dict[str, CarUpdate] = {}
+        # Bucket cars by tile_quadkey so we only compare cars within the same
+        # geographic tile. Keeps overtaking detection O(k²) per tile instead
+        # of O(n²) over the whole fleet.
+        self.cars_by_tile: Dict[int, Dict[str, CarUpdate]] = defaultdict(dict)
+        self.car_tile: Dict[str, int] = {}
         # Track pair transitions: (A, B) -> last_relative_sign (-1 or +1)
         self.relative_positions: Dict[Tuple[str, str], int] = {}
         self.alert_topic = "alerts/overtaking"
@@ -84,8 +90,23 @@ class OvertakingDetector:
         # save updated state
         self.cars[update.car_id] = update
 
-        # compare against all other cars
-        for other_id, other in self.cars.items():
+        # Move car to its current tile bucket. Updates without a tile_quadkey
+        # (e.g. stale messages from before proximity_filter was wired in) skip
+        # comparison; we keep the car in self.cars but bail out early.
+        tile_qk = data.get("tile_quadkey")
+        if tile_qk is None:
+            return
+
+        old_tile = self.car_tile.get(update.car_id)
+        if old_tile is not None and old_tile != tile_qk:
+            self.cars_by_tile[old_tile].pop(update.car_id, None)
+            if not self.cars_by_tile[old_tile]:
+                del self.cars_by_tile[old_tile]
+        self.cars_by_tile[tile_qk][update.car_id] = update
+        self.car_tile[update.car_id] = tile_qk
+
+        # compare against cars sharing the same tile only
+        for other_id, other in self.cars_by_tile[tile_qk].items():
             if other_id == update.car_id:
                 continue
 
@@ -141,6 +162,13 @@ class OvertakingDetector:
         if car_id in self.cars:
             del self.cars[car_id]
             logger.info(f"[CLEANUP] Removed car state: {car_id}")
+
+        # Remove from tile bucket
+        old_tile = self.car_tile.pop(car_id, None)
+        if old_tile is not None:
+            self.cars_by_tile[old_tile].pop(car_id, None)
+            if not self.cars_by_tile[old_tile]:
+                del self.cars_by_tile[old_tile]
         
         # Remove any relative position pairs involving this car
         pairs_to_remove = [

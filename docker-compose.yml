@@ -13,6 +13,11 @@ services:
         restart: unless-stopped
         env_file:
             - .env
+        volumes:
+            # Snapshot path resolved by overpass_client._SNAPSHOT_PATH
+            # is parent.parent.parent / "data" / "offline_roads" relative
+            # to /app/common/overpass_client.py — i.e. /data/offline_roads.
+            - ./data/offline_roads:/data/offline_roads:ro
         depends_on:
             - mosquitto_broker
 
