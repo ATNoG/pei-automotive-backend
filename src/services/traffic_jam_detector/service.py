@@ -361,7 +361,7 @@ class TrafficJamDetector:
                     new_jam.last_alert_time = now
 
     def _publish_jam_alert(self, jam: TrafficJam):
-        """Publish a traffic jam alert to the MQTT broker."""
+        """Publish a traffic jam alert to each car involved in the jam."""
         alert = {
             "alert_type": "traffic_jam",
             "jam_id": jam.jam_id,
@@ -372,16 +372,18 @@ class TrafficJamDetector:
             "detected_at": jam.detected_at,
             "timestamp": time.time(),
         }
-        
-        self.mqtt.publish(self.alert_topic, json.dumps(alert))
-        
+
+        payload = json.dumps(alert)
+        for car_id in jam.car_ids:
+            self.mqtt.publish(f"{self.alert_topic}/{car_id}", payload)
+
         logger.warning(
             f"[ALERT] Traffic jam at ({jam.center_latitude:.6f}, {jam.center_longitude:.6f}) "
             f"with {len(jam.car_ids)} vehicles"
         )
 
     def _publish_jam_cleared(self, jam: TrafficJam, reason: str):
-        """Publish a jam-cleared event to let consumers clear stale UI alerts."""
+        """Publish a jam-cleared event to each car previously involved in the jam."""
         event = {
             "alert_type": "traffic_jam_cleared",
             "jam_id": jam.jam_id,
@@ -392,7 +394,9 @@ class TrafficJamDetector:
             "reason": reason,
             "timestamp": time.time(),
         }
-        self.mqtt.publish(self.alert_topic, json.dumps(event))
+        payload = json.dumps(event)
+        for car_id in jam.car_ids:
+            self.mqtt.publish(f"{self.alert_topic}/{car_id}", payload)
 
     def _remove_jam_if_dissolved(self, jam_id: str, reason: str):
         """Remove jam if it no longer meets minimum size and publish clear event."""

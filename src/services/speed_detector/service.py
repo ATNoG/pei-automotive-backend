@@ -63,7 +63,7 @@ class SpeedDetector:
                 "timestamp": time.time(),
             }
 
-            self.mqtt.publish(self.alert_topic, json.dumps(alert))
+            self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", json.dumps(alert))
             logger.warning(
                 f"[SPEED] {update.car_id} speeding: {update.speed_kmh:.1f} km/h > {speed_limit}"
             )

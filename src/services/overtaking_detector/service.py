@@ -127,7 +127,9 @@ class OvertakingDetector:
                     "latitude": update.latitude,
                     "longitude": update.longitude,
                 }
-                self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                payload_json = json.dumps(alert)
+                self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", payload_json)
+                self.mqtt.publish(f"{self.alert_topic}/{other_id}", payload_json)
                 logger.warning(f"[OVERTAKE] {update.car_id} overtook {other_id}")
 
             # save new relative sign

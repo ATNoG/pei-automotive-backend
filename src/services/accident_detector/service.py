@@ -189,7 +189,6 @@ class AccidentDetector:
                 }
 
                 self.mqtt.publish(f"alerts/accident/{car_id}", json.dumps(notification))
-                self.mqtt.publish(self.alert_topic, json.dumps(notification))
 
                 logger.info(f"[ACCIDENT] Notified {car_id} - ahead at {dist:.0f}m")
                 notified += 1

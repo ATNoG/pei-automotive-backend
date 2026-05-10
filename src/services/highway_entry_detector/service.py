@@ -375,7 +375,7 @@ class HighwayEntryDetector:
                                     "longitude": update.longitude,
                                 }
                                 
-                                self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                                self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", json.dumps(alert))
                                 logger.warning(
                                     f"[HIGHWAY ENTRY - UNSAFE] Car {update.car_id} "
                                     f"cannot safely merge - collision risk with {highway_car_id}. "
@@ -398,7 +398,7 @@ class HighwayEntryDetector:
                                     "longitude": update.longitude,
                                 }
                                 
-                                self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                                self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", json.dumps(alert))
                                 logger.info(
                                     f"[HIGHWAY ENTRY - SAFE] Car {update.car_id} "
                                     f"can safely merge. Min distance to {highway_car_id}: {min_dist:.1f}m"
@@ -422,7 +422,7 @@ class HighwayEntryDetector:
                             "longitude": update.longitude,
                         }
                         
-                        self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                        self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", json.dumps(alert))
                         logger.info(
                             f"[HIGHWAY ENTRY - SAFE] Car {update.car_id} "
                             f"can safely merge - no highway traffic detected in entry zone"

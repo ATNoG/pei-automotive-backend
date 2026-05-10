@@ -122,12 +122,9 @@ def test_complex_scenario(get_car_id):
     
     # Setup MQTT alert collection
     alert_topics = [
-        "alerts/accident",
         "alerts/accident/+",
-        "alerts/traffic_jam",
         "alerts/traffic_jam/+",
-        "alerts/overtaking",
-        "alerts/emergency_vehicle",
+        "alerts/overtaking/+",
         "alerts/emergency_vehicle/+",
     ]
     
@@ -305,8 +302,13 @@ def test_complex_scenario(get_car_id):
         f"Got {len(accident_alerts)} accident alerts."
     )
     
-    # 2. Traffic jam should be detected (5+ cars slow/stopped)
-    jam_broadcast_alerts = [a for t, a in all_alerts if t == "alerts/traffic_jam"]
+    # 2. Traffic jam should be detected (5+ cars slow/stopped). Each detection
+    # is fanned out per car to alerts/traffic_jam/{car_id}; deduplicate by jam_id.
+    jam_dedup = {}
+    for t, a in all_alerts:
+        if a.get("alert_type") == "traffic_jam":
+            jam_dedup[a.get("jam_id")] = a
+    jam_broadcast_alerts = list(jam_dedup.values())
     assert len(jam_broadcast_alerts) > 0, (
         "Expected traffic jam detection with 10 slow/stopped cars. "
         f"Got {len(jam_broadcast_alerts)} traffic jam alerts."

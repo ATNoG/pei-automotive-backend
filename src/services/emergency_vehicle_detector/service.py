@@ -94,7 +94,7 @@ class EVDetector:
                     "car_longitude": other.longitude,
                     "timestamp": time.time(),
                 }
-                self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                self.mqtt.publish(f"{self.alert_topic}/{other_id}", json.dumps(alert))
                 logger.warning(
                     f"[EV] Emergency vehicle {update.car_id} is {dist:.1f}m "
                     f"{direction} {other_id}"

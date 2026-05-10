@@ -258,10 +258,10 @@ def test_proximity_filter_end_to_end(get_car_id):
         ensure_car_exists(car)
 
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-    client.message_callback_add("alerts/overtaking", _on_overtake_message)
+    client.message_callback_add("alerts/overtaking/+", _on_overtake_message)
     client.message_callback_add("cars/updates", _on_car_update_message)
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe([("alerts/overtaking", 1), ("cars/updates", 1)])
+    client.subscribe([("alerts/overtaking/+", 1), ("cars/updates", 1)])
     client.loop_start()
 
     # Drive both pairs in parallel.
