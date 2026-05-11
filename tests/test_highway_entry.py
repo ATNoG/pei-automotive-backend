@@ -67,7 +67,7 @@ def test_highway_entry_unsafe(get_car_id):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/highway_entry")
+    client.subscribe("alerts/lane_merge")
     client.loop_start()
     time.sleep(0.5)
 
@@ -101,7 +101,7 @@ def test_highway_entry_safe(get_car_id):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/highway_entry")
+    client.subscribe("alerts/lane_merge")
     client.loop_start()
     time.sleep(0.5)
 
