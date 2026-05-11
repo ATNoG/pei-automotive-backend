@@ -24,6 +24,7 @@ import importlib.util
 import json
 import sys
 import time
+from collections import defaultdict
 from pathlib import Path
 from threading import Thread
 
@@ -119,6 +120,7 @@ class _StubMqtt:
 class _StubConfig:
     car_updates_topic = "cars/updates"
     raw_car_updates_topic = "cars/raw_updates"
+    in_scope_topic = "cars/in_scope"
     broker_host = "localhost"
     broker_port = 1883
     broker_user = None
@@ -131,6 +133,8 @@ def _make_filter(zoom: int = 15):
     instance.config = _StubConfig()
     instance.proximity_zoom = zoom
     instance.mqtt = _StubMqtt()
+    instance.cars_by_tile = defaultdict(set)
+    instance.car_tile = {}
     return instance
 
 
@@ -188,6 +192,116 @@ def test_proximity_filter_drops_unparseable_payload():
     pf = _make_filter()
     pf._enrich_and_forward("not-json")
     assert pf.mqtt.published == []
+
+
+# ---------------------------------------------------------------------------
+# Unit tests for cars/in_scope routing
+# ---------------------------------------------------------------------------
+
+def test_lone_car_not_published_to_in_scope():
+    """A car alone in its tile must only appear on cars/updates, not in_scope."""
+    pf = _make_filter(zoom=15)
+    payload = json.dumps({
+        "car_id": "x", "latitude": LAT, "longitude": LON,
+        "speed_kmh": 50.0, "heading_deg": 90.0,
+    })
+    pf._enrich_and_forward(payload)
+
+    topics = [t for t, _ in pf.mqtt.published]
+    assert "cars/updates/x" in topics
+    assert not any(t.startswith("cars/in_scope/") for t in topics)
+
+
+def test_second_car_in_same_tile_triggers_in_scope_for_both():
+    """When a second car arrives in the same tile, that update is in_scope.
+    Subsequent updates from the first car are also in_scope."""
+    pf = _make_filter(zoom=15)
+    # Two positions within the same zoom-15 tile (~1.2 km wide).
+    payload_a = json.dumps({
+        "car_id": "a", "latitude": LAT, "longitude": LON,
+        "speed_kmh": 50.0, "heading_deg": 90.0,
+    })
+    # 0.0001° ≈ 11 m — same tile as LAT, LON at zoom 15.
+    payload_b = json.dumps({
+        "car_id": "b", "latitude": LAT + 0.0001, "longitude": LON,
+        "speed_kmh": 50.0, "heading_deg": 90.0,
+    })
+
+    pf._enrich_and_forward(payload_a)
+    assert not any(t.startswith("cars/in_scope/") for t, _ in pf.mqtt.published), (
+        "first car alone in tile should not be in_scope"
+    )
+
+    pf.mqtt.published.clear()
+    pf._enrich_and_forward(payload_b)
+    topics = [t for t, _ in pf.mqtt.published]
+    assert "cars/in_scope/b" in topics, "second car makes tile multi-car, should be in_scope"
+
+    pf.mqtt.published.clear()
+    pf._enrich_and_forward(payload_a)
+    topics = [t for t, _ in pf.mqtt.published]
+    assert "cars/in_scope/a" in topics, "first car update after tile is multi-car should be in_scope"
+
+
+def test_car_exits_scope_after_tile_drops_to_one():
+    """After one car leaves, the remaining solo car is no longer in_scope."""
+    pf = _make_filter(zoom=15)
+    payload_a = json.dumps({
+        "car_id": "a", "latitude": LAT, "longitude": LON,
+        "speed_kmh": 50.0, "heading_deg": 90.0,
+    })
+    payload_b = json.dumps({
+        "car_id": "b", "latitude": LAT + 0.0001, "longitude": LON,
+        "speed_kmh": 50.0, "heading_deg": 90.0,
+    })
+
+    pf._enrich_and_forward(payload_a)
+    pf._enrich_and_forward(payload_b)
+    pf.mqtt.published.clear()
+
+    # b moves to a completely different tile (Lisbon).
+    LISBON_LAT, LISBON_LON = 38.7223, -9.1393
+    payload_b_lisbon = json.dumps({
+        "car_id": "b", "latitude": LISBON_LAT, "longitude": LISBON_LON,
+        "speed_kmh": 50.0, "heading_deg": 90.0,
+    })
+    pf._enrich_and_forward(payload_b_lisbon)
+    pf.mqtt.published.clear()
+
+    # Now a is alone in its tile — should not be in_scope.
+    pf._enrich_and_forward(payload_a)
+    topics = [t for t, _ in pf.mqtt.published]
+    assert not any(t.startswith("cars/in_scope/") for t in topics), (
+        "car is alone in tile after partner left, must not appear in_scope"
+    )
+
+
+def test_cleanup_sentinel_forwarded_to_in_scope():
+    """_test_cleanup sentinels must reach cars/in_scope so detectors there can clean up."""
+    pf = _make_filter()
+    payload = json.dumps({
+        "car_id": "x", "latitude": 0.0, "longitude": 0.0,
+        "_test_cleanup": True,
+    })
+    pf._enrich_and_forward(payload)
+
+    topics = [t for t, _ in pf.mqtt.published]
+    assert "cars/updates/x" in topics
+    assert "cars/in_scope/x" in topics
+
+
+def test_origin_marker_forwarded_to_in_scope():
+    """Origin (0,0) markers must reach both topics for state cleanup."""
+    pf = _make_filter()
+    payload = json.dumps({
+        "car_id": "x", "latitude": 0.0, "longitude": 0.0,
+        "speed_kmh": None, "heading_deg": None,
+    })
+    pf._enrich_and_forward(payload)
+
+    topics = [t for t, _ in pf.mqtt.published]
+    assert "cars/updates/x" in topics
+    assert "cars/in_scope/x" in topics
 
 
 # ---------------------------------------------------------------------------

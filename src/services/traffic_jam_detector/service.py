@@ -597,7 +597,7 @@ class TrafficJamDetector:
             self.HEADING_TOLERANCE_DEG
         )
         self.mqtt.connect()
-        self.mqtt.subscribe(f"{self.config.car_updates_topic}/+", self._on_car_update)
+        self.mqtt.subscribe(f"{self.config.in_scope_topic}/+", self._on_car_update)
         self.mqtt.loop_forever()
 
 

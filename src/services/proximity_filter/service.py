@@ -3,28 +3,31 @@
 #
 # Sits transparently in front of the detector-facing cars/updates topic.
 # Every car update flows through this service; no detector has to be aware
-# of geotiles to benefit from per-tile reasoning later on.
+# of geotiles to benefit from per-tile reasoning.
 #
 #                              cars/raw_updates
 #         position_processor ─────────────────▶ proximity_filter
 #                                                       │ inject tile_quadkey
 #                                                       │ + tile_zoom
 #                                                       ▼
-#                                                  cars/updates
-#                                                       │
-#                                ┌─────────┬────────────┼────────────┬─────────┐
-#                                ▼         ▼            ▼            ▼         ▼
-#                         overtaking  speed_detector  accident  highway_entry  ...
+#                                                  cars/updates          (all detectors)
+#                                                  cars/in_scope         (multi-car detectors only)
 #
-# The injected `tile_quadkey` (computed at PROXIMITY_ZOOM via Igor's QuadTree
-# encoding) is the hook detectors use to bucket their state per tile and stop
-# evaluating cars outside their proximity scope.
+# cars/updates  — enriched copy of every update; single-car detectors
+#                 (speed, highway_entry, accident, ev) subscribe here.
+# cars/in_scope — published only when a tile contains ≥2 known cars;
+#                 multi-car detectors (overtaking, traffic_jam) subscribe
+#                 here so they skip lone-tile updates they can never act on.
+#
+# Cleanup sentinels (_test_cleanup) and origin-marker updates (lat≈0, lon≈0)
+# are forwarded to BOTH topics so all subscribers can clean their state.
 #
 from __future__ import annotations
 import json
 import logging
 import os
 import sys
+from collections import defaultdict
 from pathlib import Path
 
 # add parent dir
@@ -49,6 +52,26 @@ class ProximityFilter:
             password=config.broker_password,
             client_id="proximity-filter",
         )
+        # tile_qk → set of car_ids currently in that tile
+        self.cars_by_tile: dict[int, set[str]] = defaultdict(set)
+        # car_id → current tile_qk
+        self.car_tile: dict[str, int] = {}
+
+    def _update_tile(self, car_id: str, tile_qk: int) -> None:
+        old_tile = self.car_tile.get(car_id)
+        if old_tile is not None and old_tile != tile_qk:
+            self.cars_by_tile[old_tile].discard(car_id)
+            if not self.cars_by_tile[old_tile]:
+                del self.cars_by_tile[old_tile]
+        self.cars_by_tile[tile_qk].add(car_id)
+        self.car_tile[car_id] = tile_qk
+
+    def _evict_car(self, car_id: str) -> None:
+        old_tile = self.car_tile.pop(car_id, None)
+        if old_tile is not None:
+            self.cars_by_tile[old_tile].discard(car_id)
+            if not self.cars_by_tile[old_tile]:
+                del self.cars_by_tile[old_tile]
 
     def _enrich_and_forward(self, payload: str) -> None:
         try:
@@ -57,31 +80,54 @@ class ProximityFilter:
             logger.error("Failed to parse car update: %s", e)
             return
 
-        # Test cleanup sentinels and origin (0,0) markers pass through unchanged
-        # so detectors still receive their cleanup signal on cars/updates.
-        if not data.get("_test_cleanup"):
-            lat = data.get("latitude")
-            lon = data.get("longitude")
-            if lat is not None and lon is not None and not (
-                abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001
-            ):
-                data["tile_quadkey"] = get_quadkey(
-                    float(lat), float(lon), self.proximity_zoom
-                )
-                data["tile_zoom"] = self.proximity_zoom
-
         car_id = data.get("car_id")
         if not car_id:
             logger.warning("Dropping update without car_id: %s", payload[:120])
             return
 
-        self.mqtt.publish(f"{self.config.car_updates_topic}/{car_id}", json.dumps(data))
+        # Cleanup sentinels: evict from tile tracking and forward to both
+        # topics so all subscribers (including those on in_scope) can clean up.
+        if data.get("_test_cleanup"):
+            self._evict_car(car_id)
+            serialized = json.dumps(data)
+            self.mqtt.publish(f"{self.config.car_updates_topic}/{car_id}", serialized)
+            self.mqtt.publish(f"{self.config.in_scope_topic}/{car_id}", serialized)
+            return
+
+        lat = data.get("latitude")
+        lon = data.get("longitude")
+
+        # Origin markers (lat≈0, lon≈0): same treatment as cleanup sentinels.
+        if lat is not None and lon is not None and (
+            abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001
+        ):
+            self._evict_car(car_id)
+            serialized = json.dumps(data)
+            self.mqtt.publish(f"{self.config.car_updates_topic}/{car_id}", serialized)
+            self.mqtt.publish(f"{self.config.in_scope_topic}/{car_id}", serialized)
+            return
+
+        # Normal update: enrich with tile_quadkey and maintain tile state.
+        tile_qk = None
+        if lat is not None and lon is not None:
+            tile_qk = get_quadkey(float(lat), float(lon), self.proximity_zoom)
+            data["tile_quadkey"] = tile_qk
+            data["tile_zoom"] = self.proximity_zoom
+            self._update_tile(car_id, tile_qk)
+
+        serialized = json.dumps(data)
+        self.mqtt.publish(f"{self.config.car_updates_topic}/{car_id}", serialized)
+
+        # Publish to cars/in_scope only when the tile has ≥2 cars.
+        if tile_qk is not None and len(self.cars_by_tile[tile_qk]) >= 2:
+            self.mqtt.publish(f"{self.config.in_scope_topic}/{car_id}", serialized)
 
     def run(self):
         logger.info(
-            "Starting ProximityFilter: %s -> %s (zoom=%d)",
+            "Starting ProximityFilter: %s -> %s / %s (zoom=%d)",
             self.config.raw_car_updates_topic,
             self.config.car_updates_topic,
+            self.config.in_scope_topic,
             self.proximity_zoom,
         )
         self.mqtt.connect()
