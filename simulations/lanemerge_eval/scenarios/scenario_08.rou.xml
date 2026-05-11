@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 08 — UNSAFE: main-lane car right at the merge point (5 m)
+Scenario 08 - UNSAFE: main-lane car right at the merge point (5 m)
 The highway car is essentially at the merge point when the merging car
 arrives.  Current distance is already < COLLISION_THRESHOLD_M = 20 m,
 so _predict_collision returns True immediately at t=0.

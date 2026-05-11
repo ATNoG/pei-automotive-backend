@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 02 — SAFE: main-lane car far ahead (160 m past merge)
+Scenario 02 - SAFE: main-lane car far ahead (160 m past merge)
 The highway car has already passed the merge point by 160 m before the
 merging car reaches the merge point.  Well outside the ENTRY_ZONE_M=100 m
 threshold → detector should not see a highway car in the zone.

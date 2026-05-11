@@ -1,5 +1,5 @@
 """
-Lane Merge Detector — performance evaluation script.
+Lane Merge Detector - performance evaluation script.
 
 Runs all 10 SUMO scenarios end-to-end, compares the detector's alert
 output against ground truth, and reports precision / recall / F1 both
@@ -9,7 +9,7 @@ Prerequisites
 -------------
 - MQTT broker running on MQTT_HOST:MQTT_PORT (default localhost:1884)
 - LaneMergeDetector service running and subscribed to cars/updates
-- SUMO binary on PATH (optional — falls back to kinematic simulation)
+- SUMO binary on PATH (optional - falls back to kinematic simulation)
 
 Usage
 -----
@@ -37,28 +37,24 @@ _REPO_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_REPO_ROOT / "simulations" / "lanemerge_eval"))
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
-from ground_truth import SCENARIOS, ScenarioSpec   # noqa: E402
-from runner import run_scenario as _runner_run     # noqa: E402
+from ground_truth import SCENARIOS, ScenarioSpec
+from runner import run_scenario as _runner_run
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 logger = logging.getLogger("eval_lanemerge")
 
-# ---------------------------------------------------------------------------
 # Configuration (mirror test_lanemerge_eval.py so the same broker is used)
-# ---------------------------------------------------------------------------
 MQTT_HOST    = "localhost"
 MQTT_PORT    = 1884
 ALERT_TOPIC  = "alerts/lane_merge"
-ALERT_TIMEOUT = 20.0   # seconds — generous to cover slow machines / CI
+ALERT_TIMEOUT = 20.0
 
 DEFAULT_OUTPUT = _REPO_ROOT / "results" / "lanemerge_eval.json"
 
 ALL_SCENARIO_IDS = [f"{i:02d}" for i in range(1, 11)]
 
 
-# ---------------------------------------------------------------------------
 # MQTT helpers
-# ---------------------------------------------------------------------------
 @contextmanager
 def _alert_collector(topic: str = ALERT_TOPIC):
     """Yield a Queue that receives every alert published on *topic*."""
@@ -90,9 +86,7 @@ def _collect_first(q: queue.Queue, timeout: float) -> Optional[dict]:
         return None
 
 
-# ---------------------------------------------------------------------------
 # Per-scenario evaluation
-# ---------------------------------------------------------------------------
 def evaluate_scenario(scenario_id: str) -> dict:
     """
     Run one scenario, return a result dict:
@@ -117,9 +111,7 @@ def evaluate_scenario(scenario_id: str) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
 # Metrics
-# ---------------------------------------------------------------------------
 def compute_metrics(results: list[dict]) -> dict:
     """
     Binary classification metrics with 'unsafe' as the positive class.
@@ -130,9 +122,8 @@ def compute_metrics(results: list[dict]) -> dict:
     fn = sum(1 for r in results if r["expected"] == "unsafe" and r["actual"] != "unsafe")
 
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
-    recall    = tp / (tp + fn) if (tp + fn) > 0 else 0.0
-    f1        = (2 * precision * recall / (precision + recall)
-                 if (precision + recall) > 0 else 0.0)
+    recall = tp / (tp + fn) if (tp + fn) > 0 else 0.0
+    f1 = (2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0.0)
     accuracy  = (tp + tn) / len(results) if results else 0.0
 
     return {
@@ -147,12 +138,10 @@ def compute_metrics(results: list[dict]) -> dict:
     }
 
 
-# ---------------------------------------------------------------------------
 # Output helpers
-# ---------------------------------------------------------------------------
 _PASS = "PASS"
 _FAIL = "FAIL"
-_COL  = 60   # description column width
+_COL  = 60
 
 
 def print_report(results: list[dict], metrics: dict) -> None:
@@ -160,13 +149,10 @@ def print_report(results: list[dict], metrics: dict) -> None:
     passed = sum(1 for r in results if r["correct"])
 
     print()
-    print("=" * 80)
-    print("  Lane Merge Detector — Evaluation Report")
+    print("  Lane Merge Detector - Evaluation Report")
     print(f"  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
-    print("=" * 80)
     header = f"  {'ID':<4} {'Expected':<10} {'Actual':<12} {'':6} Description"
     print(header)
-    print("-" * 80)
 
     for r in results:
         tag  = _PASS if r["correct"] else _FAIL
@@ -175,7 +161,6 @@ def print_report(results: list[dict], metrics: dict) -> None:
             desc = desc[:_COL - 3] + "..."
         print(f"  {r['scenario_id']:<4} {r['expected']:<10} {r['actual']:<12} [{tag}]  {desc}")
 
-    print("-" * 80)
     print(f"  Result: {passed}/{total} correct")
     print()
     print(f"  Precision : {metrics['precision']:.4f}")
@@ -185,7 +170,6 @@ def print_report(results: list[dict], metrics: dict) -> None:
     print()
     print(f"  TP={metrics['true_positives']}  FP={metrics['false_positives']}  "
           f"TN={metrics['true_negatives']}  FN={metrics['false_negatives']}")
-    print("=" * 80)
     print()
 
 
@@ -201,9 +185,7 @@ def write_json(results: list[dict], metrics: dict, output_path: Path) -> None:
     print(f"JSON report written to: {output_path}")
 
 
-# ---------------------------------------------------------------------------
 # CLI entry point
-# ---------------------------------------------------------------------------
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(
         description="Run the lane merge evaluation and produce a metrics report."

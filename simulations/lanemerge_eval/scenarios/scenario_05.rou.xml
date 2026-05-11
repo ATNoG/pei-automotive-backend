@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 05 — SAFE: large time gap, both cars at 60 km/h
+Scenario 05 - SAFE: large time gap, both cars at 60 km/h
 The main-lane car is 200 m behind the merge.  At 60 km/h (16.67 m/s)
 it takes 12 s to reach the merge.  The merging car also travelling at
 60 km/h on a 63 m ramp reaches the merge in ~3.8 s.  The highway car

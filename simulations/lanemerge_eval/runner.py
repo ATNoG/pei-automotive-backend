@@ -4,21 +4,19 @@ TraCI → MQTT runner for lane merge evaluation.
 For each scenario, this module:
   1. Starts SUMO via TraCI with the scenario route file.
   2. Every simulation step, extracts each vehicle's GPS position,
-     speed (from TraCI — no need to diff consecutive positions) and
+     speed (from TraCI - no need to diff consecutive positions) and
      heading from SUMO.
   3. Publishes a CarUpdate JSON message to MQTT cars/updates so the
      LaneMergeDetector processes it exactly as it would in production.
 
-The runner publishes to MQTT directly (bypassing Hono/Ditto) — the same
+The runner publishes to MQTT directly (bypassing Hono/Ditto) - the same
 pattern used by the other evaluation test suites.
 
 Requirements
 ------------
-- SUMO must be installed and accessible (sumo binary on PATH or via the
-  eclipse-sumo Python wheel's bundled binary).
+- SUMO must be installed and accessible (sumo binary on PATH or via the eclipse-sumo Python wheel's bundled binary).
 - The MQTT broker must be running on MQTT_HOST:MQTT_PORT.
-- The LaneMergeDetector service must be running and subscribed to
-  cars/updates.
+- The LaneMergeDetector service must be running and subscribed to cars/updates.
 
 Usage
 -----
@@ -45,13 +43,11 @@ except ImportError:
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "src"))
 
-from common.models import CarUpdate           # noqa: E402
+from common.models import CarUpdate
 
 logger = logging.getLogger(__name__)
 
-# ---------------------------------------------------------------------------
 # Configuration
-# ---------------------------------------------------------------------------
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
 CAR_UPDATES_TOPIC = "cars/updates"
@@ -63,21 +59,14 @@ SCENARIO_DIR = EVAL_DIR / "scenarios"
 NET_FILE    = NET_DIR / "lanemerge.net.xml"
 BASE_CFG    = NET_DIR / "lanemerge.sumocfg"
 
-SUMO_STEP_LENGTH = 0.1   # seconds
+SUMO_STEP_LENGTH = 0.1 # seconds
 SPEED_LIMIT_KMH  = 100.0 # reported to detector (unused for detection but required in CarUpdate)
 
-# Per-scenario simulation end time (generous; SUMO stops when all
-# vehicles have left the network anyway).
 SIM_END_S = 120.0
-
-# IDs used inside SUMO route files (must match .rou.xml vehicle id="...")
 MERGING_CAR_ID    = "merging_car"
-MAIN_LANE_CAR_IDS = ["main_car", "main_car_2"]   # second only used in scenario 10
+MAIN_LANE_CAR_IDS = ["main_car", "main_car_2"]
 
-
-# ---------------------------------------------------------------------------
 # MQTT helpers
-# ---------------------------------------------------------------------------
 def _make_mqtt_client() -> mqtt.Client:
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.connect(MQTT_HOST, MQTT_PORT, keepalive=30)
@@ -118,9 +107,7 @@ def _cleanup(client: mqtt.Client, *car_ids: str) -> None:
     time.sleep(0.3)
 
 
-# ---------------------------------------------------------------------------
 # SUMO runner
-# ---------------------------------------------------------------------------
 def _find_sumo_binary() -> Optional[str]:
     """Try to locate the 'sumo' binary."""
     import shutil
@@ -151,7 +138,7 @@ def _run_with_traci(scenario_id: str, mqtt_client: mqtt.Client) -> bool:
 
     sumo_bin = _find_sumo_binary()
     if sumo_bin is None:
-        logger.warning("SUMO binary not found — falling back to kinematic simulation")
+        logger.warning("SUMO binary not found - falling back to kinematic simulation")
         return False
 
     cmd = [
@@ -178,7 +165,7 @@ def _run_with_traci(scenario_id: str, mqtt_client: mqtt.Client) -> bool:
                 x, y = traci.vehicle.getPosition(vid)
                 lon, lat = traci.simulation.convertGeo(x, y)
                 speed_ms = traci.vehicle.getSpeed(vid)
-                heading  = traci.vehicle.getAngle(vid)   # SUMO: 0=N, 90=E (clockwise)
+                heading  = traci.vehicle.getAngle(vid) # SUMO: 0=N, 90=E (clockwise)
 
                 _publish_update(
                     mqtt_client, vid,
@@ -187,7 +174,7 @@ def _run_with_traci(scenario_id: str, mqtt_client: mqtt.Client) -> bool:
                     heading_deg=heading,
                 )
 
-            time.sleep(SUMO_STEP_LENGTH * 0.5)   # pace publishing slightly
+            time.sleep(SUMO_STEP_LENGTH * 0.5) # pace publishing slightly
 
         return True
     except Exception as e:
@@ -200,9 +187,7 @@ def _run_with_traci(scenario_id: str, mqtt_client: mqtt.Client) -> bool:
             pass
 
 
-# ---------------------------------------------------------------------------
 # Kinematic fallback (no SUMO binary required)
-# ---------------------------------------------------------------------------
 def _load_route_coords(route_name: str) -> list[tuple[float, float]]:
     roads_dir = Path(__file__).resolve().parent.parent / "roads"
     route_file = roads_dir / f"{route_name}.json"
@@ -362,9 +347,7 @@ def _run_kinematic(scenario_id: str, spec, mqtt_client: mqtt.Client) -> None:
         time.sleep(SUMO_STEP_LENGTH)
 
 
-# ---------------------------------------------------------------------------
 # Public API
-# ---------------------------------------------------------------------------
 def run_scenario(scenario_id: str, spec) -> None:
     """
     Run one evaluation scenario end-to-end.
@@ -400,9 +383,7 @@ def run_scenario(scenario_id: str, spec) -> None:
         mqtt_client.disconnect()
 
 
-# ---------------------------------------------------------------------------
 # CLI
-# ---------------------------------------------------------------------------
 if __name__ == "__main__":
     import sys as _sys
     from ground_truth import SCENARIOS

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 10 — UNSAFE: two main-lane cars; first passes safely, second too close
+Scenario 10 - UNSAFE: two main-lane cars; first passes safely, second too close
 main_car departs 130 m before the merge → safe (large gap).
 main_car_2 departs 30 m before the merge → unsafe (same gap as scenario 06).
 The merging car travels at 60 km/h.  The detector should fire unsafe for

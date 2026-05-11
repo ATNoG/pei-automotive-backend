@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 03 — SAFE: main-lane car just outside entry zone (110 m past merge)
+Scenario 03 - SAFE: main-lane car just outside entry zone (110 m past merge)
 The car has passed the merge by 110 m, which is just beyond
 ENTRY_ZONE_M = 100 m, so the detector never considers it.
 Expected: lane_merge_safe (no car in entry zone).

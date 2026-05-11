@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 01 — SAFE: no main-lane traffic
+Scenario 01 - SAFE: no main-lane traffic
 The merging car enters the ramp alone; no highway car is present.
 Expected: LaneMergeDetector fires lane_merge_safe (no traffic in zone).
 -->

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 Node definitions for the lane-merge evaluation network.
-Coordinates are geographic (lon, lat) — netconvert reprojects to UTM 29N.
+Coordinates are geographic (lon, lat) - netconvert reprojects to UTM 29N.
 
 Geometry is derived from simulations/roads/highway.json and entering.json:
   - MERGE  : end of entering ramp / merge point on highway

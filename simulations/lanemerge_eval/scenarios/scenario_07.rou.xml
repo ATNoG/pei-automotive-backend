@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 07 — UNSAFE: merging car fast (100 km/h) onto slow main lane (30 km/h)
+Scenario 07 - UNSAFE: merging car fast (100 km/h) onto slow main lane (30 km/h)
 The merging car is going 27.78 m/s while the main-lane car ahead is only
 8.33 m/s.  The merging car reaches the merge ~2.3 s after departure and
 will immediately be on a collision course with the slow highway car

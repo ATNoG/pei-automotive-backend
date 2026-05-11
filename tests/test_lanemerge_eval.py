@@ -1,5 +1,5 @@
 """
-Lane Merge Evaluation — 10 SUMO-driven test cases.
+Lane Merge Evaluation - 10 SUMO-driven test cases.
 
 Each test runs a SUMO scenario via the lanemerge runner, collects
 alerts/lane_merge output, and asserts the detector's outcome matches
@@ -82,7 +82,7 @@ def run_scenario(scenario_id: str) -> Optional[str]:
     Run the SUMO scenario and return the detected outcome string
     ("safe" | "unsafe") or None if no alert was received.
     """
-    from runner import run_scenario as _run  # noqa: PLC0415 — late import
+    from runner import run_scenario as _run
 
     spec: ScenarioSpec = SCENARIOS[scenario_id]
 
@@ -111,7 +111,7 @@ def _record(scenario_id: str, expected: str, actual: Optional[str]) -> None:
 # ---------------------------------------------------------------------------
 
 def test_scenario_01():
-    """Safe — no main-lane traffic."""
+    """Safe - no main-lane traffic."""
     spec = SCENARIOS["01"]
     actual = run_scenario("01")
     _record("01", spec.expected_outcome, actual)
@@ -119,7 +119,7 @@ def test_scenario_01():
 
 
 def test_scenario_02():
-    """Safe — main-lane car far ahead (160 m past merge)."""
+    """Safe - main-lane car far ahead (160 m past merge)."""
     spec = SCENARIOS["02"]
     actual = run_scenario("02")
     _record("02", spec.expected_outcome, actual)
@@ -127,7 +127,7 @@ def test_scenario_02():
 
 
 def test_scenario_03():
-    """Safe — main-lane car just outside entry zone."""
+    """Safe - main-lane car just outside entry zone."""
     spec = SCENARIOS["03"]
     actual = run_scenario("03")
     _record("03", spec.expected_outcome, actual)
@@ -135,7 +135,7 @@ def test_scenario_03():
 
 
 def test_scenario_04():
-    """Safe — merging car very slow, main-lane car passes first."""
+    """Safe - merging car very slow, main-lane car passes first."""
     spec = SCENARIOS["04"]
     actual = run_scenario("04")
     _record("04", spec.expected_outcome, actual)
@@ -143,7 +143,7 @@ def test_scenario_04():
 
 
 def test_scenario_05():
-    """Safe — large time gap, both at 60 km/h."""
+    """Safe - large time gap, both at 60 km/h."""
     spec = SCENARIOS["05"]
     actual = run_scenario("05")
     _record("05", spec.expected_outcome, actual)
@@ -151,7 +151,7 @@ def test_scenario_05():
 
 
 def test_scenario_06():
-    """Unsafe — same speed (80 km/h), small gap (30 m)."""
+    """Unsafe - same speed (80 km/h), small gap (30 m)."""
     spec = SCENARIOS["06"]
     actual = run_scenario("06")
     _record("06", spec.expected_outcome, actual)
@@ -159,7 +159,7 @@ def test_scenario_06():
 
 
 def test_scenario_07():
-    """Unsafe — merging fast (100 km/h) onto slow main lane (30 km/h)."""
+    """Unsafe - merging fast (100 km/h) onto slow main lane (30 km/h)."""
     spec = SCENARIOS["07"]
     actual = run_scenario("07")
     _record("07", spec.expected_outcome, actual)
@@ -167,7 +167,7 @@ def test_scenario_07():
 
 
 def test_scenario_08():
-    """Unsafe — main-lane car right at merge point."""
+    """Unsafe - main-lane car right at merge point."""
     spec = SCENARIOS["08"]
     actual = run_scenario("08")
     _record("08", spec.expected_outcome, actual)
@@ -175,7 +175,7 @@ def test_scenario_08():
 
 
 def test_scenario_09():
-    """Unsafe — merging slow (20 km/h), fast main-lane car (120 km/h)."""
+    """Unsafe - merging slow (20 km/h), fast main-lane car (120 km/h)."""
     spec = SCENARIOS["09"]
     actual = run_scenario("09")
     _record("09", spec.expected_outcome, actual)
@@ -183,9 +183,29 @@ def test_scenario_09():
 
 
 def test_scenario_10():
-    """Unsafe — two main-lane cars; second one too close."""
+    """Unsafe - two main-lane cars; second one too close."""
     spec = SCENARIOS["10"]
     actual = run_scenario("10")
     _record("10", spec.expected_outcome, actual)
     # At least one unsafe alert must fire (for the close second car)
     assert actual == "unsafe", f"Expected 'unsafe', got {actual!r}"
+
+
+def test_scenario_11():
+    """
+    FALSE NEGATIVE - fast car (120 km/h) at 140 m exceeds ENTRY_ZONE_M=100 m.
+
+    The detector only inspects main-lane cars within 100 m of the merge point.
+    A car at 140 m doing 120 km/h reaches the merge in ~4.2 s - a real collision
+    risk - but is skipped because dist_main_to_merge > ENTRY_ZONE_M.
+
+    This test is expected to FAIL. Fix: increase ENTRY_ZONE_M to at least 150 m.
+    """
+    spec = SCENARIOS["11"]
+    actual = run_scenario("11")
+    _record("11", spec.expected_outcome, actual)
+    assert actual == "unsafe", (
+        f"False negative confirmed: detector said {actual!r}. "
+        "A car at 140 m / 120 km/h reaches the merge in ~4.2 s. "
+        "Fix: increase ENTRY_ZONE_M in LaneMergeDetector from 100 m to at least 150 m."
+    )

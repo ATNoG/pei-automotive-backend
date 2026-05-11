@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 09 — UNSAFE: merging car slow (20 km/h), fast main-lane car (120 km/h)
+Scenario 09 - UNSAFE: merging car slow (20 km/h), fast main-lane car (120 km/h)
 The merging car crawls onto the highway at 5.56 m/s.  A fast highway car
 at 33.33 m/s (120 km/h) is 55 m behind the merge point.  It reaches the
 merge in ~1.65 s and, since the merging car has only moved ~9 m forward,

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 06 — UNSAFE: same speed (80 km/h), small gap (30 m)
+Scenario 06 - UNSAFE: same speed (80 km/h), small gap (30 m)
 Both cars travel at 80 km/h (22.22 m/s).  The highway car is 30 m
 before the merge.  At the moment the merging car reaches the merge
-point (~2.8 s), the highway car is only ~5 m ahead — well within
+point (~2.8 s), the highway car is only ~5 m ahead - well within
 COLLISION_THRESHOLD_M = 20 m.
 Expected: lane_merge_unsafe.
 -->

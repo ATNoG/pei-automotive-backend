@@ -18,26 +18,22 @@ import math
 import xml.etree.ElementTree as ET
 from pathlib import Path
 
-# ---------------------------------------------------------------------------
 # GPS anchor points (from highway.json / entering.json)
-# ---------------------------------------------------------------------------
 GPS = {
-    "H_START": (40.627244, -8.730434),   # highway start
-    "MERGE":   (40.628003, -8.732348),   # merge / junction
-    "H_END":   (40.628800, -8.734500),   # highway continues
-    "E_START": (40.628041, -8.731600),   # entering ramp start
+    "H_START": (40.627244, -8.730434), # highway start
+    "MERGE":   (40.628003, -8.732348), # merge / junction
+    "H_END":   (40.628800, -8.734500), # highway continues
+    "E_START": (40.628041, -8.731600), # entering ramp start
 }
 
-# ---------------------------------------------------------------------------
-# UTM zone 29N conversion  (WGS84)
-# ---------------------------------------------------------------------------
+# UTM zone 29N conversion (WGS84)
 _A   = 6_378_137.0
 _F   = 1 / 298.257_223_563
 _B   = _A * (1 - _F)
 _E2  = 1 - (_B / _A) ** 2
 _K0  = 0.9996
-_E0  = 500_000.0          # false easting
-_ZONE_CM = -9.0            # central meridian zone 29 (°)
+_E0  = 500_000.0 # false easting
+_ZONE_CM = -9.0 # central meridian zone 29 (°)
 
 
 def _utm29(lat: float, lon: float) -> tuple[float, float]:
@@ -87,10 +83,7 @@ def _dist(p1: tuple[float, float], p2: tuple[float, float]) -> float:
 def _shape_str(points: list[tuple[float, float]]) -> str:
     return " ".join(f"{x:.4f},{y:.4f}" for x, y in points)
 
-
-# ---------------------------------------------------------------------------
 # Build network
-# ---------------------------------------------------------------------------
 def generate(out_path: Path) -> None:
     # Convert all GPS points to UTM
     utm = {k: _utm29(lat, lon) for k, (lat, lon) in GPS.items()}
@@ -129,9 +122,7 @@ def generate(out_path: Path) -> None:
     m1_start = (merge[0] - uei[0] * stub, merge[1] - uei[1] * stub)
     m1_end   = (merge[0] + uho[0] * stub, merge[1] + uho[1] * stub)
 
-    # -----------------------------------------------------------------------
     # Build XML
-    # -----------------------------------------------------------------------
     root = ET.Element("net", {
         "version": "1.16",
         "junctionCornerDetail": "5",
@@ -155,7 +146,7 @@ def generate(out_path: Path) -> None:
         "speed": "27.78", "disallow": "",
     })
 
-    # --- Dead-end junctions ---
+    # Dead-end junctions
     for node_id, pos in [("H_START", h_start), ("H_END", h_end), ("E_START", e_start)]:
         ET.SubElement(root, "junction", {
             "id": node_id, "type": "dead_end",
@@ -163,7 +154,7 @@ def generate(out_path: Path) -> None:
             "incLanes": "", "intLanes": "", "shape": "",
         })
 
-    # --- Merge junction ---
+    # Merge junction
     # Junction shape: small hexagon around (0,0)
     r = 5.0
     angles = [0, 60, 120, 180, 240, 300]
@@ -187,7 +178,7 @@ def generate(out_path: Path) -> None:
         "index": "1", "response": "01", "foes": "01", "cont": "0",
     })
 
-    # --- Regular edges ---
+    # Regular edges
     def add_edge(eid, from_node, to_node, shape_pts, speed="27.78", priority="9"):
         length = sum(_dist(shape_pts[i], shape_pts[i+1]) for i in range(len(shape_pts)-1))
         e = ET.SubElement(root, "edge", {
@@ -205,7 +196,7 @@ def generate(out_path: Path) -> None:
     add_edge("highway_out", "MERGE",   "H_END",   [merge, h_end])
     add_edge("entering",    "E_START", "MERGE",  [e_start, merge], speed="22.22", priority="7")
 
-    # --- Internal edges ---
+    # Internal edges
     def add_internal(eid, shape_pts):
         length = max(_dist(shape_pts[0], shape_pts[-1]), 0.01)
         e = ET.SubElement(root, "edge", {
@@ -220,7 +211,7 @@ def generate(out_path: Path) -> None:
     add_internal(":MERGE_0", [m0_start, m0_end])
     add_internal(":MERGE_1", [m1_start, m1_end])
 
-    # --- Connections ---
+    # Connections
     def add_conn(from_e, to_e, via, link_idx, state="M"):
         ET.SubElement(root, "connection", {
             "from": from_e, "to": to_e,

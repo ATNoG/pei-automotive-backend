@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 04 — SAFE: merging car very slow (20 km/h), fast main-lane car passes first
+Scenario 04 - SAFE: merging car very slow (20 km/h), fast main-lane car passes first
 The main-lane car is 55 m behind the merge at 90 km/h.  The merging car
 is approaching the ramp at only 20 km/h.  By the time the merging car
 reaches the merge point, the highway car has already long passed.
