@@ -8,6 +8,7 @@ import json
 import logging
 import sys
 import time
+from collections import defaultdict
 from pathlib import Path
 from typing import Dict, Optional
 from dataclasses import dataclass, field
@@ -54,6 +55,7 @@ class Accident:
     source_vehicle_id: str
     detected_at: float
     active: bool = True
+    tile_quadkey: Optional[int] = None
     # TODO: DB integration fields
     # location_id: Optional[int] = None
     # number_vehicles: Optional[int] = None
@@ -93,6 +95,11 @@ class AccidentDetector:
         )
 
         self.cars: Dict[str, CarState] = {}
+        # Bucket cars by tile_quadkey so notification scans stay tile-local.
+        # Border misses (cars at tile edge within 500m of accident in adjacent
+        # tile) are acceptable given zoom-15 tiles are ~1.2 km wide.
+        self.cars_by_tile: Dict[int, Dict[str, CarState]] = defaultdict(dict)
+        self.car_tile: Dict[str, int] = {}
         self.active_accidents: Dict[str, Accident] = {}
         self.alert_topic = "alerts/accident"
         self.event_counter = 0
@@ -172,7 +179,14 @@ class AccidentDetector:
         """Notify vehicles with accident ahead. Returns count."""
         notified = 0
 
-        for car_id, car_state in self.cars.items():
+        tile_qk = accident.tile_quadkey
+        candidates = (
+            self.cars_by_tile[tile_qk]
+            if tile_qk is not None
+            else self.cars
+        )
+
+        for car_id, car_state in candidates.items():
             if self._should_notify_car(car_state, accident):
                 dist = haversine_distance_m(
                     car_state.latitude, car_state.longitude,
@@ -240,10 +254,11 @@ class AccidentDetector:
             return
 
         now = time.time()
+        tile_qk = data.get("tile_quadkey")
         existing = self.cars.get(update.car_id)
 
         if existing is None:
-            self.cars[update.car_id] = CarState(
+            state = CarState(
                 car_id=update.car_id,
                 latitude=update.latitude,
                 longitude=update.longitude,
@@ -251,6 +266,10 @@ class AccidentDetector:
                 heading_deg=update.heading_deg,
                 timestamp=now,
             )
+            self.cars[update.car_id] = state
+            if tile_qk is not None:
+                self.cars_by_tile[tile_qk][update.car_id] = state
+                self.car_tile[update.car_id] = tile_qk
             return
 
         state = existing
@@ -270,6 +289,7 @@ class AccidentDetector:
                     longitude=update.longitude,
                     source_vehicle_id=update.car_id,
                     detected_at=now,
+                    tile_quadkey=tile_qk,
                 )
 
                 self.active_accidents[accident.event_id] = accident
@@ -289,9 +309,28 @@ class AccidentDetector:
         state.heading_deg = update.heading_deg
         state.timestamp = now
 
+        # Update tile bucket
+        if tile_qk is not None:
+            old_tile = self.car_tile.get(update.car_id)
+            if old_tile is not None and old_tile != tile_qk:
+                self.cars_by_tile[old_tile].pop(update.car_id, None)
+                if not self.cars_by_tile[old_tile]:
+                    del self.cars_by_tile[old_tile]
+            self.cars_by_tile[tile_qk][update.car_id] = state
+            self.car_tile[update.car_id] = tile_qk
+
         # Notify about existing accidents if this car qualifies
         for accident in self.active_accidents.values():
-            if accident.active and self._should_notify_car(state, accident):
+            if not accident.active:
+                continue
+            # Skip if car and accident are in different known tiles
+            if (
+                tile_qk is not None
+                and accident.tile_quadkey is not None
+                and tile_qk != accident.tile_quadkey
+            ):
+                continue
+            if self._should_notify_car(state, accident):
                 dist = haversine_distance_m(
                     state.latitude, state.longitude,
                     accident.latitude, accident.longitude
@@ -310,13 +349,20 @@ class AccidentDetector:
 
         self._cleanup_expired_accidents()
 
+    def _evict_from_tile(self, car_id: str) -> None:
+        old_tile = self.car_tile.pop(car_id, None)
+        if old_tile is not None:
+            self.cars_by_tile[old_tile].pop(car_id, None)
+            if not self.cars_by_tile[old_tile]:
+                del self.cars_by_tile[old_tile]
+
     def _cleanup_car(self, car_id: str):
         """Remove all state for a specific car (used for test cleanup)."""
-        # Remove car state
         if car_id in self.cars:
             del self.cars[car_id]
+            self._evict_from_tile(car_id)
             logger.info(f"[CLEANUP] Removed car state: {car_id}")
-        
+
         # Remove any accidents caused by this car
         accidents_to_remove = [
             event_id for event_id, accident in self.active_accidents.items()

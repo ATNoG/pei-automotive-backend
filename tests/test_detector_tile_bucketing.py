@@ -225,3 +225,61 @@ def test_traffic_jam_cluster_search_stays_in_tile():
     assert cluster_ids.issubset({f"a{i}" for i in range(5)}), (
         f"cluster leaked across tiles: {cluster_ids}"
     )
+
+
+# ---------------------------------------------------------------------------
+# Accident detector
+# ---------------------------------------------------------------------------
+
+def test_accident_detector_buckets_cars_by_tile():
+    det = _make_detector(
+        "services/accident_detector/service.py",
+        "accident_service",
+        "AccidentDetector",
+    )
+
+    det._on_car_update(_update("a", *AVEIRO, tile_qk=111))
+    det._on_car_update(_update("b", *LISBON, tile_qk=222))
+
+    assert det.car_tile == {"a": 111, "b": 222}
+    assert "a" in det.cars_by_tile[111]
+    assert "b" in det.cars_by_tile[222]
+
+
+def test_accident_notification_stays_in_tile():
+    """A car in a different tile must not receive an accident notification.
+
+    Uses the same geographic location but different fabricated tile_quadkeys
+    so the haversine check alone would pass, proving the tile guard is what
+    prevents the cross-tile notification.
+    """
+    det = _make_detector(
+        "services/accident_detector/service.py",
+        "accident_service",
+        "AccidentDetector",
+    )
+
+    # accident-car: first update at 80 km/h (creates state in tile 111)
+    det._on_car_update(_update("accident-car", *AVEIRO, tile_qk=111, speed_kmh=80.0))
+    # second update at 0 km/h triggers sudden stop -> accident in tile 111
+    det._on_car_update(_update("accident-car", *AVEIRO, tile_qk=111, speed_kmh=0.0))
+
+    assert det.active_accidents, "expected an accident to be detected"
+    accident = next(iter(det.active_accidents.values()))
+    assert accident.tile_quadkey == 111
+
+    # other-car: same location as the accident (distance=0m, would pass the
+    # haversine check), but assigned to tile 222. Two updates are needed:
+    # the first creates state, the second triggers the "check existing
+    # accidents" path.
+    det._on_car_update(_update("other-car", *AVEIRO, tile_qk=222, speed_kmh=50.0))
+    det._on_car_update(_update("other-car", *AVEIRO, tile_qk=222, speed_kmh=50.0))
+
+    notified = {
+        topic.split("/")[-1]
+        for topic, _ in det.mqtt.published
+        if topic.startswith("alerts/accident/")
+    }
+    assert "other-car" not in notified, (
+        f"cross-tile notification sent to other-car: {det.mqtt.published}"
+    )
