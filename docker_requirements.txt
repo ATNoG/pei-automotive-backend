@@ -1,0 +1,11 @@
+paho-mqtt
+websocket-client
+requests
+certifi
+geopy
+python-dotenv
+pytest
+httpx
+testcontainers[postgres]
+docker
+pg8000

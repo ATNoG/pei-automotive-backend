@@ -23,7 +23,6 @@ CREATE TABLE IF NOT EXISTS user_preferences (
     -- Appearance
     dark_mode BOOLEAN NOT NULL DEFAULT TRUE,
     colorblind_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-    language VARCHAR(10) NOT NULL DEFAULT 'en',
 
     -- Alert toggles
     alert_accident BOOLEAN NOT NULL DEFAULT TRUE,

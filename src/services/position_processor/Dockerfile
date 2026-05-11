@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY src/common ./common
 COPY src/services/position_processor/service.py .
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY docker_requirements.txt .
+RUN pip install --no-cache-dir -r docker_requirements.txt
 
 CMD ["python", "service.py"]
