@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
-from common.models import CarUpdate
+from common.models import CarUpdate, AlertPriority
 from common.utils import haversine_distance_m
 
 
@@ -126,6 +126,9 @@ class OvertakingDetector:
                     "timestamp": time.time(),
                     "latitude": update.latitude,
                     "longitude": update.longitude,
+                    # Priority-based event aggregation (visual only, no audio priority check)
+                    "priority": int(AlertPriority.LOW),
+                    "expiration_s": 2,  # Alert valid for 2 seconds
                 }
                 self.mqtt.publish(self.alert_topic, json.dumps(alert))
                 logger.warning(f"[OVERTAKE] {update.car_id} overtook {other_id}")

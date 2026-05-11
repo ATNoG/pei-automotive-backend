@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
-from common.models import CarUpdate
+from common.models import CarUpdate, AlertPriority
 from common.utils import haversine_distance_m, bearing_deg
 
 
@@ -332,6 +332,9 @@ class LaneMergeDetector:
                                     "timestamp": time.time(),
                                     "latitude": update.latitude,
                                     "longitude": update.longitude,
+                                    # Priority-based event aggregation
+                                    "priority": int(AlertPriority.HIGH),
+                                    "expiration_s": 2,  # Alert valid for 2 seconds
                                 }
 
                                 self.mqtt.publish(self.alert_topic, json.dumps(alert))
@@ -354,6 +357,9 @@ class LaneMergeDetector:
                                     "timestamp": time.time(),
                                     "latitude": update.latitude,
                                     "longitude": update.longitude,
+                                    # Priority-based event aggregation
+                                    "priority": int(AlertPriority.MEDIUM),
+                                    "expiration_s": 2,  # Alert valid for 2 seconds
                                 }
 
                                 self.mqtt.publish(self.alert_topic, json.dumps(alert))
@@ -376,6 +382,9 @@ class LaneMergeDetector:
                             "timestamp": time.time(),
                             "latitude": update.latitude,
                             "longitude": update.longitude,
+                            # Priority-based event aggregation
+                            "priority": int(AlertPriority.MEDIUM),
+                            "expiration_s": 2,  # Alert valid for 2 seconds
                         }
 
                         self.mqtt.publish(self.alert_topic, json.dumps(alert))
