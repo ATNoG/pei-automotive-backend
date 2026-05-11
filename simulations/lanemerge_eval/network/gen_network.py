@@ -140,45 +140,17 @@ def generate(out_path: Path) -> None:
         "projParameter": "+proj=utm +zone=29 +ellps=WGS84 +datum=WGS84 +units=m +no_defs",
     })
 
-    # Edge types
+    # Edge type
     ET.SubElement(root, "type", {
         "id": "road", "priority": "9", "numLanes": "1",
         "speed": "27.78", "disallow": "",
     })
 
-    # Dead-end junctions
-    for node_id, pos in [("H_START", h_start), ("H_END", h_end), ("E_START", e_start)]:
-        ET.SubElement(root, "junction", {
-            "id": node_id, "type": "dead_end",
-            "x": f"{pos[0]:.4f}", "y": f"{pos[1]:.4f}",
-            "incLanes": "", "intLanes": "", "shape": "",
-        })
+    # -----------------------------------------------------------------------
+    # Edges must come before junctions in the SUMO net.xml so that lane IDs
+    # referenced in junction incLanes are already known when SUMO parses them.
+    # -----------------------------------------------------------------------
 
-    # Merge junction
-    # Junction shape: small hexagon around (0,0)
-    r = 5.0
-    angles = [0, 60, 120, 180, 240, 300]
-    jshape = " ".join(
-        f"{r*math.cos(math.radians(a)):.4f},{r*math.sin(math.radians(a)):.4f}"
-        for a in angles
-    )
-    ET.SubElement(root, "junction", {
-        "id": "MERGE", "type": "zipper",
-        "x": "0.0000", "y": "0.0000",
-        "incLanes": "highway_in_0 entering_0",
-        "intLanes": ":MERGE_0_0 :MERGE_1_0",
-        "shape": jshape,
-    })
-    # foeDetector children
-    junc_el = root.find("junction[@id='MERGE']")
-    req0 = ET.SubElement(junc_el, "request", {
-        "index": "0", "response": "10", "foes": "10", "cont": "0",
-    })
-    req1 = ET.SubElement(junc_el, "request", {
-        "index": "1", "response": "01", "foes": "01", "cont": "0",
-    })
-
-    # Regular edges
     def add_edge(eid, from_node, to_node, shape_pts, speed="27.78", priority="9"):
         length = sum(_dist(shape_pts[i], shape_pts[i+1]) for i in range(len(shape_pts)-1))
         e = ET.SubElement(root, "edge", {
@@ -192,37 +164,59 @@ def generate(out_path: Path) -> None:
             "shape": _shape_str(shape_pts),
         })
 
-    add_edge("highway_in",  "H_START", "MERGE",  [h_start, merge])
-    add_edge("highway_out", "MERGE",   "H_END",   [merge, h_end])
-    add_edge("entering",    "E_START", "MERGE",  [e_start, merge], speed="22.22", priority="7")
-
-    # Internal edges
     def add_internal(eid, shape_pts):
         length = max(_dist(shape_pts[0], shape_pts[-1]), 0.01)
-        e = ET.SubElement(root, "edge", {
-            "id": eid, "function": "internal",
-        })
+        e = ET.SubElement(root, "edge", {"id": eid, "function": "internal"})
         ET.SubElement(e, "lane", {
             "id": f"{eid}_0", "index": "0",
             "speed": "8.33", "length": f"{length:.4f}",
             "shape": _shape_str(shape_pts),
         })
 
+    add_edge("highway_in",  "H_START", "MERGE", [h_start, merge])
+    add_edge("highway_out", "MERGE",   "H_END",  [merge, h_end])
+    add_edge("entering",    "E_START", "MERGE", [e_start, merge], speed="22.22", priority="7")
     add_internal(":MERGE_0", [m0_start, m0_end])
     add_internal(":MERGE_1", [m1_start, m1_end])
 
-    # Connections
-    def add_conn(from_e, to_e, via, link_idx, state="M"):
+    # -----------------------------------------------------------------------
+    # Junctions (after edges)
+    # -----------------------------------------------------------------------
+
+    for node_id, pos in [("H_START", h_start), ("H_END", h_end), ("E_START", e_start)]:
+        ET.SubElement(root, "junction", {
+            "id": node_id, "type": "dead_end",
+            "x": f"{pos[0]:.4f}", "y": f"{pos[1]:.4f}",
+            "incLanes": "", "intLanes": "", "shape": "",
+        })
+
+    r = 5.0
+    angles = [0, 60, 120, 180, 240, 300]
+    jshape = " ".join(
+        f"{r*math.cos(math.radians(a)):.4f},{r*math.sin(math.radians(a)):.4f}"
+        for a in angles
+    )
+    junc_el = ET.SubElement(root, "junction", {
+        "id": "MERGE", "type": "zipper",
+        "x": "0.0000", "y": "0.0000",
+        "incLanes": "highway_in_0 entering_0",
+        "intLanes": ":MERGE_0_0 :MERGE_1_0",
+        "shape": jshape,
+    })
+    ET.SubElement(junc_el, "request", {"index": "0", "response": "10", "foes": "10", "cont": "0"})
+    ET.SubElement(junc_el, "request", {"index": "1", "response": "01", "foes": "01", "cont": "0"})
+
+    # Connections (after junctions)
+    # tl and linkIndex are omitted - they are only valid for traffic-light junctions
+    def add_conn(from_e, to_e, via, state="M"):
         ET.SubElement(root, "connection", {
             "from": from_e, "to": to_e,
             "fromLane": "0", "toLane": "0",
-            "via": via, "tl": "", "linkIndex": str(link_idx),
-            "dir": "s", "state": state,
+            "via": via, "dir": "s", "state": state,
         })
 
-    add_conn("highway_in", "highway_out", ":MERGE_0_0", 0)
-    add_conn("entering",   "highway_out", ":MERGE_1_0", 1)
-    # internal → outgoing connections
+    add_conn("highway_in", "highway_out", ":MERGE_0_0")
+    add_conn("entering",   "highway_out", ":MERGE_1_0")
     ET.SubElement(root, "connection", {
         "from": ":MERGE_0", "to": "highway_out",
         "fromLane": "0", "toLane": "0", "dir": "s", "state": "M",

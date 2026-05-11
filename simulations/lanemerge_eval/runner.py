@@ -151,10 +151,17 @@ def _run_with_traci(scenario_id: str, mqtt_client: mqtt.Client) -> bool:
         "--no-step-log",
     ]
 
+    # Use a per-scenario label so a failed start never blocks the next scenario.
+    label = f"lanemerge_{scenario_id}"
     try:
-        traci.start(cmd)
+        traci.start(cmd, label=label)
     except Exception as e:
         logger.error(f"Failed to start SUMO: {e}")
+        try:
+            traci.switch(label)
+            traci.close()
+        except Exception:
+            pass
         return False
 
     try:
@@ -165,7 +172,7 @@ def _run_with_traci(scenario_id: str, mqtt_client: mqtt.Client) -> bool:
                 x, y = traci.vehicle.getPosition(vid)
                 lon, lat = traci.simulation.convertGeo(x, y)
                 speed_ms = traci.vehicle.getSpeed(vid)
-                heading  = traci.vehicle.getAngle(vid) # SUMO: 0=N, 90=E (clockwise)
+                heading  = traci.vehicle.getAngle(vid)
 
                 _publish_update(
                     mqtt_client, vid,
@@ -174,7 +181,7 @@ def _run_with_traci(scenario_id: str, mqtt_client: mqtt.Client) -> bool:
                     heading_deg=heading,
                 )
 
-            time.sleep(SUMO_STEP_LENGTH * 0.5) # pace publishing slightly
+            time.sleep(SUMO_STEP_LENGTH * 0.5)
 
         return True
     except Exception as e:
@@ -182,6 +189,7 @@ def _run_with_traci(scenario_id: str, mqtt_client: mqtt.Client) -> bool:
         return False
     finally:
         try:
+            traci.switch(label)
             traci.close()
         except Exception:
             pass
@@ -320,7 +328,7 @@ def _run_kinematic(scenario_id: str, spec, mqtt_client: mqtt.Client) -> None:
 
         # Scenario 10: second main-lane car 130m further behind
         main_samples_2: list = []
-        if scenario_id == "10":
+        if scenario_id == "09":
             start_pos_2 = max(0.0, best_pos - spec.main_lane_offset_m - 130.0)
             main_samples_2 = _interpolate_along_route(
                 main_lane_coords, start_pos_2, highway_len, spec.main_lane_speed_kmh
@@ -339,7 +347,7 @@ def _run_kinematic(scenario_id: str, spec, mqtt_client: mqtt.Client) -> None:
             _publish_update(mqtt_client, MAIN_LANE_CAR_IDS[0], lat, lon,
                             spec.main_lane_speed_kmh, hdg)
 
-        if scenario_id == "10" and i < len(main_samples_2):
+        if scenario_id == "09" and i < len(main_samples_2):
             lat, lon, hdg = main_samples_2[i]
             _publish_update(mqtt_client, MAIN_LANE_CAR_IDS[1], lat, lon,
                             spec.main_lane_speed_kmh, hdg)
@@ -376,7 +384,7 @@ def run_scenario(scenario_id: str, spec) -> None:
         time.sleep(2.0)
     finally:
         car_ids = [MERGING_CAR_ID, MAIN_LANE_CAR_IDS[0]]
-        if scenario_id == "10":
+        if scenario_id == "09":
             car_ids.append(MAIN_LANE_CAR_IDS[1])
         _cleanup(mqtt_client, *car_ids)
         mqtt_client.loop_stop()

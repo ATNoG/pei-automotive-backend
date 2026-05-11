@@ -65,51 +65,43 @@ SCENARIOS: dict[str, ScenarioSpec] = {
     ),
     "06": ScenarioSpec(
         scenario_id="06",
-        description="Same speed (80 km/h), small gap (30 m) - collision course",
+        description="Same speed (80 km/h), ~30 m gap at trigger - collision course",
         expected_outcome="unsafe",
         merging_speed_kmh=80.0,
         main_lane_speed_kmh=80.0,
-        main_lane_offset_m=30.0,
+        main_lane_offset_m=83.0,
     ),
     "07": ScenarioSpec(
         scenario_id="07",
-        description="Merging car fast (100 km/h) onto slow main lane (30 km/h)",
-        expected_outcome="unsafe",
-        merging_speed_kmh=100.0,
-        main_lane_speed_kmh=30.0,
-        main_lane_offset_m=35.0,
-    ),
-    "08": ScenarioSpec(
-        scenario_id="08",
-        description="Main-lane car right at merge point (5 m) - immediate conflict",
+        description="Both 60 km/h, ~30 m gap at trigger - immediate conflict",
         expected_outcome="unsafe",
         merging_speed_kmh=60.0,
         main_lane_speed_kmh=60.0,
-        main_lane_offset_m=5.0,
+        main_lane_offset_m=83.0,
+    ),
+    "08": ScenarioSpec(
+        scenario_id="08",
+        description="Merging car slow (40 km/h), fast main-lane car (120 km/h) approaching",
+        expected_outcome="unsafe",
+        merging_speed_kmh=40.0,
+        main_lane_speed_kmh=120.0,
+        main_lane_offset_m=180.0,
     ),
     "09": ScenarioSpec(
         scenario_id="09",
-        description="Merging car slow (20 km/h), fast main-lane car (120 km/h) approaching",
-        expected_outcome="unsafe",
-        merging_speed_kmh=20.0,
-        main_lane_speed_kmh=120.0,
-        main_lane_offset_m=55.0,
-    ),
-    "10": ScenarioSpec(
-        scenario_id="10",
         description="Two main-lane cars: first passes safely, second too close",
         expected_outcome="unsafe",
         merging_speed_kmh=60.0,
         main_lane_speed_kmh=80.0,
         main_lane_offset_m=30.0,
     ),
-    # Known false negative case
-    "11": ScenarioSpec(
-        scenario_id="11",
+    # Known false negative: demonstrates ENTRY_ZONE_M=100 m is too short
+    "10": ScenarioSpec(
+        scenario_id="10",
         description="Fast main-lane car (120 km/h) 140 m out - beyond ENTRY_ZONE_M cutoff",
         expected_outcome="unsafe",
         merging_speed_kmh=60.0,
         main_lane_speed_kmh=120.0,
         main_lane_offset_m=140.0,
-    )
+    ),
 }

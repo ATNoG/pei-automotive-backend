@@ -2,13 +2,6 @@
 <net version="1.16" junctionCornerDetail="5" limitTurnSpeed="5.50">
     <location netOffset="-522636.0363,-4497497.6291" origBoundary="-8.7360,40.6260,-8.7290,40.6300" convBoundary="-182.27,-83.76,162.13,87.92" projParameter="+proj=utm +zone=29 +ellps=WGS84 +datum=WGS84 +units=m +no_defs" />
     <type id="road" priority="9" numLanes="1" speed="27.78" disallow="" />
-    <junction id="H_START" type="dead_end" x="162.1303" y="-83.7567" incLanes="" intLanes="" shape="" />
-    <junction id="H_END" type="dead_end" x="-182.2675" y="87.9176" incLanes="" intLanes="" shape="" />
-    <junction id="E_START" type="dead_end" x="63.2475" y="4.4108" incLanes="" intLanes="" shape="" />
-    <junction id="MERGE" type="zipper" x="0.0000" y="0.0000" incLanes="highway_in_0 entering_0" intLanes=":MERGE_0_0 :MERGE_1_0" shape="5.0000,0.0000 2.5000,4.3301 -2.5000,4.3301 -5.0000,0.0000 -2.5000,-4.3301 2.5000,-4.3301">
-        <request index="0" response="10" foes="10" cont="0" />
-        <request index="1" response="01" foes="01" cont="0" />
-    </junction>
     <edge id="highway_in" from="H_START" to="MERGE" priority="9" type="road">
         <lane id="highway_in_0" index="0" speed="27.78" length="182.4868" width="3.20" shape="162.1303,-83.7567 0.0000,0.0000" />
     </edge>
@@ -24,8 +17,15 @@
     <edge id=":MERGE_1" function="internal">
         <lane id=":MERGE_1_0" index="0" speed="8.33" length="3.8660" shape="1.9952,0.1391 -1.8014,0.8689" />
     </edge>
-    <connection from="highway_in" to="highway_out" fromLane="0" toLane="0" via=":MERGE_0_0" tl="" linkIndex="0" dir="s" state="M" />
-    <connection from="entering" to="highway_out" fromLane="0" toLane="0" via=":MERGE_1_0" tl="" linkIndex="1" dir="s" state="M" />
+    <junction id="H_START" type="dead_end" x="162.1303" y="-83.7567" incLanes="" intLanes="" shape="" />
+    <junction id="H_END" type="dead_end" x="-182.2675" y="87.9176" incLanes="" intLanes="" shape="" />
+    <junction id="E_START" type="dead_end" x="63.2475" y="4.4108" incLanes="" intLanes="" shape="" />
+    <junction id="MERGE" type="zipper" x="0.0000" y="0.0000" incLanes="highway_in_0 entering_0" intLanes=":MERGE_0_0 :MERGE_1_0" shape="5.0000,0.0000 2.5000,4.3301 -2.5000,4.3301 -5.0000,0.0000 -2.5000,-4.3301 2.5000,-4.3301">
+        <request index="0" response="10" foes="10" cont="0" />
+        <request index="1" response="01" foes="01" cont="0" />
+    </junction>
+    <connection from="highway_in" to="highway_out" fromLane="0" toLane="0" via=":MERGE_0_0" dir="s" state="M" />
+    <connection from="entering" to="highway_out" fromLane="0" toLane="0" via=":MERGE_1_0" dir="s" state="M" />
     <connection from=":MERGE_0" to="highway_out" fromLane="0" toLane="0" dir="s" state="M" />
     <connection from=":MERGE_1" to="highway_out" fromLane="0" toLane="0" dir="s" state="M" />
 </net>
