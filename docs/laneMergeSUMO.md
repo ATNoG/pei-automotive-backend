@@ -4,13 +4,10 @@
 
 There are 1 or 2 vehicles per scenario, each with a known speed and position. The point of this test is not realism - it is controlled testing: we know exactly what should happen in each scenario, and we check if the detector agrees.
 SUMO produces real GPS positions that the detector processes exactly as it would in production.
-If SUMO is not installed, the runner falls back to pure Python: it interpolates positions along those same route files and publishes the same MQTT messages. The detector cannot tell the difference.
 
 ## The 10 scenarios
 
 Scenarios 01–05 are **safe** (enough gap, no traffic, slow merging car). Scenarios 06–09 are **unsafe** (insufficient gap at the moment the detector triggers). Scenario 10 is an **expected failure** that demonstrates a known false negative. Each has a known expected outcome that we compare against what the detector actually outputs.
-
-The detector triggers when the merging car is within 20 m of the merge point. Scenario offsets are designed so the main-lane car is still 10–30 m from the merge *at that moment* - not at simulation start. A car starting 30 m away at 80 km/h covers those 30 m in 1.35 s; the trigger fires after ~1.95 s, so the initial offset must be ~73 m to leave 30 m at trigger time.
 
 ## Known false negatives
 
@@ -40,21 +37,8 @@ To run only specific scenarios:
 python3 scripts/eval_lanemerge.py --scenarios 9 10
 ```
 
-## Folder layout
-
-```
-simulations/lanemerge_eval/
-├── ground_truth.py       - 10 scenarios with expected outcomes
-├── runner.py             - runs SUMO via TraCI and publishes to MQTT (kinematic fallback if no SUMO)
-├── network/
-│   ├── gen_network.py    - generates the synthetic 3-edge SUMO network from real GPS coords
-│   ├── lanemerge.net.xml - the generated network
-│   └── lanemerge.sumocfg - SUMO config (route file injected per scenario at runtime)
-└── scenarios/
-    ├── scenario_01.rou.xml  - no main-lane traffic (safe)
-    ├── ...
-    ├── scenario_09.rou.xml  - two main-lane cars, second too close (unsafe)
-    ├── scenario_10.rou.xml  - fast car at 140 m, outside entry zone (false negative)
-scripts/
-└── eval_lanemerge.py     - run this to evaluate
+If you want to run the scenarios and view the SUMO GUI, do:
+```bash
+python3 scripts/eval_lanemerge.py --gui
+python3 scripts/eval_lanemerge.py --scenarios 9 10 --gui
 ```
