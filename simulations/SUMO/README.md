@@ -30,7 +30,7 @@ python3 simulation.py
 ## files
 
     SUMO/
-    ├── lanemerge_eval            # lanemerge perfomance analysis
+    ├── scenarios/lanemerge      # lanemerge scenario pack (see ../../docs/laneMergeSUMO.md)
     ├── config/
     │   ├── osm.view.xml          # view settings for GUI
     │   └── output.add.xml        # additional file to define output
