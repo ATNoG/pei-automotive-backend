@@ -1,95 +1,229 @@
 {
-  "generated_at": "2026-05-12T10:33:57.064476+00:00",
+  "generated_at": "2026-05-12T13:00:31.745732+00:00",
   "metrics": {
-    "true_positives": 0,
+    "true_positives": 4,
     "false_positives": 0,
-    "true_negatives": 0,
-    "false_negatives": 5,
-    "precision": 0.0,
-    "recall": 0.0,
-    "f1_score": 0.0,
-    "accuracy": 0.0
+    "true_negatives": 5,
+    "false_negatives": 1,
+    "precision": 1.0,
+    "recall": 0.8,
+    "f1_score": 0.8889,
+    "accuracy": 0.9
   },
   "scenarios": [
     {
       "scenario_id": "01",
       "description": "No main-lane traffic - merging car enters freely",
       "expected": "safe",
-      "actual": "no_alert",
-      "correct": false,
-      "alert_payload": null
+      "actual": "safe",
+      "correct": true,
+      "alert_payload": {
+        "alert_type": "lane_merge_safe",
+        "merging_car_id": "sumo-merging-car",
+        "main_lane_car_id": null,
+        "merging_speed_kmh": 129.91931556435955,
+        "main_lane_speed_kmh": null,
+        "predicted_min_distance_m": null,
+        "status": "safe",
+        "timestamp": 1778590557.4497266,
+        "latitude": 40.62801362290711,
+        "longitude": -8.732138936830784,
+        "priority": 2,
+        "expiration_s": 2
+      }
     },
     {
       "scenario_id": "02",
       "description": "Main-lane car far ahead (160 m past merge) - safe gap",
       "expected": "safe",
-      "actual": "no_alert",
-      "correct": false,
-      "alert_payload": null
+      "actual": "safe",
+      "correct": true,
+      "alert_payload": {
+        "alert_type": "lane_merge_safe",
+        "merging_car_id": "sumo-merging-car",
+        "main_lane_car_id": null,
+        "merging_speed_kmh": 217.22298924755194,
+        "main_lane_speed_kmh": null,
+        "predicted_min_distance_m": null,
+        "status": "safe",
+        "timestamp": 1778590579.283277,
+        "latitude": 40.628014556721894,
+        "longitude": -8.732120555979293,
+        "priority": 2,
+        "expiration_s": 2
+      }
     },
     {
       "scenario_id": "03",
       "description": "Main-lane car just outside entry zone (110 m past merge)",
       "expected": "safe",
-      "actual": "no_alert",
-      "correct": false,
-      "alert_payload": null
+      "actual": "safe",
+      "correct": true,
+      "alert_payload": {
+        "alert_type": "lane_merge_safe",
+        "merging_car_id": "sumo-merging-car",
+        "main_lane_car_id": null,
+        "merging_speed_kmh": 57.295641229521536,
+        "main_lane_speed_kmh": null,
+        "predicted_min_distance_m": null,
+        "status": "safe",
+        "timestamp": 1778590600.9869437,
+        "latitude": 40.62801362290711,
+        "longitude": -8.732138936830784,
+        "priority": 2,
+        "expiration_s": 2
+      }
     },
     {
       "scenario_id": "04",
       "description": "Merging car very slow (20 km/h) - main-lane car passes first",
       "expected": "safe",
-      "actual": "no_alert",
-      "correct": false,
-      "alert_payload": null
+      "actual": "safe",
+      "correct": true,
+      "alert_payload": {
+        "alert_type": "lane_merge_safe",
+        "merging_car_id": "sumo-merging-car",
+        "main_lane_car_id": null,
+        "merging_speed_kmh": 46.53523574445252,
+        "main_lane_speed_kmh": null,
+        "predicted_min_distance_m": null,
+        "status": "safe",
+        "timestamp": 1778590621.954088,
+        "latitude": 40.62801244320043,
+        "longitude": -8.73216215764133,
+        "priority": 2,
+        "expiration_s": 2
+      }
     },
     {
       "scenario_id": "05",
       "description": "Large time gap (200 m behind merge) - both at 60 km/h",
       "expected": "safe",
-      "actual": "no_alert",
-      "correct": false,
-      "alert_payload": null
+      "actual": "safe",
+      "correct": true,
+      "alert_payload": {
+        "alert_type": "lane_merge_safe",
+        "merging_car_id": "sumo-main-car",
+        "main_lane_car_id": null,
+        "merging_speed_kmh": 72.69380553684213,
+        "main_lane_speed_kmh": null,
+        "predicted_min_distance_m": null,
+        "status": "safe",
+        "timestamp": 1778590658.7643917,
+        "latitude": 40.62795811079781,
+        "longitude": -8.732234793907354,
+        "priority": 2,
+        "expiration_s": 2
+      }
     },
     {
       "scenario_id": "06",
       "description": "Same speed (80 km/h), ~30 m gap at trigger - collision course",
       "expected": "unsafe",
-      "actual": "no_alert",
-      "correct": false,
-      "alert_payload": null
+      "actual": "unsafe",
+      "correct": true,
+      "alert_payload": {
+        "alert_type": "lane_merge_unsafe",
+        "merging_car_id": "sumo-merging-car",
+        "main_lane_car_id": "sumo-main-car",
+        "merging_speed_kmh": 97.05912301993195,
+        "main_lane_speed_kmh": 108.45432389712137,
+        "predicted_min_distance_m": 14.0,
+        "time_to_closest_approach_s": 0.0,
+        "status": "unsafe",
+        "timestamp": 1778590679.399829,
+        "latitude": 40.628014144824036,
+        "longitude": -8.732128663625733,
+        "priority": 3,
+        "expiration_s": 2
+      }
     },
     {
       "scenario_id": "07",
       "description": "Both 60 km/h, ~30 m gap at trigger - immediate conflict",
       "expected": "unsafe",
-      "actual": "no_alert",
-      "correct": false,
-      "alert_payload": null
+      "actual": "unsafe",
+      "correct": true,
+      "alert_payload": {
+        "alert_type": "lane_merge_unsafe",
+        "merging_car_id": "sumo-merging-car",
+        "main_lane_car_id": "sumo-main-car",
+        "merging_speed_kmh": 17.096081053074858,
+        "main_lane_speed_kmh": 61.134757598606825,
+        "predicted_min_distance_m": 13.59,
+        "time_to_closest_approach_s": 0.0,
+        "status": "unsafe",
+        "timestamp": 1778590709.0344481,
+        "latitude": 40.628014556721894,
+        "longitude": -8.732120555979293,
+        "priority": 3,
+        "expiration_s": 2
+      }
     },
     {
       "scenario_id": "08",
       "description": "Merging car slow (40 km/h), fast main-lane car (120 km/h) approaching",
       "expected": "unsafe",
-      "actual": "no_alert",
-      "correct": false,
-      "alert_payload": null
+      "actual": "unsafe",
+      "correct": true,
+      "alert_payload": {
+        "alert_type": "lane_merge_unsafe",
+        "merging_car_id": "sumo-merging-car",
+        "main_lane_car_id": "sumo-main-car",
+        "merging_speed_kmh": 68.47487870134972,
+        "main_lane_speed_kmh": 86.7469383740285,
+        "predicted_min_distance_m": 9.72,
+        "time_to_closest_approach_s": 4.9,
+        "status": "unsafe",
+        "timestamp": 1778590743.4618187,
+        "latitude": 40.62801244260105,
+        "longitude": -8.732162169439203,
+        "priority": 3,
+        "expiration_s": 2
+      }
     },
     {
       "scenario_id": "09",
       "description": "Two main-lane cars: first passes safely, second too close",
       "expected": "unsafe",
-      "actual": "no_alert",
-      "correct": false,
-      "alert_payload": null
+      "actual": "unsafe",
+      "correct": true,
+      "alert_payload": {
+        "alert_type": "lane_merge_unsafe",
+        "merging_car_id": "sumo-main-car",
+        "main_lane_car_id": "sumo-merging-car",
+        "merging_speed_kmh": 18.975280366593633,
+        "main_lane_speed_kmh": 14.258664382783916,
+        "predicted_min_distance_m": 18.94,
+        "time_to_closest_approach_s": 4.9,
+        "status": "unsafe",
+        "timestamp": 1778590787.2205803,
+        "latitude": 40.6279358111054,
+        "longitude": -8.732178558331611,
+        "priority": 3,
+        "expiration_s": 2
+      }
     },
     {
       "scenario_id": "10",
       "description": "Fast main-lane car (120 km/h) 140 m out - beyond ENTRY_ZONE_M cutoff",
       "expected": "unsafe",
-      "actual": "no_alert",
+      "actual": "safe",
       "correct": false,
-      "alert_payload": null
+      "alert_payload": {
+        "alert_type": "lane_merge_safe",
+        "merging_car_id": "sumo-main-car",
+        "main_lane_car_id": null,
+        "merging_speed_kmh": 120.21637348784355,
+        "main_lane_speed_kmh": null,
+        "predicted_min_distance_m": null,
+        "status": "safe",
+        "timestamp": 1778590816.6420255,
+        "latitude": 40.62793915343299,
+        "longitude": -8.732186987038219,
+        "priority": 2,
+        "expiration_s": 2
+      }
     }
   ]
 }

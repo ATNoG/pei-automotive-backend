@@ -182,6 +182,8 @@ class DittoPublisher:
             vids = list(self.provisioned)
         logging.info("Deleting %d simulated things from Ditto...", len(vids))
         for vid in vids:
+            # Send (0,0) to trigger cleanup in position_processor
+            self.publish(vid, 0.0, 0.0, False)
             tid = self.thing_id(vid)
             try:
                 self.session.delete(f"{self.api_url}/api/2/things/{tid}", timeout=10)
@@ -297,6 +299,10 @@ def run(args: argparse.Namespace, extra_sumo_flags: list[str] | None = None) -> 
         m = pub.metrics_snapshot()
         logging.info("Final: seen=%d max_concurrent=%d sent=%d ok=%d fail=%d",
                      len(seen), max_concurrent, m["sent"], m["ok"], m["failed"])
+        drain = getattr(args, "post_sim_drain", 0.0)
+        if drain > 0:
+            logging.info("Draining pipeline for %.1f s...", drain)
+            time.sleep(drain)
         if args.cleanup:
             pub.delete_all()
 
@@ -321,6 +327,7 @@ def run_scenario(scenario_id: str, spec, gui: bool = False) -> None:
         metrics_interval=60.0,
         gui=gui,
         cleanup=True,
+        post_sim_drain=5.0,
     )
     run(args, extra_sumo_flags=extra)
 

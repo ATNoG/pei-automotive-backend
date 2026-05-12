@@ -54,6 +54,35 @@ DEFAULT_OUTPUT = _REPO_ROOT / "simulations" / "SUMO" / "lanemerge_eval" / "resul
 ALL_SCENARIO_IDS = [f"{i:02d}" for i in range(1, 11)]
 
 
+# Car IDs as seen on the MQTT cars/updates topic (Ditto thing-id suffix after "org.acme:")
+_SUMO_CAR_IDS = ["sumo-merging-car", "sumo-main-car", "sumo-main-car-2"]
+
+
+def _cleanup_detector_state() -> None:
+    """
+    Publish _test_cleanup messages to MQTT so LaneMergeDetector resets
+    its in-memory state (cars / main_lane_cars / merging_cars / alerted_pairs)
+    before the next scenario runs.  Without this, stale state from a previous
+    scenario (or a previous eval run) causes false alerts.
+    """
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    try:
+        client.connect(MQTT_HOST, MQTT_PORT)
+        client.loop_start()
+        for car_id in _SUMO_CAR_IDS:
+            payload = json.dumps({"_test_cleanup": True, "car_id": car_id})
+            client.publish("cars/updates", payload, qos=1)
+        time.sleep(0.5)
+    except Exception as e:
+        logger.warning("Detector cleanup failed: %s", e)
+    finally:
+        try:
+            client.loop_stop()
+            client.disconnect()
+        except Exception:
+            pass
+
+
 # MQTT helpers
 @contextmanager
 def _alert_collector(topic: str = ALERT_TOPIC):
@@ -79,12 +108,20 @@ def _alert_collector(topic: str = ALERT_TOPIC):
         client.disconnect()
 
 
-def _collect_first(q: queue.Queue, timeout: float) -> Optional[dict]:
+def _collect_all_and_find_worst(q: queue.Queue, timeout: float) -> Optional[dict]:
+    alerts = []
     try:
-        return q.get(timeout=timeout)
+        alerts.append(q.get(timeout=timeout))
     except queue.Empty:
+        pass
+    while not q.empty():
+        alerts.append(q.get())
+    if not alerts:
         return None
-
+    for a in alerts:
+        if a.get("status") == "unsafe":
+            return a
+    return alerts[-1]
 
 # Per-scenario evaluation
 def evaluate_scenario(scenario_id: str, gui: bool = False) -> dict:
@@ -95,9 +132,12 @@ def evaluate_scenario(scenario_id: str, gui: bool = False) -> dict:
     spec: ScenarioSpec = SCENARIOS[scenario_id]
     logger.info(f"[{scenario_id}] {spec.description}")
 
+    _cleanup_detector_state()
+
     with _alert_collector() as alert_queue:
         _runner_run(scenario_id, spec, gui=gui)
-        alert = _collect_first(alert_queue, ALERT_TIMEOUT)
+        time.sleep(1.0) # wait for trailing MQTT messages
+        alert = _collect_all_and_find_worst(alert_queue, ALERT_TIMEOUT)
 
     actual = alert.get("status") if alert else None
 
