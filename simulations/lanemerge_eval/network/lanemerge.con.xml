@@ -1,9 +1,0 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<!--
-Connection definitions for the lane-merge evaluation network.
-Both highway_in and entering merge into highway_out at MERGE.
--->
-<connections>
-    <connection from="highway_in" to="highway_out" fromLane="0" toLane="0"/>
-    <connection from="entering"   to="highway_out" fromLane="0" toLane="0"/>
-</connections>

@@ -29,7 +29,8 @@ python3 simulation.py
 
 ## files
 
-    barraSUMO/
+    SUMO/
+    ├── lanemerge_eval            # lanemerge perfomance analysis
     ├── config/
     │   ├── osm.view.xml          # view settings for GUI
     │   └── output.add.xml        # additional file to define output

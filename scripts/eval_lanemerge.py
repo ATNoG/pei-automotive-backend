@@ -34,11 +34,11 @@ import paho.mqtt.client as mqtt
 
 # Make the eval modules importable regardless of cwd
 _REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_REPO_ROOT / "simulations" / "lanemerge_eval"))
+sys.path.insert(0, str(_REPO_ROOT / "simulations" / "SUMO" / "lanemerge_eval"))
 sys.path.insert(0, str(_REPO_ROOT / "src"))
 
 from ground_truth import SCENARIOS, ScenarioSpec
-from runner import run_scenario as _runner_run
+from bridge import run_scenario as _runner_run
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 logger = logging.getLogger("eval_lanemerge")
@@ -49,7 +49,7 @@ MQTT_PORT    = 1884
 ALERT_TOPIC  = "alerts/lane_merge"
 ALERT_TIMEOUT = 20.0
 
-DEFAULT_OUTPUT = _REPO_ROOT / "results" / "lanemerge_eval.json"
+DEFAULT_OUTPUT = _REPO_ROOT / "simulations" / "SUMO" / "lanemerge_eval" / "results" / "lanemerge_eval.json"
 
 ALL_SCENARIO_IDS = [f"{i:02d}" for i in range(1, 11)]
 
@@ -87,7 +87,7 @@ def _collect_first(q: queue.Queue, timeout: float) -> Optional[dict]:
 
 
 # Per-scenario evaluation
-def evaluate_scenario(scenario_id: str) -> dict:
+def evaluate_scenario(scenario_id: str, gui: bool = False) -> dict:
     """
     Run one scenario, return a result dict:
         {scenario_id, description, expected, actual, correct, alert_payload}
@@ -96,7 +96,7 @@ def evaluate_scenario(scenario_id: str) -> dict:
     logger.info(f"[{scenario_id}] {spec.description}")
 
     with _alert_collector() as alert_queue:
-        _runner_run(scenario_id, spec)
+        _runner_run(scenario_id, spec, gui=gui)
         alert = _collect_first(alert_queue, ALERT_TIMEOUT)
 
     actual = alert.get("status") if alert else None
@@ -200,6 +200,10 @@ def main(argv: list[str] | None = None) -> int:
         default=DEFAULT_OUTPUT,
         help=f"Path for the JSON output (default: {DEFAULT_OUTPUT})",
     )
+    parser.add_argument(
+        "--gui", action="store_true",
+        help="Open sumo-gui for each scenario (visual inspection; use with --scenarios)",
+    )
     args = parser.parse_args(argv)
 
     # Normalise IDs (accept "6" or "06")
@@ -213,7 +217,7 @@ def main(argv: list[str] | None = None) -> int:
     results: list[dict] = []
     for sid in scenario_ids:
         try:
-            result = evaluate_scenario(sid)
+            result = evaluate_scenario(sid, gui=args.gui)
         except Exception as exc:
             logger.error(f"Scenario {sid} raised an exception: {exc}", exc_info=True)
             spec = SCENARIOS[sid]

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 04 - SAFE: merging car very slow (20 km/h), fast main-lane car passes first
+The main-lane car is 55 m behind the merge at 90 km/h.  The merging car
+is approaching the ramp at only 20 km/h.  By the time the merging car
+reaches the merge point, the highway car has already long passed.
+Predicted minimum distance >> COLLISION_THRESHOLD_M = 20 m.
+Expected: lane_merge_safe.
+
+OSM edges:
+  merging ramp : 353879480 (lane 0, accel) -> 954971261 -> 106116297-AddedOnRampEdge -> 106116297
+  highway main : 497720156 (lane 1, through) -> 353879480 -> 954971261 -> 106116297-AddedOnRampEdge -> 106116297
+
+departPos=30.96 on 353879480 places the merging car 63.4 m from the merge junction.
+Main car at 305.72 - 55 = 250.72 m into 497720156 → 55 m from merge junction.
+-->
+<routes>
+    <vType id="car_slow" accel="1.5" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="10.0" minGap="2.5"/>
+    <vType id="car_fast" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="36.11" minGap="2.5"/>
+
+    <!-- Merging car at 20 km/h (5.56 m/s) on the acceleration lane -->
+    <vehicle id="merging_car" type="car_slow" depart="0.0"
+             departLane="0" departPos="30.96" departSpeed="5.56">
+        <route edges="353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+    </vehicle>
+
+    <!-- Highway car 55 m before merge on through-lane; 305.72 - 55 = 250.72 -->
+    <vehicle id="main_car" type="car_fast" depart="0.0"
+             departLane="1" departPos="250.72" departSpeed="25.0">
+        <route edges="497720156 353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+    </vehicle>
+</routes>

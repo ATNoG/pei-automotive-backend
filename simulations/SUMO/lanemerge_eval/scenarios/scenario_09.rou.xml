@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 09 - UNSAFE: two main-lane cars; first passes safely, second too close
+main_car departs 130 m before the merge → safe (large gap).
+main_car_2 departs 30 m before the merge → unsafe (same gap as scenario 06/07).
+The merging car travels at 60 km/h.  The detector should fire unsafe for
+the second car.
+Expected: at least one lane_merge_unsafe alert.
+
+OSM edges:
+  merging ramp : 353879480 (lane 0, accel) -> 954971261 -> 106116297-AddedOnRampEdge -> 106116297
+  highway main : 497720156 (lane 1, through) -> 353879480 -> ...-> 106116297
+
+First car 130 m before merge: 305.72 - 130 = 175.72 m into 497720156.
+Second car  30 m before merge: 305.72 -  30 = 275.72 m into 497720156.
+-->
+<routes>
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"/>
+
+    <vehicle id="merging_car" type="car" depart="0.0"
+             departLane="0" departPos="30.96" departSpeed="16.67">
+        <route edges="353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+    </vehicle>
+
+    <!-- First highway car: 130 m before merge (safe gap); 305.72 - 130 = 175.72 -->
+    <vehicle id="main_car" type="car" depart="0.0"
+             departLane="1" departPos="175.72" departSpeed="22.22">
+        <route edges="497720156 353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+    </vehicle>
+
+    <!-- Second highway car: 30 m before merge (unsafe); 305.72 - 30 = 275.72 -->
+    <vehicle id="main_car_2" type="car" depart="0.0"
+             departLane="1" departPos="275.72" departSpeed="22.22">
+        <route edges="497720156 353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+    </vehicle>
+</routes>

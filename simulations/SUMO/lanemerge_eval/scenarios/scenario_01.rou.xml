@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 01 - SAFE: no main-lane traffic
+The merging car enters the acceleration lane alone; no highway car is present.
+Expected: LaneMergeDetector fires lane_merge_safe (no traffic in zone).
+
+OSM edges:
+  entering ramp  : 353879480 (lane 0, acceleration) -> 954971261 -> 106116297-AddedOnRampEdge
+  highway after  : 106116297
+
+departPos=30.96 on 353879480 places the merging car 63.4 m from the merge junction
+(same effective distance as the synthetic entering edge), so trigger timing is identical.
+-->
+<routes>
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"/>
+
+    <vehicle id="merging_car" type="car" depart="0.0"
+             departLane="0" departPos="30.96" departSpeed="16.67">
+        <route edges="353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+    </vehicle>
+</routes>

@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <configuration>
     <input>
-        <net-file value="lanemerge.net.xml"/>
+        <net-file value="../../networkfile/barraOSM.net.xml"/>
         <!-- route-files is supplied at runtime by the scenario runner -->
     </input>
     <time>

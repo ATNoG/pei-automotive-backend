@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 02 - SAFE: main-lane car far ahead (160 m past merge)
+The highway car has already passed the merge point by 160 m before the
+merging car reaches the merge point.  Well outside ENTRY_ZONE_M=100 m
+threshold → detector should not see a highway car in the zone.
+Expected: lane_merge_safe.
+
+OSM edges:
+  merging ramp : 353879480 (lane 0, accel) -> 954971261 -> 106116297-AddedOnRampEdge -> 106116297
+  highway after: 106116297
+
+departPos=30.96 on 353879480 places the merging car 63.4 m from the merge junction
+(41.17 m remaining in 353879480 + 16.44 m in 954971261 + 5.79 m in 106116297-AddedOnRampEdge).
+Main car starts 160 m past the merge on 106116297.
+-->
+<routes>
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"/>
+
+    <vehicle id="merging_car" type="car" depart="0.0"
+             departLane="0" departPos="30.96" departSpeed="16.67">
+        <route edges="353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+    </vehicle>
+
+    <!-- Already 160 m past the merge junction on the post-merge highway -->
+    <vehicle id="main_car" type="car" depart="0.0"
+             departLane="0" departPos="160" departSpeed="22.22">
+        <route edges="106116297"/>
+    </vehicle>
+</routes>

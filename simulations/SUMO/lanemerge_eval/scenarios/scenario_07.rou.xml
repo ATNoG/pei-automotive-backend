@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 07 - UNSAFE: same speed (60 km/h), ~30 m gap at detection trigger
+
+Trigger fires at ~2.6 s (43.4 m / 16.67 m/s).  The highway car starts 73 m
+from the merge so it is still ~30 m away at trigger time.
+
+At t=1.2 s after trigger the merging car reaches the merge; the highway car is
+~10 m from the merge.  Predicted gap < 20 m → unsafe.
+Expected: lane_merge_unsafe.
+
+OSM edges:
+  merging ramp : 353879480 (lane 0, accel) -> 954971261 -> 106116297-AddedOnRampEdge -> 106116297
+  highway main : 497720156 (lane 1, through) -> 353879480 -> ...-> 106116297
+
+Main car 73 m before merge: 305.72 - 73 = 232.72 m into 497720156.
+-->
+<routes>
+    <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"/>
+
+    <vehicle id="merging_car" type="car" depart="0.0"
+             departLane="0" departPos="30.96" departSpeed="16.67">
+        <route edges="353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+    </vehicle>
+
+    <!-- 73 m before merge on through-lane; 305.72 - 73 = 232.72 -->
+    <vehicle id="main_car" type="car" depart="0.0"
+             departLane="1" departPos="232.72" departSpeed="16.67">
+        <route edges="497720156 353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+    </vehicle>
+</routes>
