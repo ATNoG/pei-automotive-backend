@@ -1,24 +1,27 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 06 - UNSAFE: same speed (80 km/h), ~30 m gap at detection trigger.
-highway_in length = 182.49 m.  Main car starts 73 m before MERGE (pos=109.49).
-Trigger fires at t ≈ 1.95 s; main car has travelled ≈ 43 m → ≈ 30 m from MERGE.
-At t = 0.9 s after trigger the merging car is at MERGE; the main car is ≈ 10 m
-away → predicted gap < COLLISION_THRESHOLD_M (20 m) → unsafe.
-Expected: unsafe
+Scenario 06 - UNSAFE: same speed (80 km/h), gap ~30 m at detection trigger
+
+The trigger fires when the merging car is 20 m from the merge (after travelling
+43.4 m of the 63.4 m entering edge, ~1.95 s at 80 km/h).  The highway car starts
+73 m from the merge so that at trigger time it is still ~30 m away and approaching.
+
+At t=0.9 s after trigger the merging car reaches the merge; the highway car is
+~10 m from the merge.  Predicted gap at merge crossing < 20 m → unsafe.
+Expected: lane_merge_unsafe.
 -->
 <routes>
     <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
-           maxSpeed="40.0" minGap="2.5"/>
+           maxSpeed="33.33" minGap="2.5"/>
 
     <vehicle id="merging_car" type="car" depart="0.0"
              departLane="0" departPos="0" departSpeed="22.22">
         <route edges="entering highway_out"/>
     </vehicle>
 
-    <!-- 73 m before MERGE: 182.49 - 73 = 109.49 -->
+    <!-- 73 m before merge: 182.5 - 73 = 109.5 -->
     <vehicle id="main_car" type="car" depart="0.0"
-             departLane="0" departPos="109.49" departSpeed="22.22">
+             departLane="0" departPos="109.5" departSpeed="22.22">
         <route edges="highway_in highway_out"/>
     </vehicle>
 </routes>

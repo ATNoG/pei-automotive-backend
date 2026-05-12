@@ -1,21 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 02 - SAFE: main-lane car 160 m past the merge point.
-highway_out length = 202.36 m.  The car departs at pos=160 moving away from
-MERGE; when the merging car arrives the main car is > 160 m past the
-junction - well outside ENTRY_ZONE_M (100 m).
-Expected: safe
+Scenario 02 - SAFE: main-lane car far ahead (160 m past merge)
+The highway car has already passed the merge point by 160 m before the
+merging car reaches the merge point.  Well outside the ENTRY_ZONE_M=100 m
+threshold → detector should not see a highway car in the zone.
+Expected: lane_merge_safe (no car in entry zone).
+
+highway_in length ≈ 182.5 m.  departPos = 182.5 + 160 = 342.5 m along
+highway_in + highway_out (car is already 160 m past the merge).
+We set the main car on highway_out at departPos ≈ 160 m.
 -->
 <routes>
     <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
-           maxSpeed="40.0" minGap="2.5"/>
+           maxSpeed="33.33" minGap="2.5"/>
 
     <vehicle id="merging_car" type="car" depart="0.0"
              departLane="0" departPos="0" departSpeed="16.67">
         <route edges="entering highway_out"/>
     </vehicle>
 
-    <!-- 160 m past merge on highway_out (length 202.36 m) -->
+    <!-- Already past merge by ~160 m, travelling at 80 km/h (22.22 m/s) -->
     <vehicle id="main_car" type="car" depart="0.0"
              departLane="0" departPos="160" departSpeed="22.22">
         <route edges="highway_out"/>
