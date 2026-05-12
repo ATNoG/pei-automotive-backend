@@ -16,13 +16,12 @@ Expected: lane_merge_safe (no car in entry zone at trigger time).
         <route edges="entering highway_out"/>
     </vehicle>
 
-    <!-- 200 m behind the merge on highway_in;
+    <!-- 200 m behind the merge on highway_in and departing slightly later to simulate extra distance;
          highway_in is ~182.5 m, so place on highway_in at pos 0
          and start 200 m back = we put it at pos 0 on highway_in
          and give it an earlier depart to simulate extra distance. -->
-    <vehicle id="main_car" type="car" depart="7.0"
+    <vehicle id="main_car" type="car" depart="0.5"
              departLane="0" departPos="0" departSpeed="16.67">
-        <!-- Departing 7 s later effectively creates a ~116 m extra gap -->
         <route edges="highway_in highway_out"/>
     </vehicle>
 </routes>

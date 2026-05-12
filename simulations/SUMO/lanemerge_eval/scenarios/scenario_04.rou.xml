@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
 Scenario 04 - SAFE: merging car very slow (20 km/h), fast main-lane car passes first
-The main-lane car is 55 m behind the merge at 90 km/h.  The merging car
+The main-lane car is 30 m behind the merge at ~65 km/h. The merging car
 is approaching the ramp at only 20 km/h.  By the time the merging car
 reaches the merge point, the highway car has already long passed.
 Predicted minimum distance >> COLLISION_THRESHOLD_M = 20 m.
@@ -19,10 +19,10 @@ Expected: lane_merge_safe.
         <route edges="entering highway_out"/>
     </vehicle>
 
-    <!-- Highway car 55 m before merge, at 90 km/h (25.0 m/s) -->
+    <!-- Highway car 30 m before merge, at ~65 km/h (18.0 m/s) -->
     <vehicle id="main_car" type="car_fast" depart="0.0"
-             departLane="0" departPos="127.5" departSpeed="25.0">
-        <!-- departPos = highway_in_length(182.5) - 55 = 127.5 -->
+             departLane="0" departPos="152.5" departSpeed="18.0">
+        <!-- departPos = highway_in_length(182.5) - 30 = 152.5 -->
         <route edges="highway_in highway_out"/>
     </vehicle>
 </routes>
