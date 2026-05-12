@@ -25,7 +25,7 @@ SIM_DIR = REPO_ROOT / "simulations" / "SUMO"
 sys.path.insert(0, str(SIM_DIR))
 LANEMERGE_CFG = REPO_ROOT / "simulations" / "SUMO" / "lanemerge_eval" / "network" / "lanemerge.sumocfg"
 LANEMERGE_SCENARIOS = REPO_ROOT / "simulations" / "SUMO" / "lanemerge_eval" / "scenarios"
-_EVAL_STEP = 0.1
+_EVAL_STEP = 0.5
 
 
 def _find_sumo_binary(name: str) -> str:
@@ -228,6 +228,8 @@ def run(args: argparse.Namespace, extra_sumo_flags: list[str] | None = None) -> 
     ]
     if args.end_time is not None:
         sumo_cmd += ["--end", str(args.end_time)]
+    if args.gui:
+        sumo_cmd += ["--quit-on-end", "--start"]
     if extra_sumo_flags:
         sumo_cmd += extra_sumo_flags
 
@@ -323,7 +325,7 @@ def run_scenario(scenario_id: str, spec, gui: bool = False) -> None:
         end_time=120,
         max_vehicles=None,
         max_steps=None,
-        real_time=gui,
+        real_time=True,
         metrics_interval=60.0,
         gui=gui,
         cleanup=True,
