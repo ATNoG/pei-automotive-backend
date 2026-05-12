@@ -1,29 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 03 - SAFE: main-lane car just outside entry zone (110 m past merge)
-The highway car has passed the merge point by 110 m.  With ENTRY_ZONE_M=100 m
-the car is just outside the detection zone → detector should report safe.
-Expected: lane_merge_safe.
-
-OSM edges:
-  merging ramp : 353879480 (lane 0, accel) -> 954971261 -> 106116297-AddedOnRampEdge -> 106116297
-  highway after: 106116297
-
-departPos=30.96 on 353879480 places the merging car 63.4 m from the merge junction.
-Main car starts 110 m past the merge on 106116297 (beyond the 100 m zone cutoff).
+Scenario 03 - SAFE: main-lane car 110 m past the merge point.
+110 m > ENTRY_ZONE_M (100 m): the car is already outside the monitored
+zone when the merging car triggers the check.
+Expected: safe
 -->
 <routes>
     <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
-           maxSpeed="36.11" minGap="2.5"/>
+           maxSpeed="40.0" minGap="2.5"/>
 
     <vehicle id="merging_car" type="car" depart="0.0"
-             departLane="0" departPos="30.96" departSpeed="16.67">
-        <route edges="353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+             departLane="0" departPos="0" departSpeed="16.67">
+        <route edges="entering highway_out"/>
     </vehicle>
 
-    <!-- 110 m past the merge junction, travelling at 90 km/h (25.0 m/s) -->
+    <!-- 110 m past merge on highway_out (length 202.36 m) -->
     <vehicle id="main_car" type="car" depart="0.0"
-             departLane="0" departPos="110" departSpeed="25.0">
-        <route edges="106116297"/>
+             departLane="0" departPos="110" departSpeed="25.00">
+        <route edges="highway_out"/>
     </vehicle>
 </routes>

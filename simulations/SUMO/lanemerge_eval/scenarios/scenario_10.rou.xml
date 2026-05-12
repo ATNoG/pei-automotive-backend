@@ -1,42 +1,34 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 10 - FALSE NEGATIVE: fast main-lane car (120 km/h) beyond ENTRY_ZONE_M=100 m
+Scenario 10 - FALSE NEGATIVE: fast main-lane car (120 km/h) 140 m out —
+beyond ENTRY_ZONE_M (100 m).
 
-The merging car departs near the end of the entering ramp (departPos=1.83 on 954971261,
-leaving only 20.4 m to the merge) so the detection trigger fires almost immediately (t~0).
-At that moment the highway car is 140 m from the merge — just beyond ENTRY_ZONE_M
-(100 m) — so the detector skips it.
+Merging car departs at pos=40.0 on entering (length 63.40 m), leaving only
+23.4 m to MERGE → trigger fires almost immediately (t ≈ 0.2 s).
+At that moment the highway car (starting 140 m before MERGE) has barely moved:
+  140 - 0.2 * 33.33 ≈ 133 m from MERGE — outside ENTRY_ZONE_M → detector skips it.
 
-At 120 km/h (33.3 m/s) the highway car reaches the merge in ~4.2 s.  The merging
-car is still on the ramp.  This is a real collision risk that goes undetected.
+At 120 km/h the highway car reaches MERGE in ≈ 4 s.  Real collision risk.
 
 Expected (ground truth): unsafe
-Detector output:         safe  (false negative - ENTRY_ZONE_M too short)
-Fix:                     increase ENTRY_ZONE_M from 100 m to at least 150 m
+Detector output:          safe  (false negative — ENTRY_ZONE_M too short)
+Fix:                      increase ENTRY_ZONE_M from 100 m to ≥ 150 m
 
-OSM edges:
-  merging ramp : 954971261 (lane 0, accel) -> 106116297-AddedOnRampEdge -> 106116297
-  highway main : 497720156 (lane 1, through) -> 353879480 -> ...-> 106116297
-
-Merging car departPos=1.83 on 954971261:
-  remaining in 954971261 = 16.44 - 1.83 = 14.61 m
-  + 106116297-AddedOnRampEdge = 5.79 m → total 20.4 m to merge  (trigger fires ~immediately).
-
-Main car 140 m before merge: 305.72 - 140 = 165.72 m into 497720156.
+highway_in length = 182.49 m.  Main car 140 m before MERGE: 182.49 - 140 = 42.49.
 -->
 <routes>
     <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
            maxSpeed="40.0" minGap="2.5"/>
 
-    <!-- Merging car starts 20.4 m from merge so trigger fires at t~0 -->
+    <!-- Merging car starts 23.4 m from MERGE: entering length 63.40 - 23.4 = 40.0 -->
     <vehicle id="merging_car" type="car" depart="0.0"
-             departLane="0" departPos="1.83" departSpeed="16.67">
-        <route edges="954971261 106116297-AddedOnRampEdge 106116297"/>
+             departLane="0" departPos="40.0" departSpeed="16.67">
+        <route edges="entering highway_out"/>
     </vehicle>
 
-    <!-- 140 m before merge: 305.72 - 140 = 165.72 -->
+    <!-- 140 m before MERGE: 182.49 - 140 = 42.49 -->
     <vehicle id="main_car" type="car" depart="0.0"
-             departLane="1" departPos="165.72" departSpeed="33.33">
-        <route edges="497720156 353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+             departLane="0" departPos="42.49" departSpeed="33.33">
+        <route edges="highway_in highway_out"/>
     </vehicle>
 </routes>

@@ -1,5 +1,5 @@
 {
-  "generated_at": "2026-05-12T10:03:53.639664+00:00",
+  "generated_at": "2026-05-12T10:33:57.064476+00:00",
   "metrics": {
     "true_positives": 0,
     "false_positives": 0,
@@ -15,7 +15,7 @@
       "scenario_id": "01",
       "description": "No main-lane traffic - merging car enters freely",
       "expected": "safe",
-      "actual": "error",
+      "actual": "no_alert",
       "correct": false,
       "alert_payload": null
     },
@@ -23,7 +23,7 @@
       "scenario_id": "02",
       "description": "Main-lane car far ahead (160 m past merge) - safe gap",
       "expected": "safe",
-      "actual": "error",
+      "actual": "no_alert",
       "correct": false,
       "alert_payload": null
     },
@@ -31,7 +31,7 @@
       "scenario_id": "03",
       "description": "Main-lane car just outside entry zone (110 m past merge)",
       "expected": "safe",
-      "actual": "error",
+      "actual": "no_alert",
       "correct": false,
       "alert_payload": null
     },
@@ -39,7 +39,7 @@
       "scenario_id": "04",
       "description": "Merging car very slow (20 km/h) - main-lane car passes first",
       "expected": "safe",
-      "actual": "error",
+      "actual": "no_alert",
       "correct": false,
       "alert_payload": null
     },
@@ -47,7 +47,7 @@
       "scenario_id": "05",
       "description": "Large time gap (200 m behind merge) - both at 60 km/h",
       "expected": "safe",
-      "actual": "error",
+      "actual": "no_alert",
       "correct": false,
       "alert_payload": null
     },
@@ -55,7 +55,7 @@
       "scenario_id": "06",
       "description": "Same speed (80 km/h), ~30 m gap at trigger - collision course",
       "expected": "unsafe",
-      "actual": "error",
+      "actual": "no_alert",
       "correct": false,
       "alert_payload": null
     },
@@ -63,7 +63,7 @@
       "scenario_id": "07",
       "description": "Both 60 km/h, ~30 m gap at trigger - immediate conflict",
       "expected": "unsafe",
-      "actual": "error",
+      "actual": "no_alert",
       "correct": false,
       "alert_payload": null
     },
@@ -71,7 +71,7 @@
       "scenario_id": "08",
       "description": "Merging car slow (40 km/h), fast main-lane car (120 km/h) approaching",
       "expected": "unsafe",
-      "actual": "error",
+      "actual": "no_alert",
       "correct": false,
       "alert_payload": null
     },
@@ -79,7 +79,7 @@
       "scenario_id": "09",
       "description": "Two main-lane cars: first passes safely, second too close",
       "expected": "unsafe",
-      "actual": "error",
+      "actual": "no_alert",
       "correct": false,
       "alert_payload": null
     },
@@ -87,7 +87,7 @@
       "scenario_id": "10",
       "description": "Fast main-lane car (120 km/h) 140 m out - beyond ENTRY_ZONE_M cutoff",
       "expected": "unsafe",
-      "actual": "error",
+      "actual": "no_alert",
       "correct": false,
       "alert_payload": null
     }

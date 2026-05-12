@@ -1,31 +1,23 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 05 - SAFE: large time gap (200 m behind merge), both at 60 km/h
-At 60 km/h (16.67 m/s) the main car takes 12 s to reach the merge.  The
-merging car also at 60 km/h on a 63.4 m ramp reaches the merge in ~3.8 s.
-The highway car is nowhere near the merge when the ramp car merges.
-Expected: lane_merge_safe (no car in entry zone at trigger time).
-
-OSM edges:
-  merging ramp : 353879480 (lane 0, accel) -> 954971261 -> 106116297-AddedOnRampEdge -> 106116297
-  highway main : 497720156 (lane 1, through) -> 353879480 -> ...-> 106116297
-
-In the synthetic network highway_in was only 182.5 m, so a 7 s depart delay was
-used to simulate 200 m.  On the OSM network 497720156 is 211.36 m, so the 200 m
-gap is representable directly: 305.72 - 200 = 105.72 m into 497720156.
+Scenario 05 - SAFE: large time gap — main-lane car starts at the beginning
+of highway_in (≈ 182 m from MERGE) at 60 km/h.
+Trigger fires at t ≈ 2.6 s; main car has travelled ≈ 43 m → still ≈ 139 m
+from MERGE — outside ENTRY_ZONE_M (100 m).
+Expected: safe
 -->
 <routes>
     <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
-           maxSpeed="33.33" minGap="2.5"/>
+           maxSpeed="40.0" minGap="2.5"/>
 
     <vehicle id="merging_car" type="car" depart="0.0"
-             departLane="0" departPos="30.96" departSpeed="16.67">
-        <route edges="353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+             departLane="0" departPos="0" departSpeed="16.67">
+        <route edges="entering highway_out"/>
     </vehicle>
 
-    <!-- 200 m before merge on through-lane; 305.72 - 200 = 105.72 -->
+    <!-- Start of highway_in (pos=0) ≈ 182 m from MERGE -->
     <vehicle id="main_car" type="car" depart="0.0"
-             departLane="1" departPos="105.72" departSpeed="16.67">
-        <route edges="497720156 353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+             departLane="0" departPos="0" departSpeed="16.67">
+        <route edges="highway_in highway_out"/>
     </vehicle>
 </routes>

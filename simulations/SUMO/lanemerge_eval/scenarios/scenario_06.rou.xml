@@ -1,33 +1,24 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
-Scenario 06 - UNSAFE: same speed (80 km/h), ~30 m gap at detection trigger
-
-Trigger fires when the merging car is 20 m from the merge (after travelling
-43.4 m of the 63.4 m entering ramp, ~1.95 s at 80 km/h).  The highway car
-starts 73 m from the merge so at trigger time it is ~30 m away and closing.
-
-At t=0.9 s after trigger the merging car reaches the merge; the highway car
-is ~10 m from the merge.  Predicted gap < 20 m → unsafe.
-Expected: lane_merge_unsafe.
-
-OSM edges:
-  merging ramp : 353879480 (lane 0, accel) -> 954971261 -> 106116297-AddedOnRampEdge -> 106116297
-  highway main : 497720156 (lane 1, through) -> 353879480 -> ...-> 106116297
-
-Main car 73 m before merge: 305.72 - 73 = 232.72 m into 497720156.
+Scenario 06 - UNSAFE: same speed (80 km/h), ~30 m gap at detection trigger.
+highway_in length = 182.49 m.  Main car starts 73 m before MERGE (pos=109.49).
+Trigger fires at t ≈ 1.95 s; main car has travelled ≈ 43 m → ≈ 30 m from MERGE.
+At t = 0.9 s after trigger the merging car is at MERGE; the main car is ≈ 10 m
+away → predicted gap < COLLISION_THRESHOLD_M (20 m) → unsafe.
+Expected: unsafe
 -->
 <routes>
     <vType id="car" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
-           maxSpeed="33.33" minGap="2.5"/>
+           maxSpeed="40.0" minGap="2.5"/>
 
     <vehicle id="merging_car" type="car" depart="0.0"
-             departLane="0" departPos="30.96" departSpeed="22.22">
-        <route edges="353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+             departLane="0" departPos="0" departSpeed="22.22">
+        <route edges="entering highway_out"/>
     </vehicle>
 
-    <!-- 73 m before merge on through-lane; 305.72 - 73 = 232.72 -->
+    <!-- 73 m before MERGE: 182.49 - 73 = 109.49 -->
     <vehicle id="main_car" type="car" depart="0.0"
-             departLane="1" departPos="232.72" departSpeed="22.22">
-        <route edges="497720156 353879480 954971261 106116297-AddedOnRampEdge 106116297"/>
+             departLane="0" departPos="109.49" departSpeed="22.22">
+        <route edges="highway_in highway_out"/>
     </vehicle>
 </routes>
