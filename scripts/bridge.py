@@ -6,6 +6,7 @@ import argparse
 import logging
 import os
 import re
+import shutil
 import sys
 import threading
 import time
@@ -20,7 +21,36 @@ import traci
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-SIM_DIR = REPO_ROOT / "simulations" / "barraSUMOfinal"
+SIM_DIR = REPO_ROOT / "simulations" / "SUMO"
+sys.path.insert(0, str(SIM_DIR))
+LANEMERGE_CFG = REPO_ROOT / "simulations" / "SUMO" / "lanemerge_eval" / "network" / "lanemerge.sumocfg"
+LANEMERGE_SCENARIOS = REPO_ROOT / "simulations" / "SUMO" / "lanemerge_eval" / "scenarios"
+_EVAL_STEP = 0.1
+
+
+def _find_sumo_binary(name: str) -> str:
+    """Locate a SUMO binary (sumo / sumo-gui) robustly across install layouts."""
+    if sys.platform == "win32":
+        name = name if name.endswith(".exe") else name + ".exe"
+
+    # 1. Same dir as the current Python executable (venv Scripts/)
+    candidate = Path(sys.executable).parent / name
+    if candidate.exists():
+        return str(candidate)
+
+    # 2. pip-installed sumo package: search sys.path for sumo/bin/<name>
+    for entry in sys.path:
+        candidate = Path(entry) / "sumo" / "bin" / name
+        if candidate.exists():
+            return str(candidate)
+
+    # 3. System PATH
+    found = shutil.which(name)
+    if found:
+        return found
+
+    # 4. Last resort: let the OS try (will raise if not found)
+    return name
 
 
 def load_env() -> dict:
@@ -174,7 +204,7 @@ class DittoPublisher:
             return snapshot
 
 
-def run(args: argparse.Namespace) -> None:
+def run(args: argparse.Namespace, extra_sumo_flags: list[str] | None = None) -> None:
     logging.basicConfig(
         level=logging.INFO,
         format="%(asctime)s %(levelname)s %(message)s",
@@ -184,13 +214,11 @@ def run(args: argparse.Namespace) -> None:
     pub = DittoPublisher(env["DITTO_API_URL"], env["DITTO_AUTH"], args.workers)
     pub.ensure_shared_policy()
 
-    binary_name = "sumo-gui" if args.gui else "sumo"
-    # prefer the venv's eclipse-sumo wheel binary, fall back to PATH
-    venv_bin = Path(sys.executable).parent / binary_name
-    sumo_binary = str(venv_bin) if venv_bin.exists() else binary_name
+    sumo_binary = _find_sumo_binary("sumo-gui" if args.gui else "sumo")
+    cfg_path = getattr(args, "cfg", None) or str(SIM_DIR / "osm.sumocfg")
     sumo_cmd = [
         sumo_binary,
-        "-c", str(SIM_DIR / "osm.sumocfg"),
+        "-c", cfg_path,
         "--step-length", str(args.step_length),
         "--no-warnings",
         "--tripinfo-output", os.devnull,
@@ -198,6 +226,8 @@ def run(args: argparse.Namespace) -> None:
     ]
     if args.end_time is not None:
         sumo_cmd += ["--end", str(args.end_time)]
+    if extra_sumo_flags:
+        sumo_cmd += extra_sumo_flags
 
     logging.info("Starting SUMO: %s", " ".join(sumo_cmd))
     traci.start(sumo_cmd)
@@ -269,6 +299,30 @@ def run(args: argparse.Namespace) -> None:
                      len(seen), max_concurrent, m["sent"], m["ok"], m["failed"])
         if args.cleanup:
             pub.delete_all()
+
+
+def run_scenario(scenario_id: str, spec, gui: bool = False) -> None:
+    rou_file = LANEMERGE_SCENARIOS / f"scenario_{scenario_id}.rou.xml"
+    if not rou_file.exists():
+        raise FileNotFoundError(f"Route file not found: {rou_file}")
+
+    extra = ["--route-files", str(rou_file)]
+    if not gui:
+        extra.append("--no-step-log")
+
+    args = argparse.Namespace(
+        cfg=str(LANEMERGE_CFG),
+        workers=4,
+        step_length=_EVAL_STEP,
+        end_time=120,
+        max_vehicles=None,
+        max_steps=None,
+        real_time=gui,
+        metrics_interval=60.0,
+        gui=gui,
+        cleanup=True,
+    )
+    run(args, extra_sumo_flags=extra)
 
 
 def main() -> None:
