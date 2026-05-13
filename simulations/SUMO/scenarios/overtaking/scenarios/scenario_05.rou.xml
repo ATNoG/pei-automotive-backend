@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 05 – ONCOMING TRAFFIC: fast car in lane 1 is too close for safe change.
+Ego   : 120 km/h, lane 0, pos 0.
+Slow  : 60  km/h, lane 0, pos 80.
+OncomingA: 120 km/h in lane 1, pos 150 — will pass ego area before ego can change.
+OncomingB: 120 km/h in lane 1, pos 400 — provides a safe window after A passes.
+Expected: ego waits for oncomingA to clear, then overtakes inside the window before B arrives.
+-->
+<routes>
+    <vType id="ego_type"
+           accel="3.0" decel="5.0" sigma="0.0"
+           length="4.5" maxSpeed="33.33" minGap="2.5"
+           color="0,0,255"/>
+
+    <vType id="slow_type"
+           accel="1.5" decel="4.5" sigma="0.0"
+           length="4.5" maxSpeed="16.67" minGap="2.5"
+           color="255,0,0"/>
+
+    <vType id="fast_type"
+           accel="3.5" decel="6.0" sigma="0.0"
+           length="4.5" maxSpeed="33.33" minGap="2.0"
+           color="255,165,0"/>
+
+    <vehicle id="slow_05" type="slow_type" depart="0.0"
+             departLane="0" departPos="80" departSpeed="16.67">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="near_05" type="fast_type" depart="0.0"
+             departLane="1" departPos="150" departSpeed="33.33">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="far_05" type="fast_type" depart="0.0"
+             departLane="1" departPos="400" departSpeed="33.33">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="ego_05" type="ego_type" depart="0.0"
+             departLane="0" departPos="0" departSpeed="27.78">
+        <route edges="highway"/>
+    </vehicle>
+</routes>

@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Edge definitions for the overtaking evaluation network.
+A single bidirectional-capable edge with 2 lanes, ~1 km at 130 km/h.
+numLanes="2" gives lanes 0 (right) and 1 (left).
+Speed 36.11 m/s ≡ 130 km/h (Portuguese highway limit).
+-->
+<edges>
+    <!-- 2-lane straight highway segment -->
+    <edge id="highway" from="START" to="END" numLanes="2" speed="36.11" priority="9"/>
+</edges>

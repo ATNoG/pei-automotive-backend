@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 04 – SPEED DIFFERENTIAL TOO SMALL: ego only slightly faster.
+Ego   : 70 km/h max, 70 km/h depart.
+Slow  : 60 km/h, 40 m ahead.
+Expected: ego detects a marginal speed advantage; controller still overtakes
+          but waits for a larger gap before returning.
+-->
+<routes>
+    <vType id="ego_type"
+           accel="2.6" decel="4.5" sigma="0.0"
+           length="4.5" maxSpeed="19.44" minGap="2.5"
+           color="0,0,255"/>
+
+    <vType id="slow_type"
+           accel="1.5" decel="4.5" sigma="0.0"
+           length="4.5" maxSpeed="16.67" minGap="2.5"
+           color="255,0,0"/>
+
+    <vehicle id="slow_04" type="slow_type" depart="0.0"
+             departLane="0" departPos="40" departSpeed="16.67">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="ego_04" type="ego_type" depart="0.0"
+             departLane="0" departPos="0" departSpeed="19.44">
+        <route edges="highway"/>
+    </vehicle>
+</routes>

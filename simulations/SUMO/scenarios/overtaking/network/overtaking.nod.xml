@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Node definitions for the overtaking evaluation network.
+Single straight road with 2 lanes, 1 km total.
+
+  START (0,0) ──────────────── END (1000,0)
+     lane 0  (right / main lane, index 0)
+     lane 1  (left  / overtaking lane, index 1)
+
+Plain Cartesian coordinates (metres) — no geographic projection needed.
+-->
+<nodes>
+    <node id="START" x="0"    y="0" type="dead_end"/>
+    <node id="END"   x="1000" y="0" type="dead_end"/>
+</nodes>

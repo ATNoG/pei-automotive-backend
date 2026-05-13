@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 01 – BASELINE: ego behind a single slow vehicle.
+Ego   : 120 km/h max, departs at 100 km/h (27.78 m/s), position 0.
+Slow  : 60  km/h max (16.67 m/s), departs 60 m ahead of ego at 60 km/h.
+Expected: ego detects slow car, changes to lane 1, overtakes, returns to lane 0.
+-->
+<routes>
+    <!-- Fast ego vehicle that must overtake -->
+    <vType id="ego_type"
+           accel="3.0" decel="5.0" sigma="0.0"
+           length="4.5" maxSpeed="33.33" minGap="2.5"
+           color="0,0,255"/>
+
+    <!-- Slow obstacle vehicle -->
+    <vType id="slow_type"
+           accel="1.5" decel="4.5" sigma="0.0"
+           length="4.5" maxSpeed="16.67" minGap="2.5"
+           color="255,0,0"/>
+
+    <vehicle id="slow_01" type="slow_type" depart="0.0"
+             departLane="0" departPos="60" departSpeed="16.67">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="ego_01" type="ego_type" depart="0.0"
+             departLane="0" departPos="0" departSpeed="27.78">
+        <route edges="highway"/>
+    </vehicle>
+</routes>

@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 02 – BLOCKED LEFT LANE: oncoming car in left lane prevents overtaking.
+Ego   : departs at 0, 100 km/h, lane 0.
+Slow  : 60 km/h, 80 m ahead, lane 0.
+Blocker: fast car in lane 1, approaching from behind ego (departs 200 m back at 120 km/h).
+Expected: controller waits until blocker clears lane 1 before changing lanes.
+-->
+<routes>
+    <vType id="ego_type"
+           accel="3.0" decel="5.0" sigma="0.0"
+           length="4.5" maxSpeed="33.33" minGap="2.5"
+           color="0,0,255"/>
+
+    <vType id="slow_type"
+           accel="1.5" decel="4.5" sigma="0.0"
+           length="4.5" maxSpeed="16.67" minGap="2.5"
+           color="255,0,0"/>
+
+    <vType id="fast_type"
+           accel="3.5" decel="6.0" sigma="0.0"
+           length="4.5" maxSpeed="38.89" minGap="2.0"
+           color="255,165,0"/>
+
+    <vehicle id="slow_02" type="slow_type" depart="0.0"
+             departLane="0" departPos="80" departSpeed="16.67">
+        <route edges="highway"/>
+    </vehicle>
+
+    <!-- Blocker starts behind ego in left lane, will pass before ego can change -->
+    <vehicle id="blocker_02" type="fast_type" depart="0.0"
+             departLane="1" departPos="0" departSpeed="33.33">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="ego_02" type="ego_type" depart="0.0"
+             departLane="0" departPos="0" departSpeed="27.78">
+        <route edges="highway"/>
+    </vehicle>
+</routes>
