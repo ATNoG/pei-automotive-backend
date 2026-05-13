@@ -2,16 +2,14 @@
 <routes>
     <vType id="car_a" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
            maxSpeed="27.78" minGap="2.5"/>
-    <vType id="car_b" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
-           maxSpeed="27.78" minGap="2.5"/>
 
     <vehicle id="sumo-merging-car" type="car_a" depart="0.0"
              departLane="0" departPos="0" departSpeed="22.22">
         <route edges="entering highway_out"/>
     </vehicle>
 
-    <vehicle id="sumo-main-car" type="car_b" depart="0.0"
-             departLane="0" departPos="130" departSpeed="22.22">
-        <route edges="highway_in highway_out"/>
+    <vehicle id="sumo-main-car" type="car_a" depart="0.0"
+             departLane="0" departPos="0" departSpeed="22.22">
+        <route edges="entering highway_out"/>
     </vehicle>
 </routes>

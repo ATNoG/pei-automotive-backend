@@ -1,22 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <routes>
-    <vType id="car_fast" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+    <vType id="car_fast" accel="3.0" decel="5.0" sigma="0.0" length="4.5"
            maxSpeed="33.33" minGap="2.5"/>
     <vType id="car_slow" accel="1.5" decel="4.5" sigma="0.0" length="4.5"
-           maxSpeed="22.22" minGap="2.5"/>
+           maxSpeed="13.89" minGap="2.5"/>
 
     <vehicle id="sumo-main-car" type="car_slow" depart="0.0"
-             departLane="0" departPos="0" departSpeed="22.22">
+             departLane="0" departPos="30" departSpeed="13.89">
         <route edges="highway_in highway_out"/>
     </vehicle>
 
     <vehicle id="sumo-merging-car" type="car_fast" depart="0.0"
              departLane="0" departPos="0" departSpeed="33.33">
-        <route edges="highway_in highway_out"/>
-    </vehicle>
-
-    <vehicle id="sumo-main-car-2" type="car_slow" depart="5.0"
-             departLane="0" departPos="0" departSpeed="22.22">
         <route edges="highway_in highway_out"/>
     </vehicle>
 </routes>

@@ -119,6 +119,12 @@ def evaluate_scenario(pack, spec, gui: bool = False) -> dict:
     if callable(before):
         before(spec.scenario_id)
 
+    # Optional pack-level hook: translates raw alert dict -> outcome string.
+    # Packs that use a custom alert schema (no 'status' field) must expose
+    # interpret_alert(alert: dict | None) -> str.
+    # Packs that don't expose it fall back to reading alert["status"].
+    interpret = getattr(pack, "interpret_alert", None)
+
     with _alert_collector(pack.ALERT_TOPIC) as q:
         bridge.run(
             cfg=pack.SUMOCFG,
@@ -135,7 +141,11 @@ def evaluate_scenario(pack, spec, gui: bool = False) -> dict:
         time.sleep(1.0)  # let any trailing MQTT messages arrive
         alert = _collect_alerts_worst_wins(q, pack.ALERT_TIMEOUT_S)
 
-    actual = alert.get("status") if alert else None
+    if callable(interpret):
+        actual = interpret(alert)
+    else:
+        actual = alert.get("status") if alert else None
+
     return {
         "scenario_id":   spec.scenario_id,
         "description":   spec.description,
@@ -147,11 +157,22 @@ def evaluate_scenario(pack, spec, gui: bool = False) -> dict:
 
 
 def compute_metrics(results: list[dict]) -> dict:
-    """Binary classification metrics with 'unsafe' as the positive class."""
-    tp = sum(1 for r in results if r["expected"] == "unsafe" and r["actual"] == "unsafe")
-    fp = sum(1 for r in results if r["expected"] == "safe"   and r["actual"] == "unsafe")
-    tn = sum(1 for r in results if r["expected"] == "safe"   and r["actual"] == "safe")
-    fn = sum(1 for r in results if r["expected"] == "unsafe" and r["actual"] != "unsafe")
+    """Classification metrics for any binary outcome vocabulary.
+
+    The "positive" class is whichever expected_outcome appears most as the
+    intended positive outcome (e.g. 'unsafe' for lanemerge, 'overtaking' for
+    the overtaking pack).  We detect it automatically as the non-negative
+    value: any value that is NOT 'safe', 'no_event', or 'no_alert'.
+    """
+    # Collect all distinct expected outcomes to find the positive class.
+    negatives = {"safe", "no_event", "no_alert"}
+    positive_classes = {r["expected"] for r in results if r["expected"] not in negatives}
+    positive = next(iter(positive_classes)) if positive_classes else "unsafe"
+
+    tp = sum(1 for r in results if r["expected"] == positive and r["actual"] == positive)
+    fp = sum(1 for r in results if r["expected"] != positive and r["actual"] == positive)
+    tn = sum(1 for r in results if r["expected"] != positive and r["actual"] != positive)
+    fn = sum(1 for r in results if r["expected"] == positive and r["actual"] != positive)
 
     precision = tp / (tp + fp) if (tp + fp) > 0 else 0.0
     recall    = tp / (tp + fn) if (tp + fn) > 0 else 0.0
@@ -159,6 +180,7 @@ def compute_metrics(results: list[dict]) -> dict:
     accuracy  = (tp + tn) / len(results) if results else 0.0
 
     return {
+        "positive_class":  positive,
         "true_positives":  tp,
         "false_positives": fp,
         "true_negatives":  tn,
@@ -177,14 +199,15 @@ def print_report(results: list[dict], metrics: dict, pack_name: str) -> None:
     print()
     print(f"  {pack_name} - Evaluation Report")
     print(f"  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
-    print(f"  {'ID':<4} {'Expected':<10} {'Actual':<12} {'':6} Description")
+    print(f"  Positive class: '{metrics.get('positive_class', 'unsafe')}'")
+    print(f"  {'ID':<4} {'Expected':<12} {'Actual':<14} {'':6} Description")
 
     for r in results:
         tag  = "PASS" if r["correct"] else "FAIL"
         desc = r["description"]
         if len(desc) > 60:
             desc = desc[:57] + "..."
-        print(f"  {r['scenario_id']:<4} {r['expected']:<10} {r['actual']:<12} [{tag}]  {desc}")
+        print(f"  {r['scenario_id']:<4} {r['expected']:<12} {r['actual']:<14} [{tag}]  {desc}")
 
     print(f"  Result: {passed}/{total} correct")
     print()

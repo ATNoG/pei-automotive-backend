@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<routes>
+    <vType id="car_ramp" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="22.22" minGap="2.5"/>
+    <vType id="car_hwy" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="27.78" minGap="2.5"/>
+
+    <vehicle id="sumo-merging-car" type="car_ramp" depart="0.0"
+             departLane="0" departPos="0" departSpeed="16.67">
+        <route edges="entering highway_out"/>
+    </vehicle>
+
+    <vehicle id="sumo-main-car" type="car_hwy" depart="0.0"
+             departLane="0" departPos="150" departSpeed="27.78">
+        <route edges="highway_in highway_out"/>
+    </vehicle>
+</routes>
