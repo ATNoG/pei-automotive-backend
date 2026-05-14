@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Edge definitions for the overtaking evaluation network.
+
+Two lanes allow physical overtaking:
+  lane 0 - normal travel lane (right)
+  lane 1 - passing lane (left)
+
+Speed limit: 120 km/h (33.33 m/s).
+-->
+<edges>
+    <edge id="highway" from="O_WEST" to="O_EAST" numLanes="2" speed="33.33" priority="9"/>
+</edges>
