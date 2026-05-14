@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 08 - TN / FN probe: late departure at identical speed
+merging-car departs 10 s after main-car at the same speed (80 km/h).
+By t=10 s main-car is already 222 m ahead - far beyond PROXIMITY_M=50 m.
+They never come within range; the detector never records a sign and never fires.
+Expected: no_event.
+-->
 <routes>
-    <vType id="car_slow" accel="1.5" decel="4.5" sigma="0.0" length="4.5"
-           maxSpeed="16.67" minGap="2.5"/>
+    <vType id="car_same" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="22.22" minGap="2.5"/>
 
-    <vehicle id="sumo-main-car" type="car_slow" depart="0.0"
-             departLane="0" departPos="0" departSpeed="16.67">
-        <route edges="highway_in highway_out"/>
+    <vehicle id="sumo-main-car" type="car_same" depart="0.0"
+             departLane="0" departPos="0" departSpeed="22.22">
+        <route edges="highway"/>
     </vehicle>
 
-    <vehicle id="sumo-merging-car" type="car_slow" depart="15.0"
-             departLane="0" departPos="0" departSpeed="16.67">
-        <route edges="highway_in highway_out"/>
+    <vehicle id="sumo-merging-car" type="car_same" depart="10.0"
+             departLane="1" departPos="0" departSpeed="22.22">
+        <route edges="highway"/>
     </vehicle>
 </routes>

@@ -1,24 +1,25 @@
 <?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 09 - TP: near-threshold speed differential (slow pass)
+70 km/h car (lane 1) starts 30 m behind a 60 km/h car (lane 0).
+Closing rate is only 2.77 m/s → pass takes ~10.8 s, at ~210 m.
+Both cars remain within 50 m throughout (similar speeds, long window).
+Tests that the detector catches a gradual overtake and not just fast ones.
+Expected: overtaking_event fires.
+-->
 <routes>
     <vType id="car_fast" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
-           maxSpeed="33.33" minGap="2.5"/>
-    <vType id="car_slow" accel="1.5" decel="4.5" sigma="0.0" length="4.5"
-           maxSpeed="16.67" minGap="2.5"/>
-    <vType id="car_med" accel="2.0" decel="4.5" sigma="0.0" length="4.5"
            maxSpeed="22.22" minGap="2.5"/>
+    <vType id="car_slow" accel="2.0" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="19.44" minGap="2.5"/>
 
     <vehicle id="sumo-main-car" type="car_slow" depart="0.0"
-             departLane="0" departPos="0" departSpeed="11.11">
-        <route edges="highway_in highway_out"/>
+             departLane="0" departPos="30" departSpeed="16.67">
+        <route edges="highway"/>
     </vehicle>
 
     <vehicle id="sumo-merging-car" type="car_fast" depart="0.0"
-             departLane="0" departPos="0" departSpeed="27.78">
-        <route edges="highway_in highway_out"/>
-    </vehicle>
-
-    <vehicle id="sumo-main-car-2" type="car_med" depart="0.0"
-             departLane="0" departPos="60" departSpeed="19.44">
-        <route edges="highway_in highway_out"/>
+             departLane="1" departPos="0" departSpeed="19.44">
+        <route edges="highway"/>
     </vehicle>
 </routes>
