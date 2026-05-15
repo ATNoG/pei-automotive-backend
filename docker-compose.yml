@@ -13,7 +13,7 @@ services:
       context: .
       dockerfile: src/services/position_processor/Dockerfile
     restart: unless-stopped
-    env_file: [.env]
+    env_file: .env
     depends_on:
       - mosquitto_broker
 
@@ -22,7 +22,7 @@ services:
       context: .
       dockerfile: src/services/speed_detector/Dockerfile
     restart: unless-stopped
-    env_file: [.env]
+    env_file: .env
     depends_on:
       - mosquitto_broker
       - position_processor
@@ -32,7 +32,7 @@ services:
       context: .
       dockerfile: src/services/overtaking_detector/Dockerfile
     restart: unless-stopped
-    env_file: [.env]
+    env_file: .env
     depends_on:
       - mosquitto_broker
       - position_processor
@@ -42,7 +42,7 @@ services:
       context: .
       dockerfile: src/services/emergency_vehicle_detector/Dockerfile
     restart: unless-stopped
-    env_file: [.env]
+    env_file: .env
     depends_on:
       - mosquitto_broker
       - position_processor
@@ -63,7 +63,7 @@ services:
       context: .
       dockerfile: src/services/accident_detector/Dockerfile
     restart: unless-stopped
-    env_file: [.env]
+    env_file: .env
     depends_on:
       - mosquitto_broker
       - position_processor
@@ -73,7 +73,7 @@ services:
       context: .
       dockerfile: src/services/traffic_jam_detector/Dockerfile
     restart: unless-stopped
-    env_file: [.env]
+    env_file: .env
     depends_on:
       - mosquitto_broker
       - position_processor
@@ -83,7 +83,7 @@ services:
       context: .
       dockerfile: src/services/meteo_consumer/Dockerfile
     restart: unless-stopped
-    env_file: [.env]
+    env_file: .env
     depends_on:
       - mosquitto_broker
     extra_hosts:
@@ -94,7 +94,7 @@ services:
       context: .
       dockerfile: src/services/station_assigner/Dockerfile
     restart: unless-stopped
-    env_file: [.env]
+    env_file: .env
     depends_on:
       - mosquitto_broker
       - position_processor
