@@ -1,7 +1,6 @@
 /**
- * Baseline test: GET /health, no auth.
- * Establishes the absolute floor latency: just network + uvicorn + one Python return.
- * Run:  k6 run tests/performance/k6/health.js
+ * Baseline test: GET /health, no auth
+ * Establishes the absolute floor latency: just network + uvicorn + one Python return
  */
 import http from 'k6/http';
 import { check, sleep } from 'k6';
@@ -11,12 +10,11 @@ export const options = {
   scenarios: {
     baseline: {
       executor: 'constant-vus',
-      vus: 20,
+      vus: 50,
       duration: '60s',
     },
   },
   thresholds: {
-    // /health is a pure in-process response, should be very fast.
     http_req_duration: ['p(50)<5', 'p(95)<20', 'p(99)<50'],
     http_req_failed:   ['rate<0.001'],
   },

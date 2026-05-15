@@ -1,19 +1,6 @@
 /**
  * Load test: steady ramp on GET + PATCH /api/preferences/.
- * Models normal-to-peak production traffic for the database-api service.
- *
- * Run:
- *   k6 run tests/performance/k6/load.js \
- *     -e BASE_URL=http://localhost:8082 \
- *     -e KC_URL=http://localhost:8081   \
- *     -e KC_USER=<username>             \
- *     -e KC_PASS=<password>
- *
- * What to watch:
- *   - http_req_duration{name:GET /api/preferences/}   should stay < 200 ms p95
- *   - http_req_duration{name:PATCH /api/preferences/} should stay < 300 ms p95
- *   - http_reqs                                        throughput (req/s)
- *   - asyncpg pool exhaustion shows as latency spikes at higher VUs
+ * Models normal-to-peak production traffic for the database-api service
  */
 import http  from 'k6/http';
 import { check, group, sleep } from 'k6';
@@ -27,10 +14,10 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 1,
       stages: [
-        { duration: '1m', target: 10  },  // warm up
-        { duration: '3m', target: 30  },  // normal load
-        { duration: '2m', target: 50  },  // peak load
-        { duration: '1m', target: 0   },  // ramp down
+        { duration: '30s', target: 20  },  // warm up
+        { duration: '2m',  target: 150 },  // normal load
+        { duration: '1m',  target: 300 },  // peak load
+        { duration: '30s', target: 0   },  // ramp down
       ],
     },
   },

@@ -1,25 +1,29 @@
 import http from 'k6/http';
-import { check } from 'k6';
+import { check, sleep } from 'k6';
 import { KC_URL, KC_REALM, KC_CLIENT, KC_USER, KC_PASS } from './config.js';
 
 const TOKEN_ENDPOINT = `${KC_URL}/realms/${KC_REALM}/protocol/openid-connect/token`;
 
 export function fetchToken(username, password) {
-  const res = http.post(
-    TOKEN_ENDPOINT,
-    { grant_type: 'password', client_id: KC_CLIENT, username, password, scope: 'openid' },
-    { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, tags: { name: 'token' } },
-  );
-  if (!check(res, { 'token 200': (r) => r.status === 200 })) {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    if (attempt > 0) sleep(attempt);  // 1 s, then 2 s backoff
+    const res = http.post(
+      TOKEN_ENDPOINT,
+      { grant_type: 'password', client_id: KC_CLIENT, username, password, scope: 'openid' },
+      { headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, tags: { name: 'token' } },
+    );
+    if (check(res, { 'token 200': (r) => r.status === 200 })) {
+      const body = res.json();
+      return {
+        access_token:  body.access_token,
+        refresh_token: body.refresh_token,
+        expires_in:    body.expires_in,
+      };
+    }
     console.error(`Token fetch failed (${res.status}): ${res.body}`);
-    return null;
+    if (res.status >= 400 && res.status < 500) break;
   }
-  const body = res.json();
-  return {
-    access_token:  body.access_token,
-    refresh_token: body.refresh_token,
-    expires_in:    body.expires_in,
-  };
+  return null;
 }
 
 export function doRefresh(refreshTok) {
@@ -37,9 +41,6 @@ export function doRefresh(refreshTok) {
   };
 }
 
-// Per-VU token manager; call this at the top of each iteration.
-// `initial` is the data returned by setup() and is only used on the very
-// first iteration; after that, the VU refreshes its own token.
 let _token      = null;
 let _refresh    = null;
 let _expiresAt  = 0;
@@ -55,11 +56,11 @@ export function getToken(initial) {
     data = initial || fetchToken(KC_USER, KC_PASS);
   }
 
-  if (!data) { _token = null; return null; }
+  if (!data) { _token = null; _refresh = null; return null; }
 
   _token     = data.access_token;
   _refresh   = data.refresh_token;
-  _expiresAt = now + data.expires_in;
+  _expiresAt = now + data.expires_in - Math.random() * 60;
   return _token;
 }
 

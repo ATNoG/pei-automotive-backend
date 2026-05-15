@@ -20,25 +20,133 @@ docker compose up --build -d
 ### k6 tests (HTTP / database-api)
 
 ```bash
-# Baseline: /health, no auth, 20 VUs for 60 s
+# Baseline: /health, no auth, 50 VUs for 60 s
 k6 run tests/performance/k6/health.js -e BASE_URL=http://localhost:8082
 
-# Load: ramp to 50 VUs, GET + PATCH preferences, 7 min total
-k6 run tests/performance/k6/load.js \
-  -e BASE_URL=http://localhost:8082 \
-  -e KC_URL=http://localhost:8081   \
-  -e KC_USER=<username>             \
-  -e KC_PASS=<password>
+# Load: ramp to 300 VUs, GET + PATCH preferences, 4 min total
+k6 run tests/performance/k6/load.js `
+  -e BASE_URL=http://localhost:8082 `
+  -e KC_URL=http://localhost:8081 `
+  -e KC_USER=driver `
+  -e KC_PASS=driver123
 
-# Stress: ramp to 200 VUs, find breaking point, 13 min total
-k6 run tests/performance/k6/stress.js <same -e flags>
+# Stress: ramp to 1000 VUs, find breaking point, 5 min total
+k6 run tests/performance/k6/stress.js `
+  -e BASE_URL=http://localhost:8082 ` 
+  -e KC_URL=http://localhost:8081 `
+  -e KC_USER=driver `
+  -e KC_PASS=driver123
 
-# Spike: 10 -> 200 -> 10 VUs in 30 s, then 2 min recovery, 4.5 min total
-k6 run tests/performance/k6/spike.js <same -e flags>
+# Spike: 20 -> 1000 -> 20 VUs in 45 s, then 2 min recovery, 4.5 min total
+k6 run tests/performance/k6/spike.js `
+  -e BASE_URL=http://localhost:8082 ` 
+  -e KC_URL=http://localhost:8081  `
+  -e KC_USER=driver `
+  -e KC_PASS=driver123
 ```
 
 The Keycloak client must have Direct Access Grants enabled (ROPC flow).
 `KC_CLIENT` defaults to `automotive-app`; override with `-e KC_CLIENT=<id>`.
+
+#### Results
+```bash
+█ THRESHOLDS 
+  http_req_duration
+  ✓ 'p(50)<5' p(50)=2.13ms
+  ✓ 'p(95)<20' p(95)=4.8ms
+  ✓ 'p(99)<50' p(99)=7.51ms
+  http_req_failed
+  ✓ 'rate<0.001' rate=0.00%
+
+█ TOTAL RESULTS 
+  checks_total.......: 169053 2815.137765/s
+  checks_succeeded...: 99.94% 168967 out of 169053
+  checks_failed......: 0.05%  86 out of 169053
+  ✓ status 200
+  ✓ body ok
+  ✗ under 20 ms
+    ↳  99% — ✓ 56265 / ✗ 86
+
+HTTP
+http_req_duration..............: avg=2.81ms  min=508.6µs med=2.13ms  max=422.56ms p(90)=3.79ms  p(95)=4.8ms  
+  { expected_response:true }...: avg=2.81ms  min=508.6µs med=2.13ms  max=422.56ms p(90)=3.79ms  p(95)=4.8ms  
+http_req_failed................: 0.00%  0 out of 56351
+http_reqs......................: 56351  938.379255/s
+
+EXECUTION
+iteration_duration.............: avg=53.25ms min=50.52ms med=52.56ms max=473.07ms p(90)=54.34ms p(95)=55.23ms
+iterations.....................: 56351  938.379255/s
+vus............................: 50     min=50         max=50
+vus_max........................: 50     min=50         max=5
+NETWORK
+data_received..................: 7.9 MB 131 kB/s
+data_sent......................: 4.3 MB 71 kB/s
+```
+
+```bash
+█ THRESHOLDS 
+  http_req_duration
+  ✓ 'p(95)<200' p(95)=62.64ms
+  ✓ 'p(99)<500' p(99)=105.12ms
+    {name:GET /api/preferences/}
+    ✓ 'p(95)<200' p(95)=59.48ms
+    {name:PATCH /api/preferences/}
+    ✓ 'p(95)<300' p(95)=65.12ms
+  http_req_failed
+  ✓ 'rate<0.01' rate=0.00%
+
+
+█ TOTAL RESULTS 
+  checks_total.......: 136436 566.08639/s
+  checks_succeeded...: 99.98% 136420 out of 136436
+  checks_failed......: 0.01%  16 out of 136436
+  ✓ token 200
+  ✓ status 200
+  ✓ has user_id
+  ✗ under 200 ms
+    ↳  99% — ✓ 27272 / ✗ 15
+  ✗ under 300 ms
+    ↳  99% — ✓ 27286 / ✗ 1
+
+HTTP
+http_req_duration....................: avg=23.14ms min=1.55ms med=17.12ms max=340.02ms p(90)=47.59ms p(95)=62.64ms
+  { expected_response:true }.........: avg=23.14ms min=1.55ms med=17.12ms max=340.02ms p(90)=47.59ms p(95)=62.64ms
+  { name:GET /api/preferences/ }.....: avg=21.72ms min=1.55ms med=15.93ms max=340.02ms p(90)=44.64ms p(95)=59.48ms
+  { name:PATCH /api/preferences/ }...: avg=24.55ms min=2.94ms med=18.63ms max=321.73ms p(90)=50.25ms p(95)=65.12ms
+http_req_failed......................: 0.00% 0 out of 54575
+http_reqs............................: 54575 226.437045/s
+EXECUTION
+iteration_duration...................: avg=1.04s   min=1s     med=1.03s   max=1.41s    p(90)=1.09s   p(95)=1.11s  
+iterations...........................: 27287 113.216448/s
+vus..................................: 1     min=1          max=299
+vus_max..............................: 300   min=300        max=300
+NETWORK
+data_received........................: 40 MB 164 kB/s
+data_sent............................: 66 MB 272 kB/s
+```
+
+### Locust tests (HTTP / database-api — interactive web UI)
+
+Locust is a Python-based alternative to k6 with a live browser dashboard.
+Start it, open `http://localhost:8089`, set the user count and spawn rate,
+and watch response time and RPS charts update in real time.
+
+```bash
+# Install (once)
+pip install locust
+
+# Start the web UI — then open http://localhost:8089
+KC_USER=driver KC_PASS=driver123 \
+locust -f tests/performance/locustfile.py --host http://localhost:8082
+```
+
+From the browser you can:
+- Choose between `PreferencesUser` (authenticated GET + PATCH) and `HealthUser` (no-auth baseline)
+- Set any number of users and spawn rate on the fly
+- Start, stop, and reset the test without touching the terminal
+- Watch live charts for response time, RPS, and failures
+
+---
 
 ### MQTT tests
 
@@ -103,10 +211,11 @@ PostgreSQL 16 defaults to `max_connections=100`. Keep `DB_POOL_MAX x uvicorn_wor
 
 | Endpoint | Scenario | p50 | p95 | p99 |
 |----------|----------|-----|-----|-----|
-| `GET /health` | 20 VUs | < 5 ms | < 20 ms | < 50 ms |
-| `GET /api/preferences/` | 30 VUs (load) | < 30 ms | < 100 ms | < 200 ms |
-| `PATCH /api/preferences/` | 30 VUs (load) | < 40 ms | < 150 ms | < 300 ms |
-| `GET /api/preferences/` | 200 VUs (stress) | < 200 ms | < 1 s | < 3 s |
+| `GET /health` | 50 VUs | < 5 ms | < 20 ms | < 50 ms |
+| `GET /api/preferences/` | 150 VUs (load) | < 30 ms | < 100 ms | < 200 ms |
+| `PATCH /api/preferences/` | 150 VUs (load) | < 40 ms | < 150 ms | < 300 ms |
+| `GET /api/preferences/` | 500 VUs (stress) | < 500 ms | < 2 s | < 5 s |
+| `GET /api/preferences/` | 1000 VUs (stress peak) | degraded | — pool saturated above ~20 concurrent DB conns |
 
 ---
 
@@ -159,9 +268,9 @@ Mitigation: pre-warm the tile cache with the test route set, or increase `CACHE_
 
 | VU count | Expected failure | What to check |
 |----------|-----------------|---------------|
-| > 20     | Pool queue latency spike | asyncpg pool `max_size` |
-| > 100    | uvicorn request queue backpressure | uvicorn `--limit-concurrency` |
-| > 200    | 502 / connection refused | OS `somaxconn`, ephemeral ports |
+| > 20     | Pool queue latency spike | asyncpg pool `max_size` (default 20) |
+| > 300    | uvicorn request queue backpressure | uvicorn `--limit-concurrency` |
+| > 500    | 502 / connection refused | OS `somaxconn`, ephemeral ports |
 | > 100 DB connections | PostgreSQL FATAL | `max_connections` in `postgresql.conf` |
 
 ---

@@ -5,7 +5,7 @@ export const KC_CLIENT  = __ENV.KC_CLIENT  || 'automotive-app';
 export const KC_USER    = __ENV.KC_USER    || '';
 export const KC_PASS    = __ENV.KC_PASS    || '';
 
-// Default SLA thresholds; individual scripts can override.
+// Default SLA thresholds; individual scripts can override
 export const THRESHOLDS = {
   http_req_duration: ['p(95)<200', 'p(99)<500'],
   http_req_failed:   ['rate<0.01'],
