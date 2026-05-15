@@ -32,7 +32,7 @@ k6 run tests/performance/k6/load.js `
 
 # Stress: ramp to 1000 VUs, find breaking point, 5 min total
 k6 run tests/performance/k6/stress.js `
-  -e BASE_URL=http://localhost:8082 ` 
+  -e BASE_URL=http://localhost:8082 `
   -e KC_URL=http://localhost:8081 `
   -e KC_USER=driver `
   -e KC_PASS=driver123
@@ -123,6 +123,37 @@ vus_max..............................: 300   min=300        max=300
 NETWORK
 data_received........................: 40 MB 164 kB/s
 data_sent............................: 66 MB 272 kB/s
+```
+
+```bash
+ █ THRESHOLDS 
+  http_req_duration
+  ✓ 'p(95)<2000' p(95)=1.37s
+  http_req_failed
+  ✓ 'rate<0.20' rate=0.85%
+
+█ TOTAL RESULTS 
+checks_total.......: 210375 697.562714/s
+checks_succeeded...: 98.90% 208075 out of 210375
+checks_failed......: 1.09%  2300 out of 210375
+✓ token 200
+✓ not 5xx
+✗ not timeout
+  ↳  97% — ✓ 102887 / ✗ 2300
+
+HTTP
+http_req_duration..............: avg=1.24s   min=2.13ms   med=64.49ms  max=1m0s   p(90)=791.13ms p(95)=1.37s
+  { expected_response:true }...: avg=743.6ms min=2.13ms   med=62.86ms  max=57.98s p(90)=774.31ms p(95)=1.09s
+http_req_failed................: 0.85%  900 out of 105361
+http_reqs......................: 105361 349.35665/s
+EXECUTION
+iteration_duration.............: avg=1.45s   min=202.46ms med=265.29ms max=1m0s   p(90)=991.97ms p(95)=1.57s
+iterations.....................: 105186 348.776383/s
+vus............................: 13     min=0             max=1000
+vus_max........................: 1000   min=1000          max=1000
+NETWORK
+data_received..................: 76 MB  253 kB/s
+data_sent......................: 121 MB 400 kB/s
 ```
 
 ### Locust tests (HTTP / database-api — interactive web UI)
