@@ -47,16 +47,16 @@ services:
       - mosquitto_broker
       - position_processor
 
-    lane_merge_detector:
-        build:
-            context: .
-            dockerfile: src/services/lane_merge_detector/Dockerfile
-        restart: unless-stopped
-        env_file:
-            - .env
-        depends_on:
-            - mosquitto_broker
-            - position_processor
+  lane_merge_detector:
+      build:
+          context: .
+          dockerfile: src/services/lane_merge_detector/Dockerfile
+      restart: unless-stopped
+      env_file:
+          - .env
+      depends_on:
+          - mosquitto_broker
+          - position_processor
 
   accident_detector:
     build:
