@@ -37,7 +37,7 @@ export function doRefresh(refreshTok) {
   };
 }
 
-// Per-VU token manager — call this at the top of each iteration.
+// Per-VU token manager; call this at the top of each iteration.
 // `initial` is the data returned by setup() and is only used on the very
 // first iteration; after that, the VU refreshes its own token.
 let _token      = null;

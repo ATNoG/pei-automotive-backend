@@ -1,5 +1,5 @@
 /**
- * Load test — steady ramp on GET + PATCH /api/preferences/.
+ * Load test: steady ramp on GET + PATCH /api/preferences/.
  * Models normal-to-peak production traffic for the database-api service.
  *
  * Run:
@@ -10,9 +10,9 @@
  *     -e KC_PASS=<password>
  *
  * What to watch:
- *   - http_req_duration{name:GET /api/preferences/}  — should stay < 200 ms p95
- *   - http_req_duration{name:PATCH /api/preferences/} — should stay < 300 ms p95
- *   - http_reqs                                        — throughput (req/s)
+ *   - http_req_duration{name:GET /api/preferences/}   should stay < 200 ms p95
+ *   - http_req_duration{name:PATCH /api/preferences/} should stay < 300 ms p95
+ *   - http_reqs                                        throughput (req/s)
  *   - asyncpg pool exhaustion shows as latency spikes at higher VUs
  */
 import http  from 'k6/http';
@@ -57,9 +57,9 @@ export default function (initial) {
       tags: { name: 'GET /api/preferences/' },
     });
     check(res, {
-      'status 200':      (r) => r.status === 200,
-      'has user_id':     (r) => !!r.json('user_id'),
-      'under 200 ms':    (r) => r.timings.duration < 200,
+      'status 200':   (r) => r.status === 200,
+      'has user_id':  (r) => !!r.json('user_id'),
+      'under 200 ms': (r) => r.timings.duration < 200,
     });
   });
 
@@ -74,8 +74,8 @@ export default function (initial) {
       tags: { name: 'PATCH /api/preferences/' },
     });
     check(res, {
-      'status 200':      (r) => r.status === 200,
-      'under 300 ms':    (r) => r.timings.duration < 300,
+      'status 200':   (r) => r.status === 200,
+      'under 300 ms': (r) => r.timings.duration < 300,
     });
   });
 

@@ -1,5 +1,5 @@
 /**
- * Spike test — simulates a sudden burst of traffic, then verifies recovery.
+ * Spike test: simulates a sudden burst of traffic, then verifies recovery.
  *
  * Run:
  *   k6 run tests/performance/k6/spike.js \

@@ -1,5 +1,5 @@
 /**
- * Stress test — pushes VUs well beyond normal capacity to find the breaking point.
+ * Stress test: pushes VUs well beyond normal capacity to find the breaking point.
  *
  * Run:
  *   k6 run tests/performance/k6/stress.js \
@@ -15,10 +15,10 @@
  *   - Does the system recover after VUs ramp down (resilience check)?
  *
  * Bottleneck indicators:
- *   - Latency spikes at ~20 VUs  → asyncpg pool exhausted (max_size=20 default)
- *   - 5xx errors                  → uvicorn worker queue full
- *   - Connection refused          → OS ephemeral port exhaustion
- *   - CPU 100% on the DB host     → query / index issue
+ *   - Latency spikes at ~20 VUs  -> asyncpg pool exhausted (max_size=20 default)
+ *   - 5xx errors                  -> uvicorn worker queue full
+ *   - Connection refused          -> OS ephemeral port exhaustion
+ *   - CPU 100% on the DB host     -> query / index issue
  */
 import http  from 'k6/http';
 import { check, sleep } from 'k6';
@@ -41,7 +41,7 @@ export const options = {
     },
   },
   thresholds: {
-    // Relaxed — stress tests are designed to break things.
+    // Relaxed; stress tests are designed to break things.
     http_req_duration: ['p(95)<2000'],
     http_req_failed:   ['rate<0.20'],
   },
@@ -60,7 +60,7 @@ export default function (initial) {
     tags: { name: 'GET /api/preferences/' },
   });
   check(res, {
-    'not 5xx': (r) => r.status < 500,
+    'not 5xx':    (r) => r.status < 500,
     'not timeout': (r) => r.timings.duration < 10000,
   });
   sleep(0.2);
