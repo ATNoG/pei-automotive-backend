@@ -45,13 +45,5 @@ async def update_preferences(
             current_user.get("username") or "",
         )
         repo = PreferenceRepository(conn)
-
-        # Ensure the user row exists before updating preferences
-        exists = await conn.fetchval(
-            "SELECT 1 FROM user_preferences WHERE user_id = $1",
-            user_id,
-        )
-        if not exists:
-            await repo.get_or_create_defaults(user_id)
-
+        await repo.get_or_create_defaults(user_id)
         return await repo.update(user_id, body)
