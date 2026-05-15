@@ -19,3 +19,4 @@ httpx
 testcontainers[postgres]
 docker
 pg8000
+locust
