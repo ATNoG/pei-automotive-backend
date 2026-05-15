@@ -9,7 +9,6 @@ services:
   # --- Hybrid Services: Local Build + Harbor Image Tag ---
   
   position_processor:
-    image: atnog-harbor.av.it.pt/pei-2025-automotive-app/position_processor:1.0
     build:
       context: .
       dockerfile: src/services/position_processor/Dockerfile
@@ -19,7 +18,6 @@ services:
       - mosquitto_broker
 
   speed_detector:
-    image: atnog-harbor.av.it.pt/pei-2025-automotive-app/speed_detector:1.0
     build:
       context: .
       dockerfile: src/services/speed_detector/Dockerfile
@@ -30,7 +28,6 @@ services:
       - position_processor
 
   overtaking_detector:
-    image: atnog-harbor.av.it.pt/pei-2025-automotive-app/overtaking_detector:1.0
     build:
       context: .
       dockerfile: src/services/overtaking_detector/Dockerfile
@@ -41,7 +38,6 @@ services:
       - position_processor
 
   emergency_vehicle_detector:
-    image: atnog-harbor.av.it.pt/pei-2025-automotive-app/emergency_vehicle_detector:1.0
     build:
       context: .
       dockerfile: src/services/emergency_vehicle_detector/Dockerfile
@@ -52,7 +48,6 @@ services:
       - position_processor
 
   highway_entry_detector:
-    image: atnog-harbor.av.it.pt/pei-2025-automotive-app/highway_entry_detector:1.0
     build:
       context: .
       dockerfile: src/services/highway_entry_detector/Dockerfile
@@ -63,7 +58,6 @@ services:
       - position_processor
 
   accident_detector:
-    image: atnog-harbor.av.it.pt/pei-2025-automotive-app/accident_detector:1.0
     build:
       context: .
       dockerfile: src/services/accident_detector/Dockerfile
@@ -74,7 +68,6 @@ services:
       - position_processor
 
   traffic_jam_detector:
-    image: atnog-harbor.av.it.pt/pei-2025-automotive-app/traffic_jam_detector:1.0
     build:
       context: .
       dockerfile: src/services/traffic_jam_detector/Dockerfile
@@ -85,7 +78,6 @@ services:
       - position_processor
 
   meteo_consumer:
-    image: atnog-harbor.av.it.pt/pei-2025-automotive-app/meteo_consumer:1.0
     build:
       context: .
       dockerfile: src/services/meteo_consumer/Dockerfile
@@ -97,7 +89,6 @@ services:
       - "tomastest.com:10.255.38.67"
 
   station_assigner:
-    image: atnog-harbor.av.it.pt/pei-2025-automotive-app/station_assigner:1.0
     build:
       context: .
       dockerfile: src/services/station_assigner/Dockerfile
@@ -109,7 +100,6 @@ services:
       - meteo_consumer
 
   database-api:
-    image: atnog-harbor.av.it.pt/pei-2025-automotive-app/database_api:1.0
     build:
       context: .
       dockerfile: src/services/database_api/Dockerfile

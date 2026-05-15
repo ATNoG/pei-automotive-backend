@@ -1,5 +1,5 @@
 <#import "template.ftl" as layout>
-<@layout.registrationLayout displayMessage=!messagesPerField.existsError('firstName','lastName','email','username','password','password-confirm','termsAccepted'); section>
+<@layout.registrationLayout pageTitle=msg("registerTitle") displayMessage=!messagesPerField.existsError('firstName','lastName','email','username','password','password-confirm','termsAccepted'); section>
     <#if section = "header">
         ${msg("registerTitle")}
     <#elseif section = "form">
@@ -55,7 +55,7 @@
                 <input id="kc-register-button" class="${properties.kcButtonClass!} ${properties.kcButtonPrimaryClass!} ${properties.kcButtonBlockClass!} ${properties.kcButtonLargeClass!}" type="submit" value="${msg("doRegister")}" disabled />
                 
                 <div style="text-align: center; margin-top: 16px;">
-                    <span><a href="${url.loginUrl}" style="font-size: 14px; text-decoration: underline; color: #007bff;">&laquo; ${kcSanitize(msg("backToLogin"))?no_esc}</a></span>
+                    <span><a href="${url.loginUrl}" style="font-size: 14px; text-decoration: underline; color: #007bff;">${kcSanitize(msg("backToLogin"))?no_esc}</a></span>
                 </div>
             </div>
         </form>

@@ -1,6 +1,6 @@
 <#import "template.ftl" as layout>
 
-<@layout.registrationLayout; section>
+<@layout.registrationLayout pageTitle = msg("deviceVerifyTitle"); section>
 
     <#if section == "form">
         <div id="kc-device-login-form">
