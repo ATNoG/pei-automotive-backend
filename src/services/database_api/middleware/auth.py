@@ -22,11 +22,9 @@ async def get_current_user(
             options={"verify_aud": False},
         )
 
-        email = payload.get("email") or ""
-        username = payload.get("preferred_username") or email or payload["sub"]
+        username = payload.get("preferred_username") or payload["sub"]
         return {
             "id": payload["sub"],              # Keycloak user UUID
-            "email": email,
             "username": username,
             "roles": payload.get("realm_access", {}).get("roles", []),
         }
@@ -42,16 +40,14 @@ async def get_current_user(
         )
 
 
-async def ensure_user_exists(conn, user_id: UUID, email: str, username: str):
+async def ensure_user_exists(conn, user_id: UUID, username: str):
     await conn.execute(
         """
-        INSERT INTO users (id, username, email)
-        VALUES ($1, $2, $3)
+        INSERT INTO users (id, username)
+        VALUES ($1, $2)
         ON CONFLICT (id) DO UPDATE
-        SET username = EXCLUDED.username,
-            email = EXCLUDED.email
+        SET username = EXCLUDED.username;
         """,
         user_id,
-        username,
-        email,
+        username
     )

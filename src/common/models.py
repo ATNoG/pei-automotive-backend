@@ -146,6 +146,42 @@ class Station:
         )
 
 
+class AlertPriority(IntEnum):
+    """Alert priority levels for event aggregation.
+    
+    Higher values = higher priority. Frontend will only display/play
+    alerts with priority > current_alert_priority.
+    """
+    LOW = 1
+    MEDIUM = 2
+    HIGH = 3
+    CRITICAL = 4
+
+
+@dataclass
+class AlertMetadata:
+    """Common metadata for all backend alerts.
+    
+    Used to implement priority-based event aggregation in the frontend.
+    The frontend tracks current_alert_priority and current_alert_priority_audio,
+    and will only display/play alerts with higher priority that are still valid.
+    """
+    priority: int = AlertPriority.MEDIUM  # AlertPriority enum value
+    expiration_s: int = 10  # seconds until this alert expires (time-to-live)
+    timestamp: float = field(default_factory=time.time)
+    
+    def is_valid(self) -> bool:
+        """Check if alert is still within its expiration window."""
+        return time.time() < self.timestamp + self.expiration_s
+    
+    def to_dict(self) -> Dict:
+        return {
+            "priority": int(self.priority),
+            "expiration_s": self.expiration_s,
+            "timestamp": self.timestamp,
+        }
+
+
 @dataclass
 class CarUpdate:
     # treated car

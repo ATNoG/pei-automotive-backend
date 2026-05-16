@@ -56,7 +56,7 @@ def _simulate_merge_safe(highway_car, entering_car, highway_start_idx, highway_r
         time.sleep(0.1)
 
 
-def test_highway_entry_unsafe(get_car_id):
+def test_merge_unsafe(get_car_id):
     ALERTS.clear()
 
     highway_car = get_car_id("highway-car")
@@ -67,7 +67,7 @@ def test_highway_entry_unsafe(get_car_id):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/highway_entry")
+    client.subscribe("alerts/lane_merge")
     client.loop_start()
     time.sleep(0.5)
 
@@ -90,7 +90,7 @@ def test_highway_entry_unsafe(get_car_id):
     assert len(unsafe_alerts) > 0, f"expected unsafe alert but got: {ALERTS}"
 
 
-def test_highway_entry_safe(get_car_id):
+def test_merge_safe(get_car_id):
     ALERTS.clear()
 
     highway_car = get_car_id("highway-car-2")
@@ -101,7 +101,7 @@ def test_highway_entry_safe(get_car_id):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/highway_entry")
+    client.subscribe("alerts/lane_merge")
     client.loop_start()
     time.sleep(0.5)
 
@@ -126,5 +126,5 @@ def test_highway_entry_safe(get_car_id):
     assert len(safe_alerts) > 0, f"expected safe alert but got: {ALERTS}"
 
 if __name__ == "__main__":
-    test_highway_entry_unsafe(standalone_get_car_id)
-    test_highway_entry_safe(standalone_get_car_id)
+    test_merge_unsafe(standalone_get_car_id)
+    test_merge_safe(standalone_get_car_id)

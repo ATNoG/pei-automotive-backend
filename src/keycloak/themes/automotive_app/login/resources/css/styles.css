@@ -1,0 +1,606 @@
+/* ============================================================
+   Automotive App — Keycloak Login Theme
+   Design: white background · black accents · rounded · clean
+   ============================================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ---------- Reset / base ---------- */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* Force white background on EVERY possible Keycloak wrapper */
+html,
+body,
+body.login-pf,
+.login-pf-page,
+#kc-header,
+.login-pf-header,
+div[class*="login-pf"] {
+  background: #ffffff !important;
+  background-image: none !important;
+  background-color: #ffffff !important;
+}
+
+html {
+  height: 100%; /* Must be strict height for percentage calculations to work */
+}
+
+body {
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  color: #111111;
+  background-color: #ffffff !important;
+  min-height: 100vh; /* 100vh guarantees it fills the exact viewport height */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  overflow-y: auto;
+}
+
+/* ---------- Page shell ---------- */
+#kc-header { display: none !important; }
+
+/* The main Keycloak wrapper div */
+.login-pf-page {
+  background: #ffffff !important;
+  background-image: none !important;
+  flex-grow: 0.5;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 32px 16px;
+}
+
+/* Keycloak wraps everything in this */
+.kc-login-container,
+#kc-container,
+.container-fluid {
+  background: #ffffff !important;
+  width: 100%;
+  max-width: 460px;
+  margin: 0 auto;
+}
+
+/* ---------- Logo + App name row ---------- */
+.kc-logo-wrapper {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 24px;
+  margin-top: auto;
+}
+
+.kc-logo-wrapper img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  border-radius: 16px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
+}
+
+.kc-app-name {
+  font-family: 'Inter', sans-serif;
+  font-size: 1.95rem;
+  font-weight: 700;
+  color: #396aba;
+  letter-spacing: -0.3px;
+  white-space: nowrap;
+  text-align: center;
+}
+
+/* ---------- Card ---------- */
+.card-pf,
+.kc-card {
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.07);
+  width: 100%;
+  max-width: 420px;
+  padding: 36px 32px 28px;
+  margin: 0 auto auto;
+  /* Fix overflow so long register forms don't escape the card */
+  overflow: visible;
+}
+
+/* ---------- Page title & Header ---------- */
+.login-pf-header > div {
+  display: flex;
+  flex-direction: column;
+}
+
+.login-pf-header .col-md-10 {
+  order: 1; /* Forces Title to the top */
+}
+
+.login-pf-header .subtitle {
+  order: 2; /* Forces Subtitle below title */
+  margin-bottom: 20px;
+  font-size: 0.85rem;
+  color: #666666;
+}
+
+#kc-page-title {
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: -0.3px;
+  color: #111111;
+  margin-bottom: 4px; /* Reduced margin since subtitle is now below it */
+  text-align: left; /* Changed to left so it aligns with the form */
+}
+
+/* ---------- Form groups ---------- */
+.pf-c-form__group,
+.form-group {
+  margin-bottom: 16px;
+}
+
+/* Target the wrapper div containing both the label and the asterisk */
+.form-group > div:first-child {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+/* ---------- Labels ---------- */
+.pf-c-form__label,
+label {
+  display: inline-block !important;
+  font-size: 0.813rem;
+  font-weight: 600;
+  color: #444444;
+  margin-bottom: 0 !important; /* Let the wrapper handle the bottom margin */
+  letter-spacing: 0.1px;
+}
+
+.pf-c-form__label-required,
+span.required {
+  display: inline-block !important;
+  margin: 0 !important; /* Reset margins so the gap property handles spacing */
+  color: #d32f2f !important;
+  font-weight: bold;
+}
+
+/* ---------- Inputs ---------- */
+.pf-c-form-control,
+input[type="text"],
+input[type="email"],
+input[type="password"] {
+  width: 100%;
+  height: 44px;
+  padding: 0 14px;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  color: #111111;
+  background: #fafafa;
+  border: 1.5px solid #d8d8d8;
+  border-radius: 10px;
+  outline: none;
+  transition: border-color 0.18s, box-shadow 0.18s, background 0.18s;
+  appearance: none;
+  -webkit-appearance: none;
+}
+
+.pf-c-form-control:focus,
+input[type="text"]:focus,
+input[type="email"]:focus,
+input[type="password"]:focus {
+  border-color: #111111;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(17, 17, 17, 0.08);
+}
+
+.pf-c-form-control[aria-invalid="true"],
+input[aria-invalid="true"] {
+  border-color: #d32f2f;
+  background: #fff8f8;
+}
+
+/* ---------- Password visibility wrapper ---------- */
+.pf-c-input-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.pf-c-input-group .pf-c-form-control,
+.pf-c-input-group input {
+  padding-right: 46px;
+}
+
+.pf-c-button.pf-m-control,
+button[data-password-toggle] {
+  position: absolute;
+  right: 0;
+  top: 0;
+  height: 44px;
+  width: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: #777777;
+  border-radius: 0 10px 10px 0;
+  transition: color 0.15s;
+}
+
+.pf-c-button.pf-m-control:hover,
+button[data-password-toggle]:hover {
+  color: #111111;
+}
+
+/* ---------- Error messages ---------- */
+#input-error,
+.pf-c-form__helper-text.pf-m-error,
+.kc-feedback-text {
+  display: block;
+  font-size: 0.8rem;
+  color: #d32f2f;
+  margin-top: 5px;
+}
+
+/* ---------- Alert banner ---------- */
+.alert-error,
+.alert-warning,
+.alert-success,
+.alert-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  font-size: 0.875rem;
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+
+.alert-error   { background: #fff2f2; border: 1px solid #f5c6c6; color: #b91c1c; }
+.alert-warning { background: #fffbeb; border: 1px solid #fde68a; color: #92400e; }
+.alert-success { background: #f0fdf4; border: 1px solid #bbf7d0; color: #166534; }
+.alert-info    { background: #eff6ff; border: 1px solid #bfdbfe; color: #1e40af; }
+
+.pf-c-alert__icon { flex-shrink: 0; font-size: 1rem; }
+
+/* ---------- Remember me & forgot password row ---------- */
+.pf-c-form__group.kc-form-options,
+#kc-form-options-wrapper,
+.kc-form-setting {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.checkbox label,
+.pf-c-check__label {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #444444;
+  cursor: pointer;
+  user-select: none;
+}
+
+input[type="checkbox"] {
+  width: 17px;
+  height: 17px;
+  border: 1.5px solid #d8d8d8;
+  border-radius: 5px;
+  cursor: pointer;
+  accent-color: #111111;
+  flex-shrink: 0;
+}
+
+#kc-form-options-wrapper a,
+.kc-form-setting a,
+a#forgot-password {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: #111111;
+  text-decoration: none;
+  border-bottom: 1px solid #d0d0d0;
+  padding-bottom: 1px;
+  transition: border-color 0.15s;
+}
+
+#kc-form-options-wrapper a:hover,
+.kc-form-setting a:hover,
+a#forgot-password:hover {
+  border-color: #111111;
+}
+
+/* ---------- Form Options ("Back to Login") ---------- */
+#kc-form-options {
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+#kc-form-options span a {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111111;
+  text-decoration: none;
+}
+
+#kc-form-buttons {
+  margin-top: 20px;
+}
+
+/* ---------- Submit & Action Buttons ---------- */
+.pf-c-button.pf-m-primary,
+input[type="submit"].btn-primary,
+#kc-login {
+  display: block;
+  width: 100%;
+  height: 46px;
+  padding: 0 20px;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  color: #ffffff;
+  background: #111111;
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s, box-shadow 0.18s, transform 0.1s;
+  margin-top: 4px;
+}
+
+.pf-c-button.pf-m-primary:hover,
+input[type="submit"].btn-primary:hover,
+#kc-login:hover {
+  background: #2c2c2c;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.22);
+}
+
+.pf-c-button.pf-m-primary:active,
+input[type="submit"].btn-primary:active,
+#kc-login:active {
+  background: #000000;
+  transform: translateY(1px);
+}
+
+.pf-c-button.pf-m-primary:disabled,
+input[type="submit"].btn-primary:disabled,
+#kc-login:disabled {
+  background: #aaaaaa;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+/* Secondary "No" / Cancel Button */
+#kc-cancel {
+  display: block;
+  width: 100%;
+  height: 46px;
+  padding: 0 20px;
+  font-family: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  letter-spacing: 0.1px;
+  color: #111111;
+  background: #ffffff;
+  border: 1.5px solid #d8d8d8;
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 0.18s, border-color 0.18s;
+  margin-top: 12px; /* Adds space between Yes and No */
+}
+
+#kc-cancel:hover {
+  background: #f8f8f8;
+  border-color: #111111;
+}
+
+/* ---------- Social / identity providers ---------- */
+#kc-social-providers { margin-top: 24px; }
+
+#kc-social-providers hr {
+  border: none;
+  border-top: 1px solid #ebebeb;
+  margin-bottom: 20px;
+}
+
+#kc-social-providers h2 {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #888888;
+  text-align: center;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  margin-bottom: 14px;
+}
+
+.kc-social-links,
+.pf-c-list.kc-list-flat {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.kc-social-links li a,
+.pf-c-list.kc-list-flat li a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  height: 44px;
+  border: 1.5px solid #d8d8d8;
+  border-radius: 10px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #111111;
+  text-decoration: none;
+  transition: border-color 0.15s, background 0.15s;
+  background: #ffffff;
+}
+
+.kc-social-links li a:hover,
+.pf-c-list.kc-list-flat li a:hover {
+  border-color: #111111;
+  background: #f8f8f8;
+}
+
+/* ---------- Registration link ---------- */
+#kc-registration-container {
+  margin-top: 20px;
+  text-align: center;
+}
+
+#kc-registration span,
+#kc-registration-container span {
+  font-size: 0.875rem;
+  color: #666666;
+}
+
+#kc-registration a,
+#kc-registration-container a {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: #111111;
+  text-decoration: none;
+  border-bottom: 1.5px solid #111111;
+  padding-bottom: 1px;
+  transition: opacity 0.15s;
+}
+
+#kc-registration a:hover,
+#kc-registration-container a:hover {
+  opacity: 0.65;
+}
+
+/* ---------- Language switcher ---------- */
+#kc-locale {
+  display: flex;
+  justify-content: flex-end;
+  margin-bottom: 12px;
+}
+
+#kc-current-locale-link {
+  font-size: 0.813rem;
+  font-weight: 500;
+  color: #555555;
+  background: none;
+  border: 1px solid #dddddd;
+  border-radius: 7px;
+  padding: 4px 10px;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+#kc-current-locale-link:hover { border-color: #111111; }
+
+.kcLocaleListClass {
+  list-style: none;
+  background: #ffffff;
+  border: 1px solid #e5e5e5;
+  border-radius: 10px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.10);
+  padding: 6px;
+  min-width: 140px;
+}
+
+.kcLocaleListItemClass a {
+  display: block;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 0.875rem;
+  color: #111111;
+  text-decoration: none;
+  transition: background 0.12s;
+}
+
+.kcLocaleListItemClass a:hover { background: #f3f3f3; }
+
+/* ---------- Consent / OAuth Page ---------- */
+#kc-oauth h3 {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: #111111;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+#kc-oauth ul {
+  list-style: none;
+  margin-bottom: 24px;
+  background: #fafafa;
+  border: 1.5px solid #d8d8d8;
+  border-radius: 10px;
+  padding: 12px 16px;
+}
+
+#kc-oauth ul li {
+  font-size: 0.9rem;
+  color: #444444;
+  font-weight: 500;
+}
+
+/* ---------- Footer ---------- */
+.kc-login-footer {
+  padding: 20px 16px;
+  text-align: center;
+  flex-shrink: 0;
+  background: #ffffff;
+  width: 100%;
+}
+
+.kc-footer-links {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.kc-footer-links a {
+  font-size: 0.813rem;
+  color: #888888;
+  text-decoration: none;
+  transition: color 0.15s;
+}
+
+.kc-footer-links a:hover { color: #111111; }
+
+/* ---------- Responsive ---------- */
+@media (max-width: 480px) {
+  .card-pf,
+  .kc-card {
+    padding: 24px 18px 20px;
+    border-radius: 14px;
+  }
+
+  .kc-logo-wrapper img {
+    width: 52px;
+    height: 52px;
+    border-radius: 13px;
+  }
+
+  .kc-app-name {
+    font-size: 1.5rem;
+  }
+
+  #kc-page-title { font-size: 1.15rem; margin-bottom: 18px; }
+
+  .login-pf-page {
+    padding: 28px 12px 28px;
+  }
+}

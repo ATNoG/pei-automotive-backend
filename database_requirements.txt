@@ -1,0 +1,8 @@
+-r docker_requirements.txt
+fastapi
+uvicorn[standard]
+pydantic
+pydantic-settings
+PyJWT
+asyncpg
+cryptography

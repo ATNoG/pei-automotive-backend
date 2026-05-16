@@ -59,7 +59,6 @@ class PreferenceRepository:
         if req.appearance is not None:
             fields["dark_mode"] = req.appearance.dark_mode
             fields["colorblind_enabled"] = req.appearance.colorblind_enabled
-            fields["language"] = req.appearance.language
 
         if req.alerts is not None:
             fields["alert_accident"] = req.alerts.accident.alert
@@ -117,7 +116,6 @@ class PreferenceRepository:
             appearance=AppearancePreferences(
                 dark_mode=row["dark_mode"],
                 colorblind_enabled=row["colorblind_enabled"],
-                language=row["language"],
             ),
             alerts=AlertPreferences(
                 accident=AccidentAlertPreferences(

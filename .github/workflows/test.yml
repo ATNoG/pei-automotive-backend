@@ -29,7 +29,7 @@ jobs:
             - name: Install/Update dependencies
               run: |
                   pip install --upgrade pip
-                  pip install -r requirements.txt
+                  pip install -r database_requirements.txt
                   sleep 2
 
             - name: Generate .env file

@@ -49,10 +49,10 @@ services:
             - mosquitto_broker
             - position_processor
 
-    highway_entry_detector:
+    lane_merge_detector:
         build:
             context: .
-            dockerfile: src/services/highway_entry_detector/Dockerfile
+            dockerfile: src/services/lane_merge_detector/Dockerfile
         restart: unless-stopped
         env_file:
             - .env
@@ -141,7 +141,8 @@ services:
             KC_CACHE: local
             KC_LOG_LEVEL: INFO
         volumes:
-            - ./keycloak/automotive-realm.json:/opt/keycloak/data/import/automotive-realm.json:ro
+            - ./src/keycloak/automotive-realm.json:/opt/keycloak/data/import/automotive-realm.json:ro
+            - ./src/keycloak/themes:/opt/keycloak/themes
         ports:
             - "${KC_PORT:-8081}:8080"
         command: start --import-realm
@@ -164,7 +165,9 @@ services:
         restart: unless-stopped
 
     database-api:
-        build: src/services/database_api
+        build:
+            context: .
+            dockerfile: src/services/database_api/Dockerfile
         restart: unless-stopped
         depends_on:
             postgres:
@@ -179,6 +182,8 @@ services:
             DB_PASSWORD: ${APP_DB_PASSWORD}
             KEYCLOAK_URL: http://keycloak:8080
             KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+            KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+            KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
         ports:
             - "${DATABASE_API_PORT:-8082}:8080"
         networks:
