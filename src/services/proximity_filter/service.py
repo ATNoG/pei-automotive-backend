@@ -1,14 +1,12 @@
 #
 # Proximity Filter
 #
-# Sits between the Ditto gateway and the detector-facing cars/updates topic.
-# Enriches every car update with tile_quadkey + tile_zoom computed from the
-# car's lat/lon via Igor's QuadTree encoding, then republishes per-car:
+# Replaces the position_processor as the entry point for Ditto car events.
+# Connects to Ditto WebSocket, enriches every GPS update with a tile_quadkey
+# (computed via Igor's QuadTree encoding at PROXIMITY_ZOOM), and publishes
+# a lightweight raw message to MQTT for the position_processor to consume.
 #
-#   cars/raw_updates/<car_id>  →  proximity_filter  →  cars/updates/<car_id>
-#
-# Cleanup sentinels (_test_cleanup) and origin-marker updates (lat≈0, lon≈0)
-# pass through unchanged so detectors can clean their state.
+#   Ditto WS  →  proximity_filter  →  cars/raw_updates/<car_id>  →  position_processor
 #
 from __future__ import annotations
 import json
@@ -22,6 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
+from common.ditto_client import DittoWSClient
 from common.geotile import get_quadkey
 
 logger = logging.getLogger(__name__)
@@ -38,43 +37,34 @@ class ProximityFilter:
             password=config.broker_password,
             client_id="proximity-filter",
         )
-
-    def _enrich_and_forward(self, payload: str) -> None:
-        try:
-            data = json.loads(payload)
-        except Exception as e:
-            logger.error("Failed to parse car update: %s", e)
-            return
-
-        car_id = data.get("car_id")
-        if not car_id:
-            logger.warning("Dropping update without car_id: %s", payload[:120])
-            return
-
-        lat = data.get("latitude")
-        lon = data.get("longitude")
-
-        is_sentinel = data.get("_test_cleanup") or (
-            lat is not None and lon is not None
-            and abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001
+        self.ditto = DittoWSClient(
+            ws_url=config.ditto_ws_url,
+            username=config.ditto_username,
+            password=config.ditto_password,
+            on_gps_update=self._on_gps_update,
         )
 
-        if not is_sentinel and lat is not None and lon is not None:
-            data["tile_quadkey"] = get_quadkey(float(lat), float(lon), self.proximity_zoom)
-            data["tile_zoom"] = self.proximity_zoom
-
-        self.mqtt.publish(f"{self.config.car_updates_topic}/{car_id}", json.dumps(data))
+    def _on_gps_update(self, car_id: str, lat: float, lon: float, emergency: bool = False) -> None:
+        tile_qk = get_quadkey(lat, lon, self.proximity_zoom)
+        payload = json.dumps({
+            "car_id": car_id,
+            "latitude": lat,
+            "longitude": lon,
+            "emergency": emergency,
+            "tile_quadkey": tile_qk,
+            "tile_zoom": self.proximity_zoom,
+        })
+        self.mqtt.publish(f"{self.config.raw_car_updates_topic}/{car_id}", payload)
 
     def run(self):
         logger.info(
-            "Starting ProximityFilter: %s -> %s (zoom=%d)",
+            "Starting ProximityFilter: Ditto WS -> %s (zoom=%d)",
             self.config.raw_car_updates_topic,
-            self.config.car_updates_topic,
             self.proximity_zoom,
         )
         self.mqtt.connect()
-        self.mqtt.subscribe(self.config.raw_car_updates_topic, self._enrich_and_forward)
-        self.mqtt.loop_forever()
+        self.mqtt.start_loop()
+        self.ditto.run_forever()
 
 
 def main():

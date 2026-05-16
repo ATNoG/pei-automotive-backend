@@ -4,8 +4,8 @@ Proximity filter tests.
 Coverage:
 
 1. Unit tests for the geotile primitives (no infrastructure required).
-2. Unit tests for the proximity_filter's enrich-and-forward logic, using
-   a stub MQTT client so the routing semantics are validated locally.
+2. Unit tests for the proximity_filter's _on_gps_update logic, using a stub
+   MQTT client so the routing semantics are validated locally.
 3. An end-to-end integration test that runs two simultaneous overtaking
    maneuvers in completely different tiles (Aveiro vs. Lisbon) and
    verifies that:
@@ -79,7 +79,7 @@ def test_aveiro_and_lisbon_are_in_different_tiles_at_routing_zoom():
 
 
 # ---------------------------------------------------------------------------
-# Unit tests for the proximity_filter's enrich-and-forward routing
+# Unit tests for the proximity_filter's GPS enrichment
 # ---------------------------------------------------------------------------
 
 def _load_proximity_filter_module():
@@ -118,59 +118,46 @@ def _make_filter(zoom: int = 15):
 
 def test_proximity_filter_injects_tile_quadkey():
     pf = _make_filter(zoom=15)
-    payload = json.dumps({
-        "car_id": "x", "latitude": LAT, "longitude": LON,
-        "speed_kmh": 50.0, "heading_deg": 90.0,
-    })
-    pf._enrich_and_forward(payload)
+    pf._on_gps_update("x", LAT, LON)
 
     assert len(pf.mqtt.published) == 1
     topic, out_payload = pf.mqtt.published[0]
-    assert topic == "cars/updates/x"
+    assert topic == "cars/raw_updates/x"
     parsed = json.loads(out_payload)
     assert parsed["tile_zoom"] == 15
     assert parsed["tile_quadkey"] == get_quadkey(LAT, LON, 15)
     assert parsed["car_id"] == "x"
     assert parsed["latitude"] == LAT
     assert parsed["longitude"] == LON
+    assert parsed["emergency"] is False
 
 
-def test_proximity_filter_passes_cleanup_sentinel_through_unchanged():
+def test_proximity_filter_preserves_emergency_flag():
     pf = _make_filter()
-    payload = json.dumps({
-        "car_id": "x", "latitude": 0.0, "longitude": 0.0,
-        "_test_cleanup": True,
-    })
-    pf._enrich_and_forward(payload)
+    pf._on_gps_update("ev", LAT, LON, emergency=True)
 
-    assert len(pf.mqtt.published) == 1
-    topic, out_payload = pf.mqtt.published[0]
-    assert topic == "cars/updates/x"
-    parsed = json.loads(out_payload)
-    assert "tile_quadkey" not in parsed
-    assert "tile_zoom" not in parsed
-    assert parsed["_test_cleanup"] is True
+    _, out_payload = pf.mqtt.published[0]
+    assert json.loads(out_payload)["emergency"] is True
 
 
-def test_proximity_filter_skips_tile_for_origin_marker():
+def test_proximity_filter_different_cars_different_topics():
     pf = _make_filter()
-    payload = json.dumps({
-        "car_id": "x", "latitude": 0.0, "longitude": 0.0,
-        "speed_kmh": None, "heading_deg": None,
-    })
-    pf._enrich_and_forward(payload)
+    pf._on_gps_update("car-a", LAT, LON)
+    pf._on_gps_update("car-b", LAT + 0.001, LON)
 
-    assert len(pf.mqtt.published) == 1
-    topic, out_payload = pf.mqtt.published[0]
-    assert topic == "cars/updates/x"
-    parsed = json.loads(out_payload)
-    assert "tile_quadkey" not in parsed
+    topics = [t for t, _ in pf.mqtt.published]
+    assert "cars/raw_updates/car-a" in topics
+    assert "cars/raw_updates/car-b" in topics
 
 
-def test_proximity_filter_drops_unparseable_payload():
-    pf = _make_filter()
-    pf._enrich_and_forward("not-json")
-    assert pf.mqtt.published == []
+def test_proximity_filter_aveiro_and_lisbon_different_quadkeys():
+    pf = _make_filter(zoom=15)
+    pf._on_gps_update("a", LAT, LON)
+    pf._on_gps_update("b", 38.7223, -9.1393)
+
+    qk_a = json.loads(pf.mqtt.published[0][1])["tile_quadkey"]
+    qk_b = json.loads(pf.mqtt.published[1][1])["tile_quadkey"]
+    assert qk_a != qk_b
 
 
 # ---------------------------------------------------------------------------
