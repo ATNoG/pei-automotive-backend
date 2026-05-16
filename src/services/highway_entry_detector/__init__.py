@@ -1,1 +1,0 @@
-# Highway Entry Detector Service
