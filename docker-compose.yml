@@ -1,10 +1,20 @@
 services:
     mosquitto_broker:
-        image: eclipse-mosquitto:2
+        image: iegomez/mosquitto-go-auth:3.0.0-mosquitto_2.0.18
         ports:
             - "${MQTT_PORT:-1884}:1883"
+        entrypoint: ["/bin/sh", "-c"]
+        command:
+            - "HASH=$$(/mosquitto/pw -p \"$$MQTT_BROKER_PASSWORD\") && printf '%s:%s\\n' \"$$MQTT_BROKER_USER\" \"$$HASH\" > /tmp/passwd && chmod 644 /tmp/passwd && exec mosquitto -c /mosquitto/config/mosquitto.conf"
+        environment:
+            MQTT_BROKER_USER: ${MQTT_BROKER_USER}
+            MQTT_BROKER_PASSWORD: ${MQTT_BROKER_PASSWORD}
         volumes:
-            - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
+            - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+            - ./mosquitto/mosquitto_acl:/mosquitto/config/acl
+        networks:
+            - default
+            - keycloak_net
 
     position_processor:
         build:
@@ -190,6 +200,8 @@ services:
             - database_net
 
 networks:
+    default:
+        driver: bridge
     keycloak_net:
         driver: bridge
     database_net:
