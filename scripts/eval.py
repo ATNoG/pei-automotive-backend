@@ -18,7 +18,7 @@ Examples
   python scripts/eval.py --pack lanemerge
   python scripts/eval.py --pack lanemerge --scenarios 7 10
   python scripts/eval.py --pack lanemerge --gui --scenarios 1
-  python scripts/eval.py --pack lanemerge --output /tmp/eval.json
+  python scripts/eval.py --pack lanemerge --output results/eval.json
 """
 from __future__ import annotations
 
@@ -156,18 +156,25 @@ def evaluate_scenario(pack, spec, gui: bool = False) -> dict:
     }
 
 
-def compute_metrics(results: list[dict]) -> dict:
+def compute_metrics(results: list[dict], pack=None) -> dict:
     """Classification metrics for any binary outcome vocabulary.
 
     The "positive" class is whichever expected_outcome appears most as the
     intended positive outcome (e.g. 'unsafe' for lanemerge, 'overtaking' for
     the overtaking pack).  We detect it automatically as the non-negative
     value: any value that is NOT 'safe', 'no_event', or 'no_alert'.
+    
+    If the pack defines POSITIVE_CLASS, use that instead of auto-detection.
+    This avoids failures when running only negative scenarios.
     """
-    # Collect all distinct expected outcomes to find the positive class.
-    negatives = {"safe", "no_event", "no_alert"}
-    positive_classes = {r["expected"] for r in results if r["expected"] not in negatives}
-    positive = next(iter(positive_classes)) if positive_classes else "unsafe"
+    # Check if pack explicitly defines the positive class
+    if pack and hasattr(pack, "POSITIVE_CLASS"):
+        positive = pack.POSITIVE_CLASS
+    else:
+        # Fallback to automatic detection
+        negatives = {"safe", "no_event", "no_alert"}
+        positive_classes = {r["expected"] for r in results if r["expected"] not in negatives}
+        positive = next(iter(positive_classes)) if positive_classes else "unsafe"
 
     tp = sum(1 for r in results if r["expected"] == positive and r["actual"] == positive)
     fp = sum(1 for r in results if r["expected"] != positive and r["actual"] == positive)
@@ -246,7 +253,7 @@ def _build_parser() -> argparse.ArgumentParser:
             "  python scripts/eval.py --pack lanemerge\n"
             "  python scripts/eval.py --pack lanemerge --scenarios 7 10\n"
             "  python scripts/eval.py --pack lanemerge --gui --scenarios 1\n"
-            "  python scripts/eval.py --pack lanemerge --output /tmp/eval.json\n"
+            "  python scripts/eval.py --pack lanemerge --output results/eval.json\n"
             "\n"
             f"Available packs: {', '.join(packs) if packs else '(none)'}\n"
             "Each pack lives under simulations/SUMO/scenarios/<name>/ and exposes\n"
@@ -306,7 +313,7 @@ def main(argv: list[str] | None = None) -> int:
                 "alert_payload": None,
             })
 
-    metrics = compute_metrics(results)
+    metrics = compute_metrics(results, pack=pack)
     print_report(results, metrics, args.pack)
     write_json(results, metrics, output, args.pack)
     return 0 if all(r["correct"] for r in results) else 1

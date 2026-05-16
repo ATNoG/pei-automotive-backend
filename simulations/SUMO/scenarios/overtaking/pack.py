@@ -78,6 +78,10 @@ def interpret_alert(alert: dict | None) -> str:
         return "overtaking"
     return "no_event"
 
+# Positive class for metrics (used by eval.py)
+# Explicitly tell eval.py which outcome class is "positive" (event detected)
+# to avoid automatic detection failures when running only negative scenarios.
+POSITIVE_CLASS = "overtaking"
 
 # Cleanup hook
 _CLEANUP_CAR_IDS   = ["sumo-merging-car", "sumo-main-car", "sumo-main-car-2"]

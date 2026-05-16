@@ -11,12 +11,12 @@ Expected: no_event.
     <vType id="car_same" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
            maxSpeed="22.22" minGap="2.5"/>
 
-    <vehicle id="sumo-main-car" type="car_same" depart="0.0"
+    <vehicle id="sumo-merging-car" type="car_same" depart="0.0"
              departLane="0" departPos="0" departSpeed="22.22">
         <route edges="highway"/>
     </vehicle>
 
-    <vehicle id="sumo-merging-car" type="car_same" depart="0.0"
+    <vehicle id="sumo-main-car" type="car_same" depart="0.0"
              departLane="1" departPos="0" departSpeed="22.22">
         <route edges="highway"/>
     </vehicle>

@@ -24,7 +24,11 @@ sumo -c osm.sumocfg
 Run with Python (TraCI) to access a running sim:
 
 ``` bash
+# Linux
 python3 simulation.py
+
+# Windows
+python simulation.py
 ```
 
 ## files
@@ -56,7 +60,11 @@ python3 simulation.py
 Generated with:
 
 ``` bash
+# Linux
 python3 /usr/share/sumo/tools/osmWebWizard.py
+
+# Windows
+python "%SUMO_HOME%\tools\osmWebWizard.py"
 ```
 
 https://sumo.dlr.de/docs/Tutorials/OSMWebWizard.html
@@ -79,7 +87,11 @@ https://sumo.dlr.de/docs/Netedit/index.html#editing_modes
 We have roads now we need to create vehicles to drive in them. An easy way is to do it random.
 
 ``` bash
+# Linux
 ./routes/random.sh
+
+# Windows
+.\routes\random.bat
 ```
 
 -   1 hour simulation

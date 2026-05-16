@@ -28,7 +28,7 @@ python scripts/eval.py --pack overtaking
 python scripts/eval.py --pack overtaking --scenarios 01 --gui
 
 # Salvar resultado noutro caminho
-python scripts/eval.py --pack overtaking --output /tmp/overtaking_eval.json
+python scripts/eval.py --pack overtaking --output results/overtaking_eval.json
 ```
 
 ## Estrutura dos cenários

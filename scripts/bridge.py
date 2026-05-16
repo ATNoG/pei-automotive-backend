@@ -60,7 +60,13 @@ def _find_sumo_binary(name: str) -> str:
     if found:
         return found
 
-    # 4. Last resort: let the OS try (will raise if not found)
+    # 4. SUMO_HOME environment variable
+    if "SUMO_HOME" in os.environ:
+        candidate = Path(os.environ["SUMO_HOME"]) / "bin" / name
+        if candidate.exists():
+            return str(candidate)
+
+    # 5. Last resort: let the OS try (will raise if not found)
     return name
 
 
@@ -132,7 +138,10 @@ class DittoPublisher:
             sys.exit(f"Failed to upsert shared policy: {r.status_code} {r.text}")
 
     def thing_id(self, vid: str) -> str:
-        return f"{self.THING_PREFIX}:sumo-{slugify(vid)}"
+        slug = slugify(vid)
+        if slug.startswith("sumo-"):
+            return f"{self.THING_PREFIX}:{slug}"
+        return f"{self.THING_PREFIX}:sumo-{slug}"
 
     def _provision(self, vid: str, emergency: bool) -> None:
         tid = self.thing_id(vid)
@@ -281,6 +290,10 @@ def run(
             traci.simulationStep()
             sim_time = traci.simulation.getTime()
             vehicle_ids = traci.vehicle.getIDList()
+
+            if traci.simulation.getArrivedIDList():
+                logging.info("A vehicle reached its destination. Stopping scenario.")
+                break
 
             if max_vehicles and len(vehicle_ids) > max_vehicles:
                 vehicle_ids_pub = vehicle_ids[:max_vehicles]

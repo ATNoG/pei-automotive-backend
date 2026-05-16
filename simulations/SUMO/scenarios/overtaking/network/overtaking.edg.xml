@@ -9,5 +9,5 @@ Two lanes allow physical overtaking:
 Speed limit: 120 km/h (33.33 m/s).
 -->
 <edges>
-    <edge id="highway" from="O_WEST" to="O_EAST" numLanes="2" speed="33.33" priority="9"/>
+    <edge id="highway" from="O_START" to="O_END" numLanes="2" speed="33.33" priority="9"/>
 </edges>

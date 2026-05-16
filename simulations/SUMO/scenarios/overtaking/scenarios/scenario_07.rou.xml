@@ -11,12 +11,12 @@ Expected: overtaking_event fires.
     <vType id="car_slow" accel="1.5" decel="4.5" sigma="0.0" length="4.5"
            maxSpeed="13.89" minGap="2.5"/>
 
-    <vehicle id="sumo-main-car" type="car_slow" depart="0.0"
+    <vehicle id="sumo-merging-car" type="car_slow" depart="0.0"
              departLane="0" departPos="20" departSpeed="11.11">
         <route edges="highway"/>
     </vehicle>
 
-    <vehicle id="sumo-merging-car" type="car_fast" depart="0.0"
+    <vehicle id="sumo-main-car" type="car_fast" depart="0.0"
              departLane="1" departPos="0" departSpeed="33.33">
         <route edges="highway"/>
     </vehicle>

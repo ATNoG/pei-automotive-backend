@@ -16,12 +16,12 @@ Expected: no_event.
            maxSpeed="33.33" minGap="2.5"
            lcStrategic="0" lcSpeedGain="0" lcCooperative="0"/>
 
-    <vehicle id="sumo-main-car" type="car_slow" depart="0.0"
+    <vehicle id="sumo-merging-car" type="car_slow" depart="0.0"
              departLane="0" departPos="30" departSpeed="11.11">
         <route edges="highway"/>
     </vehicle>
 
-    <vehicle id="sumo-merging-car" type="car_blocked" depart="0.0"
+    <vehicle id="sumo-main-car" type="car_blocked" depart="0.0"
              departLane="0" departPos="0" departSpeed="11.11">
         <route edges="highway"/>
     </vehicle>

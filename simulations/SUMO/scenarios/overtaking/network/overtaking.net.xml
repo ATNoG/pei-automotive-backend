@@ -1,34 +1,39 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2026-05-14T15:44:48.566950+00:00 by Eclipse SUMO netconvert 1.26.0
+<!-- generated on 2026-05-16T13:21:28.909373+00:00 by Eclipse SUMO netconvert 1.26.0
 <netconvertConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/netconvertConfiguration.xsd">
 
     <input>
-        <node-files value="C:\Users\ACER\AndroidStudioProjects\pei-automotive-backend\simulations\SUMO\scenarios\overtaking\network\overtaking.nod.xml"/>
-        <edge-files value="C:\Users\ACER\AndroidStudioProjects\pei-automotive-backend\simulations\SUMO\scenarios\overtaking\network\overtaking.edg.xml"/>
+        <node-files value="overtaking.nod.xml"/>
+        <edge-files value="overtaking.edg.xml"/>
     </input>
 
     <output>
-        <output-file value="C:\Users\ACER\AndroidStudioProjects\pei-automotive-backend\simulations\SUMO\scenarios\overtaking\network\overtaking.net.xml"/>
+        <output-file value="overtaking.net.xml"/>
     </output>
 
     <projection>
         <proj value="+proj=utm +zone=29 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"/>
     </projection>
 
+    <processing>
+        <offset.x value="-522636.0363"/>
+        <offset.y value="-4497497.6291"/>
+    </processing>
+
 </netconvertConfiguration>
 -->
 
 <net version="1.20" junctionCornerDetail="5" limitTurnSpeed="5.50" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/net_file.xsd">
 
-    <location netOffset="-522242.94,-4497385.11" convBoundary="0.00,0.00,507.44,1.53" origBoundary="-8.737000,40.627000,-8.731000,40.627000" projParameter="+proj=utm +zone=29 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"/>
+    <location netOffset="-522636.04,-4497497.63" convBoundary="-810.38,45.62,-109.32,373.44" origBoundary="-8.741917,40.628417,-8.733639,40.631389" projParameter="+proj=utm +zone=29 +ellps=WGS84 +datum=WGS84 +units=m +no_defs"/>
 
-    <edge id="highway" from="O_WEST" to="O_EAST" priority="9">
-        <lane id="highway_0" index="0" speed="33.33" length="507.44" shape="0.01,-4.80 507.45,-3.27"/>
-        <lane id="highway_1" index="1" speed="33.33" length="507.44" shape="0.00,-1.60 507.44,-0.07"/>
+    <edge id="highway" from="O_START" to="O_END" priority="9">
+        <lane id="highway_0" index="0" speed="33.33" length="773.92" shape="-107.29,49.97 -808.35,377.79"/>
+        <lane id="highway_1" index="1" speed="33.33" length="773.92" shape="-108.64,47.07 -809.70,374.89"/>
     </edge>
 
-    <junction id="O_EAST" type="dead_end" x="507.44" y="1.53" incLanes="highway_0 highway_1" intLanes="" shape="507.46,-4.87 507.44,1.53"/>
-    <junction id="O_WEST" type="dead_end" x="0.00" y="0.00" incLanes="" intLanes="" shape="0.00,0.00 0.02,-6.40"/>
+    <junction id="O_END" type="dead_end" x="-810.38" y="373.44" incLanes="highway_0 highway_1" intLanes="" shape="-807.67,379.24 -810.38,373.44"/>
+    <junction id="O_START" type="dead_end" x="-109.32" y="45.62" incLanes="" intLanes="" shape="-109.32,45.62 -106.61,51.42"/>
 
 </net>
