@@ -5,7 +5,7 @@ import paho.mqtt.client as mqtt
 
 from helpers import (
     MQTT_HOST, MQTT_PORT, ROADS_DIR,
-    ensure_car_exists, send_position, standalone_get_car_id,
+    ensure_car_exists, send_position, standalone_get_car_id, make_mqtt_client,
 )
 
 ALERTS = []
@@ -27,7 +27,7 @@ def test_speeding(get_car_id):
     ALERTS.clear()
     CAR_UPDATES.clear()
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = make_mqtt_client()
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
     client.subscribe("alerts/speed")

@@ -12,7 +12,7 @@ import requests
 from requests.auth import HTTPBasicAuth
 from dotenv import load_dotenv
 
-from helpers import MQTT_HOST, MQTT_PORT, SIM_DIR
+from helpers import MQTT_HOST, MQTT_PORT, SIM_DIR, make_mqtt_client
 
 # Load environment variables
 load_dotenv()
@@ -121,7 +121,7 @@ def _cleanup_test_cars(car_ids: List[str]) -> None:
     print(f"\n[cleanup] removing {len(car_ids)} test cars...")
 
     try:
-        client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+        client = make_mqtt_client()
         client.connect(MQTT_HOST, MQTT_PORT, keepalive=5)
         client.loop_start()
         time.sleep(0.2)

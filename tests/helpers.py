@@ -5,10 +5,25 @@ import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+import paho.mqtt.client as mqtt
+from dotenv import load_dotenv
+
+load_dotenv()
+
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
+MQTT_USER = os.getenv("MQTT_BROKER_USER", "")
+MQTT_PASS = os.getenv("MQTT_BROKER_PASSWORD", "")
 SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
 ROADS_DIR = SIM_DIR / "roads"
+
+
+def make_mqtt_client() -> mqtt.Client:
+    """Create an authenticated MQTT client. Credentials are read from .env."""
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    if MQTT_USER and MQTT_PASS:
+        client.username_pw_set(MQTT_USER, MQTT_PASS)
+    return client
 
 
 def ensure_car_exists(car_name: str, emergency: bool = False) -> None:

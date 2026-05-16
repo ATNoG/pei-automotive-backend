@@ -18,6 +18,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import paho.mqtt.client as mqtt
 
+from helpers import make_mqtt_client
+
 SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
 ROADS_DIR = Path(__file__).resolve().parent.parent / "simulations/roads"
 
@@ -66,7 +68,7 @@ def mqtt_alert_collector(topics: list[str]):
         alert_queue.put((msg.topic, payload))
         all_alerts.append((msg.topic, payload))
     
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = make_mqtt_client()
     try:
         client.on_message = on_message
         client.connect(MQTT_HOST, MQTT_PORT)
