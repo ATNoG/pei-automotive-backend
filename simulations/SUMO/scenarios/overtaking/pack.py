@@ -66,6 +66,7 @@ SCENARIOS: dict[str, ScenarioSpec] = {
     "08": _spec("08", "FN probe: merging-car departs 10 s late at same speed - never in range","no_event"),
     "09": _spec("09", "Near-threshold: 70 km/h passes 60 km/h, slow 10.8 s pass", "overtaking"),
     "10": _spec("10", "FP probe: side-by-side same speed - no longitudinal flip", "no_event"),
+    "11": _spec("11", "Oncoming: 2 cars in opposite directions - no overtake", "no_event"),
 }
 
 

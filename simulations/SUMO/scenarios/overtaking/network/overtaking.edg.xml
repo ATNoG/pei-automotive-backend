@@ -10,4 +10,5 @@ Speed limit: 120 km/h (33.33 m/s).
 -->
 <edges>
     <edge id="highway" from="O_START" to="O_END" numLanes="2" speed="33.33" priority="9"/>
+    <edge id="-highway" from="O_END" to="O_START" numLanes="1" speed="33.33" priority="9"/>
 </edges>
