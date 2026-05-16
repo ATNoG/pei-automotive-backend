@@ -1,30 +1,29 @@
 #
-# Position Processor - service.py
+# Position Processor
 #
-# receives raw gps data from ditto_client.py
-# calculates speed and heading given previous states
-# and publishes the new car data updates to a MQTT broker
+# Pure MQTT service: subscribes to cars/raw_updates/+ (published by the
+# proximity_filter), computes speed, heading, and speed limit from consecutive
+# GPS positions, then republishes an enriched CarUpdate to cars/updates/<car_id>
+# for all detectors to consume.
 #
-# also resolves the speed limit for the current road segment
-# using the tile-cached Overpass road data
-# so the frontend never needs to call external APIs itself.
+# The tile_quadkey and tile_zoom fields injected by the proximity_filter are
+# passed through unchanged so detectors can bucket state by tile.
 #
 from __future__ import annotations
-import time
+import json
 import logging
 import sys
 import threading
+import time
 from pathlib import Path
 from typing import Dict, Tuple
 
-# add parent dir
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
 from common.logging_config import setup_logging
 from common.config import load_config
 from common.models import CarUpdate
 from common.mqtt_client import MQTTClient
-from common.ditto_client import DittoWSClient
 from common.utils import haversine_distance_m, bearing_deg
 from common.overpass_client import get_road_info, DEFAULT_SPEED_LIMIT_KMH
 
@@ -41,25 +40,10 @@ class PositionProcessor:
             password=config.broker_password,
             client_id="position-processor",
         )
-        # state for each car (thread-safe access)
         self.states: Dict[str, Tuple[float, float, float]] = {}
         self.states_lock = threading.Lock()
-        # Ditto WebSocket client
-        self.ditto = DittoWSClient(
-            ws_url=config.ditto_ws_url,
-            username=config.ditto_username,
-            password=config.ditto_password,
-            on_gps_update=self._handle_raw_gps,
-        )
 
     def _resolve_speed_limit(self, lat: float, lon: float) -> float:
-        """
-        Look up the speed limit for the road nearest to (lat, lon).
-
-        Uses the tile-cached Overpass data via get_road_info, which also
-        returns the OSM way id and highway type for richer logging.
-        Always returns a valid positive float.
-        """
         try:
             speed_limit, way_id, hw_type = get_road_info(lat, lon)
             if way_id is not None:
@@ -77,23 +61,48 @@ class PositionProcessor:
             logger.warning("Speed-limit lookup failed: %s", e)
             return float(DEFAULT_SPEED_LIMIT_KMH)
 
+    def _handle_raw_update(self, payload: str) -> None:
+        try:
+            data = json.loads(payload)
+        except Exception as e:
+            logger.error("Failed to parse raw update: %s", e)
+            return
 
-    def _handle_raw_gps(self, car_id: str, lat: float, lon: float, emergency: bool = False):
-        # Handle test cleanup marker (coordinates at origin with tiny tolerance)
-        if abs(lat) < 0.0001 and abs(lon) < 0.0001:
-            # This is a cleanup signal, remove the car state
+        car_id = data.get("car_id")
+        if not car_id:
+            logger.warning("Dropping update without car_id")
+            return
+
+        lat = data.get("latitude")
+        lon = data.get("longitude")
+
+        # Cleanup sentinel or origin marker: evict state and forward so
+        # all detectors on cars/updates can clean up their own state.
+        if data.get("_test_cleanup") or (
+            lat is not None and lon is not None
+            and abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001
+        ):
             with self.states_lock:
                 if car_id in self.states:
                     del self.states[car_id]
-                    logger.info(f"[CLEANUP] Removed car state: {car_id}")
+                    logger.info("[CLEANUP] Removed car state: %s", car_id)
+            self.mqtt.publish(
+                f"{self.config.car_updates_topic}/{car_id}",
+                json.dumps({"car_id": car_id, "_test_cleanup": True}),
+                qos=1,
+            )
             return
+
+        lat = float(lat)
+        lon = float(lon)
+        emergency = bool(data.get("emergency", False))
+        tile_quadkey = data.get("tile_quadkey")
+        tile_zoom = data.get("tile_zoom")
 
         now = time.time()
 
-        # Thread-safe state access
         with self.states_lock:
             last = self.states.get(car_id)
-
             speed_kmh = None
             heading = None
 
@@ -101,25 +110,21 @@ class PositionProcessor:
                 last_lat, last_lon, last_ts = last
                 dt = now - last_ts
 
-                if dt > 0.05:  # allow faster updates for realistic speed calculation (50ms)
+                if dt > 0.05:
                     dist_m = haversine_distance_m(last_lat, last_lon, lat, lon)
                     speed_mps = dist_m / dt
                     speed_kmh = speed_mps * 3.6
 
-                    # filter unrealistic values
                     if speed_kmh > 600 or speed_kmh < 0:
                         speed_kmh = None
 
                     if dist_m > 1.0:
                         heading = bearing_deg(last_lat, last_lon, lat, lon)
 
-            # update state
             self.states[car_id] = (lat, lon, now)
 
-        # resolve speed limit for the current road segment
         speed_limit = self._resolve_speed_limit(lat, lon)
 
-        # build enriched CarUpdate
         update = CarUpdate(
             car_id=car_id,
             latitude=lat,
@@ -128,6 +133,8 @@ class PositionProcessor:
             heading_deg=heading,
             speed_limit_kmh=speed_limit,
             emergency=emergency,
+            tile_quadkey=tile_quadkey,
+            tile_zoom=tile_zoom,
             timestamp=now,
         )
 
@@ -136,11 +143,8 @@ class PositionProcessor:
             car_id, lat, lon, speed_kmh, heading, speed_limit,
         )
 
-        # Publish to the raw topic. The proximity_filter service enriches
-        # each update with tile metadata before forwarding it to the
-        # detector-facing car_updates_topic.
         self.mqtt.publish(
-            topic=self.config.raw_car_updates_topic,
+            topic=f"{self.config.car_updates_topic}/{car_id}",
             payload=update.to_json(),
             qos=1,
         )
@@ -148,8 +152,8 @@ class PositionProcessor:
     def run(self):
         logger.info("Starting PositionProcessor...")
         self.mqtt.connect()
-        self.mqtt.start_loop()
-        self.ditto.run_forever()
+        self.mqtt.subscribe(f"{self.config.raw_car_updates_topic}/+", self._handle_raw_update)
+        self.mqtt.loop_forever()
 
 
 def main():
