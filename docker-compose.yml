@@ -65,10 +65,10 @@ services:
             - mosquitto_broker
             - position_processor
 
-    highway_entry_detector:
+    lane_merge_detector:
         build:
             context: .
-            dockerfile: src/services/highway_entry_detector/Dockerfile
+            dockerfile: src/services/lane_merge_detector/Dockerfile
         restart: unless-stopped
         env_file:
             - .env
