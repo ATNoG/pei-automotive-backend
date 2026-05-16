@@ -332,8 +332,9 @@ class LaneMergeDetector:
                                     "timestamp": time.time(),
                                     "latitude": update.latitude,
                                     "longitude": update.longitude,
+                                    # Priority-based event aggregation
                                     "priority": int(AlertPriority.HIGH),
-                                    "expiration_s": 2,
+                                    "expiration_s": 2,  # Alert valid for 2 seconds
                                 }
 
                                 self.mqtt.publish(self.alert_topic, json.dumps(alert))
@@ -356,8 +357,9 @@ class LaneMergeDetector:
                                     "timestamp": time.time(),
                                     "latitude": update.latitude,
                                     "longitude": update.longitude,
+                                    # Priority-based event aggregation
                                     "priority": int(AlertPriority.MEDIUM),
-                                    "expiration_s": 2,
+                                    "expiration_s": 2,  # Alert valid for 2 seconds
                                 }
 
                                 self.mqtt.publish(self.alert_topic, json.dumps(alert))
@@ -380,8 +382,9 @@ class LaneMergeDetector:
                             "timestamp": time.time(),
                             "latitude": update.latitude,
                             "longitude": update.longitude,
+                            # Priority-based event aggregation
                             "priority": int(AlertPriority.MEDIUM),
-                            "expiration_s": 2,
+                            "expiration_s": 2,  # Alert valid for 2 seconds
                         }
 
                         self.mqtt.publish(self.alert_topic, json.dumps(alert))

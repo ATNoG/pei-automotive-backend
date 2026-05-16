@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Edge definitions for the lane-merge evaluation network.
+Speed limits match simulations/roads/*.json context (100 km/h highway,
+80 km/h entering ramp).
+-->
+<edges>
+    <!-- Main highway lane, approaching the merge point -->
+    <edge id="highway_in"  from="H_START" to="MERGE"  numLanes="1" speed="27.78" priority="9"/>
+    <!-- Main highway lane, continuing past the merge point -->
+    <edge id="highway_out" from="MERGE"   to="H_END"  numLanes="1" speed="27.78" priority="9"/>
+    <!-- Entering / merging ramp -->
+    <edge id="entering"    from="E_START" to="MERGE"  numLanes="1" speed="22.22" priority="7"/>
+</edges>

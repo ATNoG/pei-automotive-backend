@@ -20,7 +20,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
-from common.models import CarUpdate
+from common.models import CarUpdate, AlertPriority
 from common.utils import haversine_distance_m, bearing_deg
 
 logger = logging.getLogger(__name__)
@@ -292,6 +292,9 @@ class TrafficJamDetector:
                     "jam": jam.to_dict(),
                     "distance_m": dist,
                     "timestamp": time.time(),
+                    # Priority-based event aggregation
+                    "priority": int(AlertPriority.MEDIUM),
+                    "expiration_s": 20,  # Alert valid for 20 seconds
                 }
 
                 # Send to individual car and broadcast
@@ -388,6 +391,9 @@ class TrafficJamDetector:
             "center_longitude": jam.center_longitude,
             "detected_at": jam.detected_at,
             "timestamp": time.time(),
+            # Priority-based event aggregation
+            "priority": int(AlertPriority.MEDIUM),
+            "expiration_s": 20,  # Alert valid for 20 seconds
         }
 
         payload = json.dumps(alert)
@@ -410,6 +416,9 @@ class TrafficJamDetector:
             "center_longitude": jam.center_longitude,
             "reason": reason,
             "timestamp": time.time(),
+            # Priority-based event aggregation (cleared events don't block new alerts)
+            "priority": int(AlertPriority.LOW),
+            "expiration_s": 5,
         }
         payload = json.dumps(event)
         for car_id in jam.car_ids:
@@ -558,6 +567,9 @@ class TrafficJamDetector:
                         "jam": jam.to_dict(),
                         "distance_m": dist,
                         "timestamp": now,
+                        # Priority-based event aggregation
+                        "priority": int(AlertPriority.MEDIUM),
+                        "expiration_s": 20,  # Alert valid for 20 seconds
                     }
                     
                     self.mqtt.publish(f"alerts/traffic_jam/{update.car_id}", json.dumps(notification))

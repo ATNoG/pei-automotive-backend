@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
-from common.models import CarUpdate
+from common.models import CarUpdate, AlertPriority
 from common.overpass_client import DEFAULT_SPEED_LIMIT_KMH
 
 logger = logging.getLogger(__name__)
@@ -61,6 +61,9 @@ class SpeedDetector:
                 "latitude": update.latitude,
                 "longitude": update.longitude,
                 "timestamp": time.time(),
+                # Priority-based event aggregation (visual only, no audio priority check)
+                "priority": int(AlertPriority.LOW),
+                "expiration_s": 2,  # Alert valid for 2 seconds
             }
 
             self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", json.dumps(alert))
