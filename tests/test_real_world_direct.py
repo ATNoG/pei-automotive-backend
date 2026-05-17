@@ -61,10 +61,10 @@ def test_real_world_overtaking_direct(get_car_id):
     client.connect(MQTT_HOST, MQTT_PORT)
     client.loop_start()
     # Give the network loop a moment to start and process the SUBSCRIBE
-    time.sleep(0.05)
+    time.sleep(0.1)
     client.subscribe("alerts/overtaking/+", qos=1)
     client.subscribe(f"alerts/lane_merge/{car_entering}", qos=1)
-    time.sleep(0.05)
+    time.sleep(0.1)
 
     with open(ROADS_DIR / "real_world_entering.json") as f:
         entering_route = json.load(f)["features"][0]["geometry"]["coordinates"]
@@ -87,7 +87,7 @@ def test_real_world_overtaking_direct(get_car_id):
         e_lat, e_lon = entering_route[min(i, len(entering_route) - 1)]
         l_lat, l_lon = left_route[min(i, len(left_route) - 1)]
         _send_pair(e_lat, e_lon, l_lat, l_lon)
-        time.sleep(0.02)
+        time.sleep(0.1)
 
     # Phase 2+3: entering car on main_right (1 pt ≈ 1 m/iter),
     # left car on main_left (1 pt ≈ 2 m/iter).
@@ -98,7 +98,7 @@ def test_real_world_overtaking_direct(get_car_id):
         e_lat, e_lon = main_right[e_idx]
         l_lat, l_lon = main_left[i]
         _send_pair(e_lat, e_lon, l_lat, l_lon)
-        time.sleep(0.02)
+        time.sleep(0.1)
 
     time.sleep(2)
     client.loop_stop()
