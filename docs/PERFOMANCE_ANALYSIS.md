@@ -240,14 +240,7 @@ Install matplotlib once if not already installed:
 ```bash
 pip install matplotlib
 ```
-
-**Linux:**
-```bash
-python3 tests/performance/measure_latency.py --cars 50 --duration 60
-python3 tests/performance/measure_latency.py --cars 200 --duration 120 --rate 0.5
-```
-
-**Windows:**
+Run the test with desired parameters (e.g. 50 cars for 1 min at 1 update/s):
 ```bash
 python3 tests/performance/measure_latency.py --cars 50 --duration 60
 python3 tests/performance/measure_latency.py --cars 200 --duration 120 --rate 0.5
@@ -257,8 +250,6 @@ Plots are saved to `tests/performance/plots/`:
 - `latency_stages.png` - bar chart: avg ± std and p95 per stage
 - `latency_boxplot.png` - box plots per stage
 - `latency_timeseries.png` - e2e scatter over time with rolling average
-
-Raw data is also saved as `plots/latency_<timestamp>.json`.
 
 ---
 
