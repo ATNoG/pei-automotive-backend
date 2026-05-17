@@ -9,11 +9,17 @@ from helpers import (
     ensure_car_exists, send_position_ditto, standalone_get_car_id,
 )
 
-ALERTS = []
+OVERTAKING_ALERTS = []
+LANE_MERGE_ALERTS = []
 
 
 def on_message(client, userdata, msg):
-    ALERTS.append(json.loads(msg.payload.decode()))
+    topic = msg.topic
+    payload = json.loads(msg.payload.decode())
+    if topic == "alerts/overtaking":
+        OVERTAKING_ALERTS.append(payload)
+    elif topic == "alerts/lane_merge":
+        LANE_MERGE_ALERTS.append(payload)
 
 
 def test_real_world_overtaking_direct(get_car_id):
@@ -44,7 +50,8 @@ def test_real_world_overtaking_direct(get_car_id):
     car_entering = get_car_id("rw-direct-entering")
     car_left = get_car_id("rw-direct-left")
 
-    ALERTS.clear()
+    OVERTAKING_ALERTS.clear()
+    LANE_MERGE_ALERTS.clear()
 
     ensure_car_exists(car_entering)
     ensure_car_exists(car_left)
@@ -53,6 +60,7 @@ def test_real_world_overtaking_direct(get_car_id):
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
     client.subscribe("alerts/overtaking")
+    client.subscribe("alerts/lane_merge")
     client.loop_start()
 
     with open(ROADS_DIR / "real_world_entering.json") as f:
@@ -92,7 +100,8 @@ def test_real_world_overtaking_direct(get_car_id):
     time.sleep(2)
     client.loop_stop()
 
-    assert len(ALERTS) > 0, "expected at least one overtaking alert, got none"
+    assert len(OVERTAKING_ALERTS) > 0, f"expected at least one overtaking alert, got {len(OVERTAKING_ALERTS)}"
+    assert len(LANE_MERGE_ALERTS) > 0, f"expected at least one lane merge alert, got {len(LANE_MERGE_ALERTS)}"
 
 
 if __name__ == "__main__":
