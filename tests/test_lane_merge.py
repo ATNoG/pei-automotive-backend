@@ -42,7 +42,7 @@ def _simulate_merge_unsafe(highway_car, entering_car, highway_start_idx, highway
 def _simulate_merge_safe(highway_car, entering_car, highway_start_idx, highway_route, entering_route):
     """simulate both cars approaching the merge point over 10 steps - safe version"""
     for step in range(7):
-        entering_idx = min(step * len(entering_route) // 8, len(entering_route) - 1)
+        entering_idx = min(step * len(entering_route) // 6, len(entering_route) - 1)
         entering_lat, entering_lon = entering_route[entering_idx]
 
         highway_idx = highway_start_idx + step
@@ -75,7 +75,7 @@ def test_merge_unsafe(get_car_id):
         highway_route = json.load(f)["features"][0]["geometry"]["coordinates"]
     with open(ROADS_DIR / "entering.json") as f:
         entering_route = json.load(f)["features"][0]["geometry"]["coordinates"]
-    
+
     merge_lat, merge_lon = entering_route[-1]
     merge_idx = _find_merge_index(highway_route, merge_lat, merge_lon)
     # start close to merge point so predicted distance is well below threshold (~7m vs 15m)
@@ -107,14 +107,15 @@ def test_merge_safe(get_car_id):
 
     with open(ROADS_DIR / "highway.json") as f:
         highway_route = json.load(f)["features"][0]["geometry"]["coordinates"]
-    
+
     with open(ROADS_DIR / "entering.json") as f:
         entering_route = json.load(f)["features"][0]["geometry"]["coordinates"]
-    
+
     # Find merge point and position highway car to be within detection range but safely behind
     merge_lat, merge_lon = entering_route[-1]
     merge_idx = _find_merge_index(highway_route, merge_lat, merge_lon)
-    # start farther from merge point so predicted distance is safely above threshold (~35-45m vs 15m)
+    # start farther from merge point so the highway car is ~52-62m away when the
+    # entering car triggers detection (well above the 20m collision threshold)
     highway_start_idx = max(0, merge_idx - 11)
 
     _simulate_merge_safe(highway_car, entering_car, highway_start_idx, highway_route, entering_route)
