@@ -54,9 +54,12 @@ def test_real_world_overtaking(get_car_id):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/overtaking/+")
-    client.subscribe("alerts/lane_merge/{car_id}".format(car_id=car_entering))
     client.loop_start()
+    # Wait briefly so SUBSCRIBE is processed before we send updates
+    time.sleep(0.05)
+    client.subscribe("alerts/overtaking/+", qos=1)
+    client.subscribe(f"alerts/lane_merge/{car_entering}", qos=1)
+    time.sleep(0.05)
 
     with open(ROADS_DIR / "real_world_entering.json") as f:
         entering_route = json.load(f)["features"][0]["geometry"]["coordinates"]
