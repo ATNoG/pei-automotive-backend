@@ -337,7 +337,9 @@ class LaneMergeDetector:
                                     "expiration_s": 2,  # Alert valid for 2 seconds
                                 }
 
-                                self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                                payload = json.dumps(alert)
+                                self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", payload)
+                                self.mqtt.publish(f"{self.alert_topic}/{main_car_id}", payload)
                                 logger.warning(
                                     f"[LANE MERGE - UNSAFE] Car {update.car_id} "
                                     f"cannot safely merge - collision risk with {main_car_id}. "
@@ -362,7 +364,7 @@ class LaneMergeDetector:
                                     "expiration_s": 2,  # Alert valid for 2 seconds
                                 }
 
-                                self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                                self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", json.dumps(alert))
                                 logger.info(
                                     f"[LANE MERGE - SAFE] Car {update.car_id} "
                                     f"can safely merge. Min distance to {main_car_id}: {min_dist:.1f}m"
@@ -387,7 +389,7 @@ class LaneMergeDetector:
                             "expiration_s": 2,  # Alert valid for 2 seconds
                         }
 
-                        self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                        self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", json.dumps(alert))
                         logger.info(
                             f"[LANE MERGE - SAFE] Car {update.car_id} "
                             f"can safely merge - no main lane traffic in entry zone"
@@ -414,7 +416,7 @@ class LaneMergeDetector:
     def run(self):
         logger.info("Starting Lane Merge Detector...")
         self.mqtt.connect()
-        self.mqtt.subscribe(self.config.car_updates_topic, self._on_car_update)
+        self.mqtt.subscribe(f"{self.config.car_updates_topic}/+", self._on_car_update)
         self.mqtt.loop_forever()
 
 

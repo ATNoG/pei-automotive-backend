@@ -27,7 +27,7 @@ def test_curved_route(get_car_id):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("cars/updates")
+    client.subscribe("cars/updates/+")
     client.loop_start()
 
     with open(ROADS_DIR / "route.json") as f:
