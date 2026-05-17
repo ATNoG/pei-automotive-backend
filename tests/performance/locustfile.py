@@ -1,30 +1,20 @@
 """
-Locust performance test suite for database-api.
-
-Start the web UI, then open http://localhost:8089 in a browser:
-    KC_USER=driver KC_PASS=driver123 \
-    locust -f tests/performance/locustfile.py --host http://localhost:8082
-
-Env vars (all optional, shown with defaults):
-    KC_URL=http://localhost:8081
-    KC_USER=driver
-    KC_PASS=driver123
-    KC_REALM=automotive-app
-    KC_CLIENT=automotive-app
+Locust performance test suite for database-api
 """
 import os
 import random
 import time
 
 import requests
-from locust import HttpUser, StopUser, between, task
+from locust import HttpUser, between, task
+from locust.exception import StopUser
 
 
-KC_URL    = os.getenv("KC_URL",    "http://localhost:8081")
-KC_REALM  = os.getenv("KC_REALM",  "automotive-app")
+KC_URL    = os.getenv("KC_URL", "http://localhost:8081")
+KC_REALM  = os.getenv("KC_REALM", "automotive-app")
 KC_CLIENT = os.getenv("KC_CLIENT", "automotive-app")
-KC_USER   = os.getenv("KC_USER",   "driver")
-KC_PASS   = os.getenv("KC_PASS",   "driver123")
+KC_USER   = os.getenv("KC_USER", "driver")
+KC_PASS   = os.getenv("KC_PASS", "driver123")
 
 _TOKEN_ENDPOINT = f"{KC_URL}/realms/{KC_REALM}/protocol/openid-connect/token"
 
@@ -76,7 +66,6 @@ class _TokenManager:
         self._token      = data["access_token"]
         self._refresh    = data.get("refresh_token")
         ttl              = data.get("expires_in", 300)
-        # Random jitter up to 60 s prevents thundering-herd token refresh.
         self._expires_at = time.monotonic() + ttl - random.uniform(0, 60)
 
     @property

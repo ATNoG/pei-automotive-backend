@@ -11,7 +11,6 @@ TOPIC = "cars/updates"
 
 
 # Metrics
-
 @dataclass
 class Metrics:
     sent:      int = 0
@@ -54,7 +53,6 @@ class Metrics:
 
 
 # Subscriber
-
 def _build_payload(car_id: str, ts: float) -> str:
     return json.dumps({
         "car_id":          car_id,
@@ -96,7 +94,6 @@ def _run_subscriber(host: str, port: int, metrics: Metrics, stop: threading.Even
 
 
 # Publisher
-
 def _run_publisher(
     host: str, port: int, car_id: str,
     rate: float, metrics: Metrics, stop: threading.Event,
@@ -119,7 +116,6 @@ def _run_publisher(
 
 
 # Spike scenario
-
 def _run_spike(host: str, port: int, metrics: Metrics) -> None:
     phases = [
         (30, 10,  "normal"),
@@ -154,7 +150,6 @@ def _run_spike(host: str, port: int, metrics: Metrics) -> None:
 
 
 # Reporting
-
 def _print_report(snap: dict, elapsed: float) -> None:
     throughput = round(snap["received"] / max(elapsed, 1), 1)
     lat = snap["latency"]
@@ -204,7 +199,6 @@ def _diagnose(snap: dict, throughput: float) -> None:
 
 
 # CLI
-
 SCENARIOS = {
     "baseline": dict(publishers=1,  rate=10,  duration=30),
     "load":     dict(publishers=10, rate=50,  duration=60),

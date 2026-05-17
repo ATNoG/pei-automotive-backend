@@ -7,20 +7,6 @@ Compares end-to-end response times for two GPS injection paths:
 
   Ditto direct: HTTP PUT to Ditto REST API -> Ditto WebSocket event
                -> position_processor -> cars/updates
-
-The script subscribes to cars/updates on the internal Mosquitto broker and
-correlates each incoming CarUpdate with the send that triggered it using the
-injected (latitude, longitude) pair.
-
-Usage:
-    python tests/performance/hono_vs_ditto.py --car perf-car
-    python tests/performance/hono_vs_ditto.py --car perf-car --iterations 50 --warmup 3
-
-Requires:
-    - Docker Compose stack running (Hono, Ditto, Mosquitto, position_processor)
-    - A device provisioned with simulations/create_car.py (produces devices/<car>.json)
-    - Environment variables from .env (DITTO_API_URL, DITTO_USER, DITTO_PASS,
-      MQTT_ADAPTER_IP, MQTT_ADAPTER_PORT_MQTTS)
 """
 
 import argparse
@@ -47,7 +33,7 @@ HONO_PORT  = int(os.getenv("MQTT_ADAPTER_PORT_MQTTS", "8883"))
 
 REGISTRY_DIR = Path(__file__).resolve().parents[2] / "simulations" / "devices"
 
-# Base coordinates for Aveiro; each update steps by this delta so lat/lon is unique.
+# Base coordinates for Aveiro
 _BASE_LAT = 40.6405
 _BASE_LON = -8.6538
 _DELTA    = 0.00001
@@ -61,7 +47,6 @@ def _load_meta(car: str) -> dict:
 
 
 # Subscriber
-
 class UpdateListener:
     def __init__(self, host: str, port: int):
         self._lock      = threading.Lock()
@@ -116,7 +101,6 @@ class UpdateListener:
 
 
 # Ditto direct injection
-
 def _ditto_put(thing_id: str, lat: float, lon: float, session: requests.Session) -> None:
     body = {
         "gps":  {"properties": {"latitude": lat, "longitude": lon}},
@@ -156,7 +140,6 @@ def run_ditto_direct(meta: dict, listener: UpdateListener, n: int, interval: flo
 
 
 # Hono MQTT injection
-
 def _make_hono_client(meta: dict) -> mqtt.Client:
     cert_hint = meta.get("ca_cert")
     ca_certs = cert_hint if cert_hint and Path(cert_hint).exists() else certifi.where()
@@ -219,7 +202,6 @@ def run_hono_mqtt(meta: dict, listener: UpdateListener, n: int, interval: float)
 
 
 # Reporting
-
 def _stats(lats: list[float]) -> dict:
     if not lats:
         return {}
@@ -276,7 +258,6 @@ def _diagnose(ditto: dict, hono: dict) -> None:
 
 
 # CLI
-
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Compare Hono vs Ditto direct injection latency")
     p.add_argument("--car",        required=True, help="Car name used with create_car.py")
@@ -302,8 +283,7 @@ def main() -> None:
     listener = UpdateListener(args.mqtt_host, args.mqtt_port)
 
     try:
-        # Warmup: position_processor needs at least 2 positions before it can
-        # compute speed/heading and publish a CarUpdate. Use Ditto direct for warmup.
+        # Warmup: position_processor needs at least 2 positions before it can compute speed/heading and publish a CarUpdate
         print(f"  [1/4] warming up ({args.warmup} updates via Ditto direct) ...")
         session = requests.Session()
         session.auth = DITTO_AUTH
