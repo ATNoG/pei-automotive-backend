@@ -16,9 +16,9 @@ LANE_MERGE_ALERTS = []
 def on_message(client, userdata, msg):
     topic = msg.topic
     payload = json.loads(msg.payload.decode())
-    if topic == "alerts/overtaking/+":
+    if topic.startswith("alerts/overtaking/"):
         OVERTAKING_ALERTS.append(payload)
-    elif topic == "alerts/lane_merge/+":
+    elif topic.startswith("alerts/lane_merge/"):
         LANE_MERGE_ALERTS.append(payload)
 
 
