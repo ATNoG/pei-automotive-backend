@@ -39,7 +39,7 @@ k6 run tests/performance/k6/stress.js `
 
 # Spike: 20 -> 1000 -> 20 VUs in 45 s, then 2 min recovery, 4.5 min total
 k6 run tests/performance/k6/spike.js `
-  -e BASE_URL=http://localhost:8082 ` 
+  -e BASE_URL=http://localhost:8082 `
   -e KC_URL=http://localhost:8081  `
   -e KC_USER=driver `
   -e KC_PASS=driver123
@@ -65,7 +65,7 @@ The Keycloak client must have Direct Access Grants enabled (ROPC flow).
   ✓ status 200
   ✓ body ok
   ✗ under 20 ms
-    ↳  99% — ✓ 56265 / ✗ 86
+    ↳  99% - ✓ 56265 / ✗ 86
 
 HTTP
 http_req_duration..............: avg=2.81ms  min=508.6µs med=2.13ms  max=422.56ms p(90)=3.79ms  p(95)=4.8ms  
@@ -104,9 +104,9 @@ data_sent......................: 4.3 MB 71 kB/s
   ✓ status 200
   ✓ has user_id
   ✗ under 200 ms
-    ↳  99% — ✓ 27272 / ✗ 15
+    ↳  99% - ✓ 27272 / ✗ 15
   ✗ under 300 ms
-    ↳  99% — ✓ 27286 / ✗ 1
+    ↳  99% - ✓ 27286 / ✗ 1
 
 HTTP
 http_req_duration....................: avg=23.14ms min=1.55ms med=17.12ms max=340.02ms p(90)=47.59ms p(95)=62.64ms
@@ -139,7 +139,7 @@ checks_failed......: 1.09%  2300 out of 210375
 ✓ token 200
 ✓ not 5xx
 ✗ not timeout
-  ↳  97% — ✓ 102887 / ✗ 2300
+  ↳  97% - ✓ 102887 / ✗ 2300
 
 HTTP
 http_req_duration..............: avg=1.24s   min=2.13ms   med=64.49ms  max=1m0s   p(90)=791.13ms p(95)=1.37s
@@ -156,7 +156,7 @@ data_received..................: 76 MB  253 kB/s
 data_sent......................: 121 MB 400 kB/s
 ```
 
-### Locust tests (HTTP / database-api — interactive web UI)
+### Locust tests (HTTP / database-api - interactive web UI)
 
 Locust is a Python-based alternative to k6 with a live browser dashboard.
 Start it, open `http://localhost:8089`, set the user count and spawn rate,
@@ -166,7 +166,7 @@ and watch response time and RPS charts update in real time.
 # Install (once)
 pip install locust
 
-# Start the web UI — then open http://localhost:8089
+# Start the web UI - then open http://localhost:8089
 KC_USER=driver KC_PASS=driver123 \
 locust -f tests/performance/locustfile.py --host http://localhost:8082
 ```
@@ -246,7 +246,7 @@ PostgreSQL 16 defaults to `max_connections=100`. Keep `DB_POOL_MAX x uvicorn_wor
 | `GET /api/preferences/` | 150 VUs (load) | < 30 ms | < 100 ms | < 200 ms |
 | `PATCH /api/preferences/` | 150 VUs (load) | < 40 ms | < 150 ms | < 300 ms |
 | `GET /api/preferences/` | 500 VUs (stress) | < 500 ms | < 2 s | < 5 s |
-| `GET /api/preferences/` | 1000 VUs (stress peak) | degraded | — pool saturated above ~20 concurrent DB conns |
+| `GET /api/preferences/` | 1000 VUs (stress peak) | degraded | - pool saturated above ~20 concurrent DB conns |
 
 ---
 
