@@ -4,13 +4,19 @@
 # by predicting potential collisions based on current speeds and positions.
 # Handles highway on-ramps, zip merges, and any lane convergence point.
 #
+# Supports multiple merge zones, each defined by a (main_lane, merging_lane)
+# route pair. Zones come from /app/roads/merge_zones.json; if that file is
+# absent the detector falls back to the legacy single pair ("highway",
+# "entering") so older deployments keep working.
+#
 from __future__ import annotations
 import json
 import logging
 import sys
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, Optional, Tuple, List
+from typing import Dict, Optional, Tuple, List, Set
 
 # add parent dir
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -23,6 +29,17 @@ from common.utils import haversine_distance_m, bearing_deg
 
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class MergeZone:
+    name: str
+    main_lane_coords: List[Tuple[float, float]]
+    merging_coords: List[Tuple[float, float]]
+    merge_point: Optional[Tuple[float, float]] = None
+    main_lane_cars: Set[str] = field(default_factory=set)
+    merging_cars: Set[str] = field(default_factory=set)
+    alerted_pairs: Set[Tuple[str, str]] = field(default_factory=set)
 
 
 class LaneMergeDetector:
@@ -45,34 +62,65 @@ class LaneMergeDetector:
         self.cars: Dict[str, CarUpdate] = {}
         self.alert_topic = "alerts/lane_merge"
 
-        # Track which cars are on the main lane vs merging
-        self.main_lane_cars = set()
-        self.merging_cars = set()
+        self.zones: List[MergeZone] = self._load_zones()
+        if not self.zones:
+            logger.error("No merge zones loaded - detector will not produce alerts")
+        else:
+            for z in self.zones:
+                logger.info(f"Merge zone '{z.name}' merge_point={z.merge_point}")
 
-        # Load main lane and merging road coordinates
-        self.main_lane_coords = self._load_route("highway")
-        self.merging_coords = self._load_route("entering")
+    def _find_roads_file(self, filename: str) -> Optional[Path]:
+        docker_path = Path("/app/roads") / filename
+        local_path = (
+            Path(__file__).resolve().parent.parent.parent.parent
+            / "simulations" / "roads" / filename
+        )
+        if docker_path.exists():
+            return docker_path
+        if local_path.exists():
+            return local_path
+        return None
 
-        # Find the merge point (where merging lane meets main lane)
-        self.merge_point = self._find_merge_point()
-        logger.info(f"Merge point identified at: {self.merge_point}")
+    def _load_zones(self) -> List[MergeZone]:
+        cfg_path = self._find_roads_file("merge_zones.json")
+        if cfg_path:
+            try:
+                with open(cfg_path) as f:
+                    cfg = json.load(f)
+                pair_specs = [
+                    (z["name"], z["main_route"], z["merging_route"])
+                    for z in cfg["zones"]
+                ]
+            except Exception as e:
+                logger.error(f"Failed to parse {cfg_path}: {e}; falling back to default zone")
+                pair_specs = [("default", "highway", "entering")]
+        else:
+            pair_specs = [("default", "highway", "entering")]
 
-        # Track already alerted pairs to avoid duplicate alerts
-        self.alerted_pairs = set()
+        zones: List[MergeZone] = []
+        for name, main_name, merging_name in pair_specs:
+            main_coords = self._load_route(main_name)
+            merging_coords = self._load_route(merging_name)
+            if not main_coords or not merging_coords:
+                logger.warning(
+                    f"Skipping zone '{name}': missing routes "
+                    f"(main={main_name}, merging={merging_name})"
+                )
+                continue
+            zones.append(MergeZone(
+                name=name,
+                main_lane_coords=main_coords,
+                merging_coords=merging_coords,
+                merge_point=merging_coords[-1],
+            ))
+        return zones
 
     def _load_route(self, route_name: str) -> List[Tuple[float, float]]:
         """Load route coordinates from JSON file."""
-        docker_path = Path("/app/roads") / f"{route_name}.json"
-        local_path = Path(__file__).resolve().parent.parent.parent.parent / "simulations" / "roads" / f"{route_name}.json"
-
-        if docker_path.exists():
-            route_file = docker_path
-        elif local_path.exists():
-            route_file = local_path
-        else:
-            logger.error(f"Route file not found. Tried: {docker_path} and {local_path}")
+        route_file = self._find_roads_file(f"{route_name}.json")
+        if not route_file:
+            logger.error(f"Route file not found for '{route_name}'")
             return []
-
         try:
             with open(route_file) as f:
                 data = json.load(f)
@@ -82,32 +130,19 @@ class LaneMergeDetector:
             logger.error(f"Failed to load route {route_name}: {e}")
             return []
 
-    def _find_merge_point(self) -> Optional[Tuple[float, float]]:
-        """Find the point where merging road meets main lane (end of merging road)."""
-        if not self.merging_coords:
-            return None
-        return self.merging_coords[-1]
-
-    def _is_near_route(self, lat: float, lon: float, route: List[Tuple[float, float]],
-                       threshold_m: float = 30) -> bool:
-        """Check if a position is near any point in the route."""
-        for route_lat, route_lon in route:
-            dist = haversine_distance_m(lat, lon, route_lat, route_lon)
-            if dist < threshold_m:
-                return True
-        return False
-
-    def _classify_car(self, update: CarUpdate) -> Optional[str]:
-        """Classify if car is on main lane or merging road."""
+    def _classify_car(self, update: CarUpdate, zone: MergeZone) -> Optional[str]:
+        """Classify if car is on main lane or merging road within this zone."""
         merging_min_dist = float('inf')
         main_lane_min_dist = float('inf')
 
-        merging_check_coords = self.merging_coords[:-3] if len(self.merging_coords) > 3 else self.merging_coords
+        merging_check_coords = (
+            zone.merging_coords[:-3] if len(zone.merging_coords) > 3 else zone.merging_coords
+        )
         for route_lat, route_lon in merging_check_coords:
             dist = haversine_distance_m(update.latitude, update.longitude, route_lat, route_lon)
             merging_min_dist = min(merging_min_dist, dist)
 
-        for route_lat, route_lon in self.main_lane_coords:
+        for route_lat, route_lon in zone.main_lane_coords:
             dist = haversine_distance_m(update.latitude, update.longitude, route_lat, route_lon)
             main_lane_min_dist = min(main_lane_min_dist, dist)
 
@@ -120,14 +155,13 @@ class LaneMergeDetector:
 
         return None
 
-    def _distance_to_merge_point(self, lat: float, lon: float) -> float:
-        """Calculate distance to merge point."""
-        if not self.merge_point:
+    def _distance_to_merge_point(self, lat: float, lon: float, zone: MergeZone) -> float:
+        if not zone.merge_point:
             return float('inf')
-        return haversine_distance_m(lat, lon, self.merge_point[0], self.merge_point[1])
+        return haversine_distance_m(lat, lon, zone.merge_point[0], zone.merge_point[1])
 
-    def _find_closest_point_on_route(self, lat: float, lon: float, route: List[Tuple[float, float]]) -> int:
-        """Find the index of the closest point on a route to the given position."""
+    def _find_closest_point_on_route(self, lat: float, lon: float,
+                                     route: List[Tuple[float, float]]) -> int:
         if not route:
             return 0
 
@@ -171,7 +205,8 @@ class LaneMergeDetector:
 
         return route[-1]
 
-    def _predict_collision(self, merging_car: CarUpdate, main_lane_car: CarUpdate) -> Tuple[bool, float, float]:
+    def _predict_collision(self, merging_car: CarUpdate, main_lane_car: CarUpdate,
+                           zone: MergeZone) -> Tuple[bool, float, float]:
         """
         Predict if a collision would occur by simulating both cars along their actual routes.
         The merging car follows the merging route until merge, then follows the main lane route.
@@ -192,15 +227,15 @@ class LaneMergeDetector:
             return True, 0.0, current_distance
 
         merging_idx = self._find_closest_point_on_route(
-            merging_car.latitude, merging_car.longitude, self.merging_coords
+            merging_car.latitude, merging_car.longitude, zone.merging_coords
         )
         main_lane_idx = self._find_closest_point_on_route(
-            main_lane_car.latitude, main_lane_car.longitude, self.main_lane_coords
+            main_lane_car.latitude, main_lane_car.longitude, zone.main_lane_coords
         )
 
         merge_idx_on_main = self._find_closest_point_on_route(
-            self.merge_point[0], self.merge_point[1], self.main_lane_coords
-        ) if self.merge_point else len(self.main_lane_coords) - 1
+            zone.merge_point[0], zone.merge_point[1], zone.main_lane_coords
+        ) if zone.merge_point else len(zone.main_lane_coords) - 1
 
         min_distance = current_distance
         time_to_min_distance = 0.0
@@ -213,26 +248,26 @@ class LaneMergeDetector:
 
             distance_to_merge_along_route = 0
             temp_idx = merging_idx
-            while temp_idx < len(self.merging_coords) - 1:
+            while temp_idx < len(zone.merging_coords) - 1:
                 seg_dist = haversine_distance_m(
-                    self.merging_coords[temp_idx][0], self.merging_coords[temp_idx][1],
-                    self.merging_coords[temp_idx + 1][0], self.merging_coords[temp_idx + 1][1]
+                    zone.merging_coords[temp_idx][0], zone.merging_coords[temp_idx][1],
+                    zone.merging_coords[temp_idx + 1][0], zone.merging_coords[temp_idx + 1][1]
                 )
                 distance_to_merge_along_route += seg_dist
                 temp_idx += 1
 
             if merging_travel_dist < distance_to_merge_along_route:
                 pred_merging_pos = self._simulate_position_along_route(
-                    self.merging_coords, merging_idx, merging_travel_dist
+                    zone.merging_coords, merging_idx, merging_travel_dist
                 )
             else:
                 remaining_dist = merging_travel_dist - distance_to_merge_along_route
                 pred_merging_pos = self._simulate_position_along_route(
-                    self.main_lane_coords, merge_idx_on_main, remaining_dist
+                    zone.main_lane_coords, merge_idx_on_main, remaining_dist
                 )
 
             pred_main_lane_pos = self._simulate_position_along_route(
-                self.main_lane_coords, main_lane_idx, main_lane_travel_dist
+                zone.main_lane_coords, main_lane_idx, main_lane_travel_dist
             )
 
             if pred_merging_pos and pred_main_lane_pos:
@@ -266,18 +301,24 @@ class LaneMergeDetector:
 
         self.cars[update.car_id] = update
 
-        car_type = self._classify_car(update)
+        for zone in self.zones:
+            self._process_zone_update(update, zone)
+
+    def _process_zone_update(self, update: CarUpdate, zone: MergeZone) -> None:
+        car_type = self._classify_car(update, zone)
 
         if car_type == "merging":
-            self.merging_cars.add(update.car_id)
-            self.main_lane_cars.discard(update.car_id)
+            zone.merging_cars.add(update.car_id)
+            zone.main_lane_cars.discard(update.car_id)
         elif car_type == "main_lane":
-            self.main_lane_cars.add(update.car_id)
-            self.merging_cars.discard(update.car_id)
-            dist_to_merge = self._distance_to_merge_point(update.latitude, update.longitude)
+            zone.main_lane_cars.add(update.car_id)
+            zone.merging_cars.discard(update.car_id)
+            dist_to_merge = self._distance_to_merge_point(
+                update.latitude, update.longitude, zone
+            )
             if dist_to_merge > self.ENTRY_ZONE_M * 2:
-                self.alerted_pairs = {
-                    pair for pair in self.alerted_pairs
+                zone.alerted_pairs = {
+                    pair for pair in zone.alerted_pairs
                     if update.car_id not in pair
                 }
 
@@ -287,129 +328,145 @@ class LaneMergeDetector:
         if update.speed_kmh == 0:
             return
 
-        if car_type == "merging":
-            dist_to_merge = self._distance_to_merge_point(update.latitude, update.longitude)
+        if car_type != "merging":
+            return
 
-            if dist_to_merge < self.MERGE_POINT_DETECTION_M:
-                logger.info(f"[MERGE DETECTION] Car {update.car_id} is approaching merge point (distance: {dist_to_merge:.1f}m)")
+        dist_to_merge = self._distance_to_merge_point(
+            update.latitude, update.longitude, zone
+        )
+        if dist_to_merge >= self.MERGE_POINT_DETECTION_M:
+            return
 
-                found_main_lane_car_in_zone = False
+        logger.info(
+            f"[MERGE DETECTION][{zone.name}] Car {update.car_id} approaching merge "
+            f"point (distance: {dist_to_merge:.1f}m)"
+        )
 
-                for main_car_id in self.main_lane_cars:
-                    if main_car_id not in self.cars:
-                        continue
+        found_main_lane_car_in_zone = False
 
-                    main_car = self.cars[main_car_id]
+        for main_car_id in zone.main_lane_cars:
+            if main_car_id not in self.cars:
+                continue
 
-                    if main_car.speed_kmh is None or main_car.heading_deg is None:
-                        continue
+            main_car = self.cars[main_car_id]
 
-                    if main_car.speed_kmh == 0:
-                        continue
+            if main_car.speed_kmh is None or main_car.heading_deg is None:
+                continue
+            if main_car.speed_kmh == 0:
+                continue
 
-                    dist_main_to_merge = self._distance_to_merge_point(
-                        main_car.latitude, main_car.longitude
-                    )
+            dist_main_to_merge = self._distance_to_merge_point(
+                main_car.latitude, main_car.longitude, zone
+            )
 
-                    if dist_main_to_merge < self.ENTRY_ZONE_M:
-                        found_main_lane_car_in_zone = True
-                        logger.info(f"[MERGE DETECTION] Analyzing collision: merging {update.car_id} vs main {main_car_id}, dist={dist_main_to_merge:.1f}m")
-                        collision, ttc, min_dist = self._predict_collision(update, main_car)
+            if dist_main_to_merge >= self.ENTRY_ZONE_M:
+                continue
 
-                        pair_key = (update.car_id, main_car_id)
+            found_main_lane_car_in_zone = True
+            logger.info(
+                f"[MERGE DETECTION][{zone.name}] Analyzing collision: merging "
+                f"{update.car_id} vs main {main_car_id}, dist={dist_main_to_merge:.1f}m"
+            )
+            collision, ttc, min_dist = self._predict_collision(update, main_car, zone)
 
-                        if collision:
-                            if pair_key not in self.alerted_pairs:
-                                alert = {
-                                    "alert_type": "lane_merge_unsafe",
-                                    "merging_car_id": update.car_id,
-                                    "main_lane_car_id": main_car_id,
-                                    "merging_speed_kmh": update.speed_kmh,
-                                    "main_lane_speed_kmh": main_car.speed_kmh,
-                                    "predicted_min_distance_m": round(min_dist, 2),
-                                    "time_to_closest_approach_s": round(ttc, 2),
-                                    "status": "unsafe",
-                                    "timestamp": time.time(),
-                                    "latitude": update.latitude,
-                                    "longitude": update.longitude,
-                                    # Priority-based event aggregation
-                                    "priority": int(AlertPriority.HIGH),
-                                    "expiration_s": 2,  # Alert valid for 2 seconds
-                                }
+            pair_key = (update.car_id, main_car_id)
+            if pair_key in zone.alerted_pairs:
+                continue
 
-                                self.mqtt.publish(self.alert_topic, json.dumps(alert))
-                                logger.warning(
-                                    f"[LANE MERGE - UNSAFE] Car {update.car_id} "
-                                    f"cannot safely merge - collision risk with {main_car_id}. "
-                                    f"Predicted min distance: {min_dist:.1f}m"
-                                )
-                                self.alerted_pairs.add(pair_key)
-                        else:
-                            if pair_key not in self.alerted_pairs:
-                                alert = {
-                                    "alert_type": "lane_merge_safe",
-                                    "merging_car_id": update.car_id,
-                                    "main_lane_car_id": main_car_id,
-                                    "merging_speed_kmh": update.speed_kmh,
-                                    "main_lane_speed_kmh": main_car.speed_kmh,
-                                    "predicted_min_distance_m": round(min_dist, 2),
-                                    "status": "safe",
-                                    "timestamp": time.time(),
-                                    "latitude": update.latitude,
-                                    "longitude": update.longitude,
-                                    # Priority-based event aggregation
-                                    "priority": int(AlertPriority.MEDIUM),
-                                    "expiration_s": 2,  # Alert valid for 2 seconds
-                                }
+            if collision:
+                alert = {
+                    "alert_type": "lane_merge_unsafe",
+                    "merging_car_id": update.car_id,
+                    "main_lane_car_id": main_car_id,
+                    "merging_speed_kmh": update.speed_kmh,
+                    "main_lane_speed_kmh": main_car.speed_kmh,
+                    "predicted_min_distance_m": round(min_dist, 2),
+                    "time_to_closest_approach_s": round(ttc, 2),
+                    "status": "unsafe",
+                    "timestamp": time.time(),
+                    "latitude": update.latitude,
+                    "longitude": update.longitude,
+                    "priority": int(AlertPriority.HIGH),
+                    "expiration_s": 2,
+                    "zone": zone.name,
+                }
+                self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                logger.warning(
+                    f"[LANE MERGE - UNSAFE][{zone.name}] Car {update.car_id} "
+                    f"cannot safely merge - collision risk with {main_car_id}. "
+                    f"Predicted min distance: {min_dist:.1f}m"
+                )
+            else:
+                alert = {
+                    "alert_type": "lane_merge_safe",
+                    "merging_car_id": update.car_id,
+                    "main_lane_car_id": main_car_id,
+                    "merging_speed_kmh": update.speed_kmh,
+                    "main_lane_speed_kmh": main_car.speed_kmh,
+                    "predicted_min_distance_m": round(min_dist, 2),
+                    "status": "safe",
+                    "timestamp": time.time(),
+                    "latitude": update.latitude,
+                    "longitude": update.longitude,
+                    "priority": int(AlertPriority.MEDIUM),
+                    "expiration_s": 2,
+                    "zone": zone.name,
+                }
+                self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                logger.info(
+                    f"[LANE MERGE - SAFE][{zone.name}] Car {update.car_id} "
+                    f"can safely merge. Min distance to {main_car_id}: {min_dist:.1f}m"
+                )
 
-                                self.mqtt.publish(self.alert_topic, json.dumps(alert))
-                                logger.info(
-                                    f"[LANE MERGE - SAFE] Car {update.car_id} "
-                                    f"can safely merge. Min distance to {main_car_id}: {min_dist:.1f}m"
-                                )
-                                self.alerted_pairs.add(pair_key)
+            zone.alerted_pairs.add(pair_key)
 
-                if not found_main_lane_car_in_zone:
-                    if update.car_id not in [pair[0] for pair in self.alerted_pairs]:
-                        alert = {
-                            "alert_type": "lane_merge_safe",
-                            "merging_car_id": update.car_id,
-                            "main_lane_car_id": None,
-                            "merging_speed_kmh": update.speed_kmh,
-                            "main_lane_speed_kmh": None,
-                            "predicted_min_distance_m": None,
-                            "status": "safe",
-                            "timestamp": time.time(),
-                            "latitude": update.latitude,
-                            "longitude": update.longitude,
-                            # Priority-based event aggregation
-                            "priority": int(AlertPriority.MEDIUM),
-                            "expiration_s": 2,  # Alert valid for 2 seconds
-                        }
+        if not found_main_lane_car_in_zone:
+            already_alerted_no_traffic = any(
+                pair[0] == update.car_id for pair in zone.alerted_pairs
+            )
+            if already_alerted_no_traffic:
+                return
 
-                        self.mqtt.publish(self.alert_topic, json.dumps(alert))
-                        logger.info(
-                            f"[LANE MERGE - SAFE] Car {update.car_id} "
-                            f"can safely merge - no main lane traffic in entry zone"
-                        )
-                        self.alerted_pairs.add((update.car_id, "no-traffic"))
+            alert = {
+                "alert_type": "lane_merge_safe",
+                "merging_car_id": update.car_id,
+                "main_lane_car_id": None,
+                "merging_speed_kmh": update.speed_kmh,
+                "main_lane_speed_kmh": None,
+                "predicted_min_distance_m": None,
+                "status": "safe",
+                "timestamp": time.time(),
+                "latitude": update.latitude,
+                "longitude": update.longitude,
+                "priority": int(AlertPriority.MEDIUM),
+                "expiration_s": 2,
+                "zone": zone.name,
+            }
+            self.mqtt.publish(self.alert_topic, json.dumps(alert))
+            logger.info(
+                f"[LANE MERGE - SAFE][{zone.name}] Car {update.car_id} "
+                f"can safely merge - no main lane traffic in entry zone"
+            )
+            zone.alerted_pairs.add((update.car_id, "no-traffic"))
 
     def _cleanup_car(self, car_id: str):
-        """Remove all state for a specific car (used for test cleanup)."""
+        """Remove all state for a specific car across every zone."""
         if car_id in self.cars:
             del self.cars[car_id]
             logger.info(f"[CLEANUP] Removed car state: {car_id}")
 
-        self.main_lane_cars.discard(car_id)
-        self.merging_cars.discard(car_id)
-
-        pairs_to_remove = {
-            pair for pair in self.alerted_pairs
-            if car_id in pair
-        }
-        self.alerted_pairs -= pairs_to_remove
-        if pairs_to_remove:
-            logger.info(f"[CLEANUP] Removed {len(pairs_to_remove)} alert pairs for {car_id}")
+        for zone in self.zones:
+            zone.main_lane_cars.discard(car_id)
+            zone.merging_cars.discard(car_id)
+            pairs_to_remove = {
+                pair for pair in zone.alerted_pairs if car_id in pair
+            }
+            zone.alerted_pairs -= pairs_to_remove
+            if pairs_to_remove:
+                logger.info(
+                    f"[CLEANUP][{zone.name}] Removed {len(pairs_to_remove)} "
+                    f"alert pairs for {car_id}"
+                )
 
     def run(self):
         logger.info("Starting Lane Merge Detector...")
