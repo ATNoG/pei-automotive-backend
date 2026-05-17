@@ -20,3 +20,4 @@ testcontainers[postgres]
 docker
 pg8000
 locust
+matplotlib
