@@ -227,24 +227,42 @@ python3 tests/performance/mqtt_load.py `
 
 ### Hono vs Ditto injection comparison
 
-- Requires a provisioned car (create_car.py) and a running stack with Hono accessible
+Compares two GPS injection paths. All latency is measured by the pipeline monitor - there is no self-measured wall-clock timing in the script. Requires a provisioned car (`create_car.py`) and a running stack.
+
+Start the pipeline monitor first in a separate terminal:
+
+```bash
+# from pei-automotive-pipeline/
+python3 server.py --mqtt-host localhost --ditto-ws wss://automotive-app.ddns.net/ws/2
+```
+
+Then run the comparison (`--pipeline-url` is required):
+
 **Linux:**
 ```bash
 python3 tests/performance/hono_vs_ditto.py \
   --car perf-car \
   --iterations 50 \
-  --mqtt-host localhost --mqtt-port 1884
+  --pipeline-url http://localhost:8765
 ```
+
 **Windows:**
 ```bash
 python3 tests/performance/hono_vs_ditto.py `
   --car perf-car `
   --iterations 50 `
-  --mqtt-host localhost --mqtt-port 1884
+  --pipeline-url http://localhost:8765
 ```
 
-#### Results interpretation
+The script will exit immediately if the pipeline is unreachable or Ditto is not connected.
 
+#### What the output shows
+
+The single metric shown is **pipeline d2p** - time from when the Ditto WebSocket event fires to when position_processor publishes to `cars/updates`. This is measured by the pipeline monitor independently for each injection phase (it resets its stats between phases).
+
+The **Hono overhead** at the bottom is the difference in d2p avg between the two phases. Because d2p starts from the Ditto WebSocket event (after Hono has already propagated the update into Ditto), this overhead reflects how much slower Hono makes the downstream pipeline respond - not the TLS transmission or AMQP ingestion time, which happen before Ditto fires the event.
+
+A high d2p p95 (> 100 ms) on the first run is expected - it means position_processor had a cache miss on the Overpass API for speed limit resolution. Re-run on the same area to warm the cache.
 
 ---
 
