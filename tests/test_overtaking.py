@@ -28,7 +28,7 @@ def test_overtaking(get_car_id):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/overtaking")
+    client.subscribe("alerts/overtaking/+")
     client.loop_start()
 
     with open(ROADS_DIR / "right_lane.json") as f:
