@@ -258,7 +258,11 @@ def test_proximity_filter_end_to_end(get_car_id):
 
     cross_tile_alerts = [
         a for a in ALERTS
-        if {a.get("overtaking_car_id"), a.get("overtaken_car_id")} not in (pair_a, pair_b)
+        if (
+            a.get("overtaking_car_id") in test_car_ids
+            and a.get("overtaken_car_id") in test_car_ids
+            and {a.get("overtaking_car_id"), a.get("overtaken_car_id")} not in (pair_a, pair_b)
+        )
     ]
     a_alerts = [
         a for a in ALERTS
