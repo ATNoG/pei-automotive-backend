@@ -57,8 +57,12 @@ class LaneMergeDetector:
         self.merge_point = self._find_merge_point()
         logger.info(f"Merge point identified at: {self.merge_point}")
 
-        # Track already alerted pairs to avoid duplicate alerts
-        self.alerted_pairs = set()
+        # Track last alert status per pair to avoid duplicate alerts.
+        # Maps (merging_car_id, main_lane_car_id) -> "safe" | "unsafe".
+        # A "safe" verdict can be upgraded to "unsafe" if a later evaluation
+        # (e.g. with fresher main-lane position) detects a collision; an
+        # "unsafe" verdict is sticky and is not downgraded back to "safe".
+        self.alerted_pairs: Dict[Tuple[str, str], str] = {}
 
     def _load_route(self, route_name: str) -> List[Tuple[float, float]]:
         """Load route coordinates from JSON file."""
@@ -277,7 +281,7 @@ class LaneMergeDetector:
             dist_to_merge = self._distance_to_merge_point(update.latitude, update.longitude)
             if dist_to_merge > self.ENTRY_ZONE_M * 2:
                 self.alerted_pairs = {
-                    pair for pair in self.alerted_pairs
+                    pair: status for pair, status in self.alerted_pairs.items()
                     if update.car_id not in pair
                 }
 
@@ -287,114 +291,144 @@ class LaneMergeDetector:
         if update.speed_kmh == 0:
             return
 
+        # Re-evaluate pairs on EVERY relevant update — whether the merging car or
+        # the main-lane car just moved. The collision verdict depends on both
+        # positions, and updates can arrive out of order; gating evaluation on
+        # only one side would lock in a stale verdict.
         if car_type == "merging":
-            dist_to_merge = self._distance_to_merge_point(update.latitude, update.longitude)
+            self._evaluate_merging_car(update)
+        elif car_type == "main_lane":
+            self._evaluate_main_lane_car(update)
 
+    def _evaluate_merging_car(self, merging_update: CarUpdate) -> None:
+        dist_to_merge = self._distance_to_merge_point(
+            merging_update.latitude, merging_update.longitude
+        )
+        if dist_to_merge >= self.MERGE_POINT_DETECTION_M:
+            return
+
+        logger.info(
+            f"[MERGE DETECTION] Car {merging_update.car_id} is approaching merge point "
+            f"(distance: {dist_to_merge:.1f}m)"
+        )
+
+        found_main_lane_car_in_zone = False
+        for main_car_id in list(self.main_lane_cars):
+            main_car = self.cars.get(main_car_id)
+            if not self._is_evaluable(main_car):
+                continue
+            if self._distance_to_merge_point(main_car.latitude, main_car.longitude) < self.ENTRY_ZONE_M:
+                found_main_lane_car_in_zone = True
+                self._evaluate_pair(merging_update, main_car)
+
+        if not found_main_lane_car_in_zone:
+            self._maybe_publish_no_traffic(merging_update)
+
+    def _evaluate_main_lane_car(self, main_update: CarUpdate) -> None:
+        if self._distance_to_merge_point(main_update.latitude, main_update.longitude) >= self.ENTRY_ZONE_M:
+            return
+
+        for merging_car_id in list(self.merging_cars):
+            merging_car = self.cars.get(merging_car_id)
+            if not self._is_evaluable(merging_car):
+                continue
+            dist_to_merge = self._distance_to_merge_point(
+                merging_car.latitude, merging_car.longitude
+            )
             if dist_to_merge < self.MERGE_POINT_DETECTION_M:
-                logger.info(f"[MERGE DETECTION] Car {update.car_id} is approaching merge point (distance: {dist_to_merge:.1f}m)")
+                self._evaluate_pair(merging_car, main_update)
 
-                found_main_lane_car_in_zone = False
+    @staticmethod
+    def _is_evaluable(car: Optional[CarUpdate]) -> bool:
+        return (
+            car is not None
+            and car.speed_kmh is not None
+            and car.heading_deg is not None
+            and car.speed_kmh > 0
+        )
 
-                for main_car_id in self.main_lane_cars:
-                    if main_car_id not in self.cars:
-                        continue
+    def _evaluate_pair(self, merging_car: CarUpdate, main_car: CarUpdate) -> None:
+        logger.info(
+            f"[MERGE DETECTION] Analyzing collision: merging {merging_car.car_id} "
+            f"vs main {main_car.car_id}"
+        )
+        collision, ttc, min_dist = self._predict_collision(merging_car, main_car)
+        pair_key = (merging_car.car_id, main_car.car_id)
+        prev_status = self.alerted_pairs.get(pair_key)
 
-                    main_car = self.cars[main_car_id]
+        if collision:
+            if prev_status == "unsafe":
+                return
+            alert = {
+                "alert_type": "lane_merge_unsafe",
+                "merging_car_id": merging_car.car_id,
+                "main_lane_car_id": main_car.car_id,
+                "merging_speed_kmh": merging_car.speed_kmh,
+                "main_lane_speed_kmh": main_car.speed_kmh,
+                "predicted_min_distance_m": round(min_dist, 2),
+                "time_to_closest_approach_s": round(ttc, 2),
+                "status": "unsafe",
+                "timestamp": time.time(),
+                "latitude": merging_car.latitude,
+                "longitude": merging_car.longitude,
+                "priority": int(AlertPriority.HIGH),
+                "expiration_s": 2,
+            }
+            payload = json.dumps(alert)
+            self.mqtt.publish(f"{self.alert_topic}/{merging_car.car_id}", payload)
+            self.mqtt.publish(f"{self.alert_topic}/{main_car.car_id}", payload)
+            logger.warning(
+                f"[LANE MERGE - UNSAFE] Car {merging_car.car_id} cannot safely merge - "
+                f"collision risk with {main_car.car_id}. Predicted min distance: {min_dist:.1f}m"
+            )
+            self.alerted_pairs[pair_key] = "unsafe"
+        else:
+            if prev_status is not None:
+                return
+            alert = {
+                "alert_type": "lane_merge_safe",
+                "merging_car_id": merging_car.car_id,
+                "main_lane_car_id": main_car.car_id,
+                "merging_speed_kmh": merging_car.speed_kmh,
+                "main_lane_speed_kmh": main_car.speed_kmh,
+                "predicted_min_distance_m": round(min_dist, 2),
+                "status": "safe",
+                "timestamp": time.time(),
+                "latitude": merging_car.latitude,
+                "longitude": merging_car.longitude,
+                "priority": int(AlertPriority.MEDIUM),
+                "expiration_s": 2,
+            }
+            self.mqtt.publish(f"{self.alert_topic}/{merging_car.car_id}", json.dumps(alert))
+            logger.info(
+                f"[LANE MERGE - SAFE] Car {merging_car.car_id} can safely merge. "
+                f"Min distance to {main_car.car_id}: {min_dist:.1f}m"
+            )
+            self.alerted_pairs[pair_key] = "safe"
 
-                    if main_car.speed_kmh is None or main_car.heading_deg is None:
-                        continue
-
-                    if main_car.speed_kmh == 0:
-                        continue
-
-                    dist_main_to_merge = self._distance_to_merge_point(
-                        main_car.latitude, main_car.longitude
-                    )
-
-                    if dist_main_to_merge < self.ENTRY_ZONE_M:
-                        found_main_lane_car_in_zone = True
-                        logger.info(f"[MERGE DETECTION] Analyzing collision: merging {update.car_id} vs main {main_car_id}, dist={dist_main_to_merge:.1f}m")
-                        collision, ttc, min_dist = self._predict_collision(update, main_car)
-
-                        pair_key = (update.car_id, main_car_id)
-
-                        if collision:
-                            if pair_key not in self.alerted_pairs:
-                                alert = {
-                                    "alert_type": "lane_merge_unsafe",
-                                    "merging_car_id": update.car_id,
-                                    "main_lane_car_id": main_car_id,
-                                    "merging_speed_kmh": update.speed_kmh,
-                                    "main_lane_speed_kmh": main_car.speed_kmh,
-                                    "predicted_min_distance_m": round(min_dist, 2),
-                                    "time_to_closest_approach_s": round(ttc, 2),
-                                    "status": "unsafe",
-                                    "timestamp": time.time(),
-                                    "latitude": update.latitude,
-                                    "longitude": update.longitude,
-                                    # Priority-based event aggregation
-                                    "priority": int(AlertPriority.HIGH),
-                                    "expiration_s": 2,  # Alert valid for 2 seconds
-                                }
-
-                                payload = json.dumps(alert)
-                                self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", payload)
-                                self.mqtt.publish(f"{self.alert_topic}/{main_car_id}", payload)
-                                logger.warning(
-                                    f"[LANE MERGE - UNSAFE] Car {update.car_id} "
-                                    f"cannot safely merge - collision risk with {main_car_id}. "
-                                    f"Predicted min distance: {min_dist:.1f}m"
-                                )
-                                self.alerted_pairs.add(pair_key)
-                        else:
-                            if pair_key not in self.alerted_pairs:
-                                alert = {
-                                    "alert_type": "lane_merge_safe",
-                                    "merging_car_id": update.car_id,
-                                    "main_lane_car_id": main_car_id,
-                                    "merging_speed_kmh": update.speed_kmh,
-                                    "main_lane_speed_kmh": main_car.speed_kmh,
-                                    "predicted_min_distance_m": round(min_dist, 2),
-                                    "status": "safe",
-                                    "timestamp": time.time(),
-                                    "latitude": update.latitude,
-                                    "longitude": update.longitude,
-                                    # Priority-based event aggregation
-                                    "priority": int(AlertPriority.MEDIUM),
-                                    "expiration_s": 2,  # Alert valid for 2 seconds
-                                }
-
-                                self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", json.dumps(alert))
-                                logger.info(
-                                    f"[LANE MERGE - SAFE] Car {update.car_id} "
-                                    f"can safely merge. Min distance to {main_car_id}: {min_dist:.1f}m"
-                                )
-                                self.alerted_pairs.add(pair_key)
-
-                if not found_main_lane_car_in_zone:
-                    if update.car_id not in [pair[0] for pair in self.alerted_pairs]:
-                        alert = {
-                            "alert_type": "lane_merge_safe",
-                            "merging_car_id": update.car_id,
-                            "main_lane_car_id": None,
-                            "merging_speed_kmh": update.speed_kmh,
-                            "main_lane_speed_kmh": None,
-                            "predicted_min_distance_m": None,
-                            "status": "safe",
-                            "timestamp": time.time(),
-                            "latitude": update.latitude,
-                            "longitude": update.longitude,
-                            # Priority-based event aggregation
-                            "priority": int(AlertPriority.MEDIUM),
-                            "expiration_s": 2,  # Alert valid for 2 seconds
-                        }
-
-                        self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", json.dumps(alert))
-                        logger.info(
-                            f"[LANE MERGE - SAFE] Car {update.car_id} "
-                            f"can safely merge - no main lane traffic in entry zone"
-                        )
-                        self.alerted_pairs.add((update.car_id, "no-traffic"))
+    def _maybe_publish_no_traffic(self, merging_update: CarUpdate) -> None:
+        if merging_update.car_id in [pair[0] for pair in self.alerted_pairs]:
+            return
+        alert = {
+            "alert_type": "lane_merge_safe",
+            "merging_car_id": merging_update.car_id,
+            "main_lane_car_id": None,
+            "merging_speed_kmh": merging_update.speed_kmh,
+            "main_lane_speed_kmh": None,
+            "predicted_min_distance_m": None,
+            "status": "safe",
+            "timestamp": time.time(),
+            "latitude": merging_update.latitude,
+            "longitude": merging_update.longitude,
+            "priority": int(AlertPriority.MEDIUM),
+            "expiration_s": 2,
+        }
+        self.mqtt.publish(f"{self.alert_topic}/{merging_update.car_id}", json.dumps(alert))
+        logger.info(
+            f"[LANE MERGE - SAFE] Car {merging_update.car_id} "
+            f"can safely merge - no main lane traffic in entry zone"
+        )
+        self.alerted_pairs[(merging_update.car_id, "no-traffic")] = "safe"
 
     def _cleanup_car(self, car_id: str):
         """Remove all state for a specific car (used for test cleanup)."""
@@ -405,11 +439,12 @@ class LaneMergeDetector:
         self.main_lane_cars.discard(car_id)
         self.merging_cars.discard(car_id)
 
-        pairs_to_remove = {
+        pairs_to_remove = [
             pair for pair in self.alerted_pairs
             if car_id in pair
-        }
-        self.alerted_pairs -= pairs_to_remove
+        ]
+        for pair in pairs_to_remove:
+            del self.alerted_pairs[pair]
         if pairs_to_remove:
             logger.info(f"[CLEANUP] Removed {len(pairs_to_remove)} alert pairs for {car_id}")
 
