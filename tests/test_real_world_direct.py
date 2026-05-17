@@ -100,7 +100,10 @@ def test_real_world_overtaking_direct(get_car_id):
         _send_pair(e_lat, e_lon, l_lat, l_lon)
         time.sleep(0.1)
 
-    time.sleep(2)
+    # Ditto WS throttling delays event delivery; poll until both alerts arrive.
+    deadline = time.time() + 15
+    while time.time() < deadline and (not OVERTAKING_ALERTS or not LANE_MERGE_ALERTS):
+        time.sleep(0.1)
     client.loop_stop()
 
     assert len(OVERTAKING_ALERTS) > 0, f"expected at least one overtaking alert, got {len(OVERTAKING_ALERTS)}"
