@@ -67,7 +67,7 @@ def test_merge_unsafe(get_car_id):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/lane_merge")
+    client.subscribe("alerts/lane_merge/{car_id}".format(car_id=entering_car))
     client.loop_start()
     time.sleep(0.5)
 
@@ -101,7 +101,7 @@ def test_merge_safe(get_car_id):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/lane_merge")
+    client.subscribe("alerts/lane_merge/{car_id}".format(car_id=entering_car))
     client.loop_start()
     time.sleep(0.5)
 
