@@ -18,7 +18,7 @@ urllib3.disable_warnings()
 load_dotenv()
 MQTT_HOST = os.getenv("MQTT_ADAPTER_IP")
 MQTT_PORT = int(os.getenv("MQTT_ADAPTER_PORT_MQTTS"))
-DITTO_API = os.getenv("DITTO_API_URL")
+DITTO_API = os.getenv("DITTO_API_URL", "").rstrip("/")
 DITTO_AUTH = (os.getenv("DITTO_USER"), os.getenv("DITTO_PASS"))
 REGISTRY_DIR = (Path(__file__).resolve().parent / "devices").resolve()
 
