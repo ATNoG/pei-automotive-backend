@@ -1,468 +1,572 @@
 #!/usr/bin/env python3
 """
-Timing Measurement Script for PEI Automotive Backend
+Pipeline load test - N simulated cars injecting GPS via Ditto REST concurrently.
 
-Measures latency at each stage of the data pipeline:
-1. Client → Hono MQTT (send to Hono ACK)
-2. Hono → Ditto (Hono to Ditto twin update confirmed)
-3. Ditto → Position Processor (Ditto WS event received by processor)
-4. Position Processor → MQTT Broker (car/updates published)
+No Hono device registration required.  Car IDs are generated automatically
+(org.acme:load-car-000 …).  Ditto things are created in a setup step before
+the test begins.
+
+Measures four per-injection latencies:
+  client_ditto_ms  - HTTP PUT to Ditto (client → Ditto round-trip)
+  ditto_proc_ms    - PUT returns → processor publishes  (Ditto WS propagation)
+  proc_client_ms   - processor timestamp → subscriber receives  (Overpass + MQTT)
+  e2e_ms           - full pipeline (client → subscriber)
+
+Generates three plots in tests/performance/plots/:
+  latency_stages.png      - bar chart: avg ± std per stage
+  latency_boxplot.png     - box plots per stage
+  latency_timeseries.png  - e2e scatter over time
 
 Usage:
-    python3 measure_latency.py <car_name>
+    python3 tests/performance/measure_latency.py --cars 20 --duration 60
+    python3 tests/performance/measure_latency.py --cars 100 --duration 120 --rate 0.5
 """
 
 import argparse
 import json
 import os
+import queue
 import sys
-import time
 import threading
+import time
+import warnings
 from pathlib import Path
-from typing import Dict, List
-import statistics
+from typing import Optional
 
-# Add src directory to path to use common modules
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 import paho.mqtt.client as mqtt
 import requests
-import ssl
-import urllib3
-import certifi
 from dotenv import load_dotenv
 
-# Use existing common modules
-from common.config import load_config
-from common.ditto_client import DittoWSClient
-from common.mqtt_client import MQTTClient
-from common.logging_config import setup_logging
-
-urllib3.disable_warnings()
 load_dotenv()
 
-# Hono configuration (for sending positions)
-MQTT_HOST = os.getenv("MQTT_ADAPTER_IP")
-MQTT_PORT = int(os.getenv("MQTT_ADAPTER_PORT_MQTTS", "8883"))
-DITTO_API = os.getenv("DITTO_API_URL")
-DITTO_AUTH = (os.getenv("DITTO_USER"), os.getenv("DITTO_PASS"))
+DITTO_API  = os.getenv("DITTO_API_URL", "").rstrip("/")
+DITTO_AUTH = (os.getenv("DITTO_USER", "ditto"), os.getenv("DITTO_PASS", "ditto"))
+MQTT_HOST  = "localhost"
+MQTT_PORT  = 1884
 
-REGISTRY_DIR = (Path(__file__).resolve().parent.parent / "simulations" / "devices").resolve()
+PLOTS_DIR = Path(__file__).parent / "plots"
 
+_BASE_LAT = 40.6405
+_BASE_LON = -8.6538
+_DELTA    = 0.00001
 
-def get_cert_path(cert_hint: str) -> str:
-    """Get valid certificate path for Hono connection."""
-    if cert_hint and Path(cert_hint).exists():
-        return cert_hint
-    return certifi.where()
-
-
-def load_metadata(name: str) -> dict:
-    """Load device metadata from simulations registry."""
-    meta_file = REGISTRY_DIR / f"{name}.json"
-    if not meta_file.exists():
-        sys.exit(f"Metadata file missing: {meta_file}")
-    return json.loads(meta_file.read_text())
+_NAMESPACE = "org.acme"
+_PREFIX    = "load-car"
 
 
-class TimingMeasurer:
-    """Measures timing through the entire pipeline."""
+def _car_id(n: int) -> str:
+    return f"{_PREFIX}-{n:03d}"
 
-    def __init__(self, car_name: str):
-        self.car_name = car_name
-        self.metadata = load_metadata(car_name)
-        self.config = load_config()
 
-        # Override broker host for external access
-        if self.config.broker_host == "mosquitto_broker":
-            self.config.broker_host = "localhost"
-            self.config.broker_port = 1884  # Exposed port
+def _thing_id(n: int) -> str:
+    return f"{_NAMESPACE}:{_car_id(n)}"
 
-        self.measurements: List[Dict] = []
-        self.lock = threading.Lock()
 
-        # Components
-        self.mqtt_listener = None
-        self.ditto_listener = None
+# ── Ditto setup ────────────────────────────────────────────────────────────────
 
-    def start_listeners(self):
-        """Start Ditto WS and MQTT listeners using common modules."""
-        print("Starting listeners...")
+def _create_things(n: int, session: requests.Session) -> None:
+    """Create N Ditto things in parallel (idempotent - safe to re-run)."""
+    errors: list[str] = []
+    lock = threading.Lock()
 
-        # 1. Start Ditto WebSocket listener
-        def on_ditto_gps(car_id: str, lat: float, lon: float):
-            """Called when Ditto WS receives GPS update."""
-            if car_id != self.car_name:
-                return
-
-            t_ditto_ws = time.time()
-            with self.lock:
-                for m in self.measurements:
-                    if (abs(m.get("lat", 0) - lat) < 0.0001 and
-                        abs(m.get("lon", 0) - lon) < 0.0001 and
-                        "t_ditto_ws" not in m):
-                        m["t_ditto_ws"] = t_ditto_ws
-                        print(f"  ✓ Ditto WS event received for position {m['idx']}")
-                        break
-
-        self.ditto_listener = DittoWSClient(
-            ws_url=self.config.ditto_ws_url,
-            username=self.config.ditto_username,
-            password=self.config.ditto_password,
-            on_gps_update=on_ditto_gps
+    def _create(i: int) -> None:
+        tid = _thing_id(i)
+        r = session.put(
+            f"{DITTO_API}/api/2/things/{tid}",
+            json={"attributes": {"created_by": "measure_latency"}},
+            timeout=15,
         )
+        if r.status_code not in (200, 201, 204):
+            with lock:
+                errors.append(f"{tid}: {r.status_code}")
 
-        # Run Ditto WS in background thread
-        ditto_thread = threading.Thread(target=self.ditto_listener.run_forever, daemon=True)
-        ditto_thread.start()
-        time.sleep(1)  # Let it connect
+    threads = [threading.Thread(target=_create, args=(i,), daemon=True) for i in range(n)]
+    for t in threads:
+        t.start()
+    for t in threads:
+        t.join(timeout=20)
 
-        # 2. Start local MQTT listener for car updates
-        def on_car_update(payload_str: str):
-            """Called when position processor publishes car update."""
-            try:
-                payload = json.loads(payload_str)
-                car_id = payload.get("car_id")
+    if errors:
+        sys.exit(f"Failed to create Ditto things:\n" + "\n".join(errors))
 
-                if car_id != self.car_name:
-                    return
 
-                t_mqtt_out = time.time()
-                lat = payload.get("latitude")
-                lon = payload.get("longitude")
+# ── E2E subscriber ─────────────────────────────────────────────────────────────
 
-                with self.lock:
-                    for m in self.measurements:
-                        if (abs(m.get("lat", 0) - lat) < 0.0001 and
-                            abs(m.get("lon", 0) - lon) < 0.0001 and
-                            "t_mqtt_out" not in m):
-                            m["t_mqtt_out"] = t_mqtt_out
-                            m["speed_kmh"] = payload.get("speed_kmh")
-                            m["heading_deg"] = payload.get("heading_deg")
-                            print(f"  ✓ Processor output received for position {m['idx']}")
-                            break
-            except Exception as e:
-                print(f"Error processing MQTT message: {e}")
+class _E2ESubscriber:
+    """
+    Subscribes to cars/updates.  Queues (t_received, proc_ts) per car_id.
+    next_after(car_id, t0) returns the first arrival where t_received > t0.
+    """
 
-        self.mqtt_listener = MQTTClient(
-            host=self.config.broker_host,
-            port=self.config.broker_port,
-            username=self.config.broker_user,
-            password=self.config.broker_password,
-            client_id="timing-measurer"
-        )
-
-        self.mqtt_listener.connect()
-        self.mqtt_listener.subscribe(self.config.car_updates_topic, on_car_update)
-        self.mqtt_listener.start_loop()
-        time.sleep(0.5)  # Let it connect
-
-        print("✓ Listeners started\n")
-
-    def send_position_with_measurement(self, measurement: Dict, lat: float, lon: float):
-        """Send position to Hono and update measurement with timing."""
-        measurement["t_send"] = time.time()
-
-        cert_file = get_cert_path(self.metadata.get("ca_cert"))
+    def __init__(self, host: str, port: int, car_ids: set[str]) -> None:
+        self._qs: dict[str, queue.Queue] = {cid: queue.Queue() for cid in car_ids}
         client = mqtt.Client(protocol=mqtt.MQTTv311)
-        client.username_pw_set(
-            f"{self.metadata['auth_id']}@{self.metadata['hono_tenant']}",
-            self.metadata["password"]
+        client.on_connect = (
+            lambda c, _u, _f, rc: c.subscribe("cars/updates", qos=0) if rc == 0 else None
         )
-        client.tls_set(
-            ca_certs=cert_file,
-            certfile=None,
-            keyfile=None,
-            cert_reqs=ssl.CERT_NONE,
-            tls_version=ssl.PROTOCOL_TLSv1_2,
-        )
-        client.tls_insecure_set(True)
-
-        # Track connection and publish
-        connected = False
-        published = False
-
-        def on_connect(cl, userdata, flags, rc):
-            nonlocal connected
-            connected = (rc == 0)
-
-        def on_publish(cl, userdata, mid):
-            nonlocal published
-            published = True
-            measurement["t_hono_ack"] = time.time()
-
-        client.on_connect = on_connect
-        client.on_publish = on_publish
-
-        # Connect
-        client.connect(MQTT_HOST, MQTT_PORT, 60)
+        client.on_message = self._on_message
+        client.connect(host, port, keepalive=10)
         client.loop_start()
+        self._client = client
 
-        # Wait for connection
-        timeout = time.time() + 5
-        while not connected and time.time() < timeout:
-            time.sleep(0.05)
-
-        if not connected:
-            print(f"  ✗ Failed to connect to Hono")
-            client.loop_stop()
-            client.disconnect()
-            return measurement
-
-        # Build and send payload
-        feature_value = {
-            "gps": {"properties": {"latitude": lat, "longitude": lon}},
-        }
-        payload = {
-            "topic": f"{self.metadata['thing_id'].replace(':', '/')}/things/twin/commands/modify",
-            "headers": {},
-            "path": "/features/",
-            "value": feature_value,
-        }
-
-        client.publish("telemetry", json.dumps(payload), qos=1)
-
-        # Wait for publish ACK
-        timeout = time.time() + 5
-        while not published and time.time() < timeout:
-            time.sleep(0.05)
-
-        client.loop_stop()
-        client.disconnect()
-
-        if not published:
-            print(f"  ✗ Failed to get Hono ACK")
-            return measurement
-
-        # Verify position arrived in Ditto via HTTP
+    def _on_message(self, _c, _u, msg) -> None:
+        t_recv = time.time()
         try:
-            api_url = DITTO_API.rstrip('/')
-            if not api_url.endswith('/api/2'):
-                api_url = f"{api_url}/api/2"
+            payload = json.loads(msg.payload.decode())
+            cid = payload.get("car_id")
+            if cid and cid in self._qs:
+                self._qs[cid].put((t_recv, payload.get("timestamp")))
+        except Exception:
+            pass
 
-            resp = requests.get(
-                f"{api_url}/things/{self.metadata['thing_id']}",
-                auth=DITTO_AUTH,
-                timeout=5,
-                verify=False
+    def next_after(
+        self, car_id: str, t0: float, timeout: float = 30.0
+    ) -> Optional[tuple[float, Optional[float]]]:
+        q = self._qs[car_id]
+        deadline = time.time() + timeout
+        while True:
+            remaining = deadline - time.time()
+            if remaining <= 0:
+                return None
+            try:
+                t_recv, proc_ts = q.get(timeout=min(remaining, 0.5))
+                if t_recv > t0:
+                    return t_recv, proc_ts
+                # stale (warmup / previous round) - discard
+            except queue.Empty:
+                if time.time() >= deadline:
+                    return None
+
+    def stop(self) -> None:
+        self._client.loop_stop()
+        self._client.disconnect()
+
+
+# ── injection worker ───────────────────────────────────────────────────────────
+
+def _worker(
+    car_n: int,
+    rate: float,
+    stop: threading.Event,
+    sub: _E2ESubscriber,
+    records: list,
+    lock: threading.Lock,
+    session: requests.Session,
+) -> None:
+    tid    = _thing_id(car_n)
+    cid    = _car_id(car_n)
+    seq    = 0
+    period = 1.0 / max(rate, 0.001)
+
+    while not stop.is_set():
+        lat = _BASE_LAT + (seq % 500) * _DELTA
+        lon = _BASE_LON + (seq % 500) * _DELTA
+        body = {
+            "gps":  {"properties": {"latitude": lat, "longitude": lon}},
+            "info": {"properties": {"emergency": False}},
+        }
+        t0 = time.time()
+        try:
+            r = session.put(
+                f"{DITTO_API}/api/2/things/{tid}/features",
+                json=body,
+                timeout=15,
             )
+            if r.status_code not in (200, 201, 204):
+                time.sleep(period)
+                continue
+        except Exception:
+            time.sleep(period)
+            continue
 
-            if resp.status_code == 200:
-                gps = resp.json().get("features", {}).get("gps", {}).get("properties", {})
-                if gps.get("latitude") == lat and gps.get("longitude") == lon:
-                    measurement["t_ditto_http"] = time.time()
-                    print(f"  ✓ Confirmed in Ditto")
-            else:
-                print(f"  ⚠ Ditto query failed: {resp.status_code}")
-        except Exception as e:
-            print(f"  ⚠ Error checking Ditto: {e}")
+        t_put = time.time()
+        result = sub.next_after(cid, t0, timeout=30.0)
+        t_recv = proc_ts = None
+        if result:
+            t_recv, proc_ts = result
 
-    def run(self, num_positions: int = 5, delay: float = 2.0):
-        """Execute timing measurement."""
-        print("\n" + "="*70)
-        print(f"Timing Measurement: {self.car_name}")
-        print("="*70)
-        print(f"Positions: {num_positions} | Delay: {delay}s")
-        print("="*70 + "\n")
-
-        self.start_listeners()
-
-        # Test positions
-        positions = [
-            (40.6316, -8.6579),
-            (40.6320, -8.6575),
-            (40.6325, -8.6570),
-            (40.6330, -8.6565),
-            (40.6335, -8.6560),
-        ]
-
-        try:
-            for i in range(num_positions):
-                lat, lon = positions[i % len(positions)]
-                print(f"Position {i+1}/{num_positions}: ({lat}, {lon})")
-
-                # Create measurement entry and add to list BEFORE sending
-                # to avoid race condition with fast processor
-                measurement = {
-                    "idx": i+1,
-                    "lat": lat,
-                    "lon": lon,
-                    "t_send": 0  # Will be set when sending
-                }
-
-                with self.lock:
-                    self.measurements.append(measurement)
-
-                # Now send the position
-                self.send_position_with_measurement(measurement, lat, lon)
-
-                if i < num_positions - 1:
-                    print(f"  Waiting {delay}s...\n")
-                    time.sleep(delay)
-
-            # Wait for all updates to propagate
-            print("\n" + "="*70)
-            print("Waiting for position processor updates...")
-            print("="*70 + "\n")
-            time.sleep(10)
-
-        finally:
-            # Cleanup
-            if self.mqtt_listener:
-                self.mqtt_listener.disconnect()
-            if self.ditto_listener:
-                self.ditto_listener.stop()
-
-        self.print_statistics()
-
-    def print_statistics(self):
-        """Print timing statistics."""
-        print("\n" + "="*70)
-        print("TIMING STATISTICS")
-        print("="*70 + "\n")
-
-        # Calculate latencies
-        stage1 = []  # Send → Hono ACK
-        stage2 = []  # Hono ACK → Ditto HTTP confirmed
-        stage3 = []  # Ditto HTTP → Ditto WS event
-        stage4 = []  # Ditto WS → Processor MQTT output
-        total = []   # Send → Processor output
-
-        for m in self.measurements:
-            if "t_send" in m and "t_hono_ack" in m:
-                stage1.append((m["t_hono_ack"] - m["t_send"]) * 1000)
-
-            if "t_hono_ack" in m and "t_ditto_http" in m:
-                stage2.append((m["t_ditto_http"] - m["t_hono_ack"]) * 1000)
-
-            if "t_ditto_http" in m and "t_ditto_ws" in m:
-                stage3.append((m["t_ditto_ws"] - m["t_ditto_http"]) * 1000)
-
-            if "t_ditto_ws" in m and "t_mqtt_out" in m:
-                stage4.append((m["t_mqtt_out"] - m["t_ditto_ws"]) * 1000)
-
-            if "t_send" in m and "t_mqtt_out" in m:
-                total.append((m["t_mqtt_out"] - m["t_send"]) * 1000)
-
-        def print_stats(name: str, values: List[float]):
-            if not values:
-                print(f"{name}: No data collected\n")
-                return
-            print(f"{name}:")
-            print(f"  Count:  {len(values)}")
-            print(f"  Min:    {min(values):7.2f} ms")
-            print(f"  Max:    {max(values):7.2f} ms")
-            print(f"  Mean:   {statistics.mean(values):7.2f} ms")
-            if len(values) > 1:
-                print(f"  Median: {statistics.median(values):7.2f} ms")
-                print(f"  Stdev:  {statistics.stdev(values):7.2f} ms")
-            print()
-
-        print_stats("1. Client → Hono ACK", stage1)
-        print_stats("2. Hono ACK → Ditto Confirmed (HTTP)", stage2)
-        print_stats("3. Ditto WS → Position Processor Output", stage4)
-        print_stats("END-TO-END (Client → Processor Output)", total)
-
-        print("="*70)
-        print(f"Measurements sent: {len(self.measurements)}")
-        print(f"Complete E2E:      {len(total)}")
-        print("="*70 + "\n")
-
-        # Save detailed results
-        self.save_results()
-
-    def save_results(self):
-        """Save detailed results to JSON file."""
-        import datetime
-        timestamp = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-        output_file = Path(__file__).parent / f"timing_results_{self.car_name}_{timestamp}.json"
-
-        results = {
-            "car_name": self.car_name,
-            "timestamp": timestamp,
-            "measurements": []
+        rec = {
+            "car":            cid,
+            "t_send":         t0,
+            "client_ditto_ms": round((t_put  - t0)    * 1000, 1),
+            "ditto_proc_ms":   round((proc_ts - t_put) * 1000, 1) if proc_ts else None,
+            "proc_client_ms":  round((t_recv  - proc_ts) * 1000, 1) if (t_recv and proc_ts) else None,
+            "e2e_ms":          round((t_recv  - t0)    * 1000, 1) if t_recv else None,
         }
+        with lock:
+            records.append(rec)
 
-        for m in self.measurements:
-            entry = {
-                "position": m["idx"],
-                "latitude": m["lat"],
-                "longitude": m["lon"],
-                "timestamps": {}
-            }
-
-            if "t_send" in m:
-                entry["timestamps"]["t_send"] = m["t_send"]
-            if "t_hono_ack" in m:
-                entry["timestamps"]["t_hono_ack"] = m["t_hono_ack"]
-            if "t_ditto_http" in m:
-                entry["timestamps"]["t_ditto_http"] = m["t_ditto_http"]
-            if "t_ditto_ws" in m:
-                entry["timestamps"]["t_ditto_ws"] = m["t_ditto_ws"]
-            if "t_mqtt_out" in m:
-                entry["timestamps"]["t_mqtt_out"] = m["t_mqtt_out"]
-
-            # Calculate latencies
-            latencies = {}
-            if "t_send" in m and "t_hono_ack" in m:
-                latencies["client_to_hono_ms"] = (m["t_hono_ack"] - m["t_send"]) * 1000
-            if "t_hono_ack" in m and "t_ditto_http" in m:
-                latencies["hono_to_ditto_ms"] = (m["t_ditto_http"] - m["t_hono_ack"]) * 1000
-            if "t_ditto_ws" in m and "t_mqtt_out" in m:
-                latencies["ditto_ws_to_processor_ms"] = (m["t_mqtt_out"] - m["t_ditto_ws"]) * 1000
-            if "t_send" in m and "t_mqtt_out" in m:
-                latencies["total_e2e_ms"] = (m["t_mqtt_out"] - m["t_send"]) * 1000
-
-            entry["latencies"] = latencies
-
-            if "speed_kmh" in m:
-                entry["speed_kmh"] = m["speed_kmh"]
-            if "heading_deg" in m:
-                entry["heading_deg"] = m["heading_deg"]
-
-            results["measurements"].append(entry)
-
-        with open(output_file, 'w') as f:
-            json.dump(results, f, indent=2)
-
-        print(f"Detailed results saved to: {output_file}\n")
+        elapsed = time.time() - t0
+        sleep_for = max(0.0, period - elapsed)
+        if sleep_for > 0:
+            stop.wait(timeout=sleep_for)
+        seq += 1
 
 
-def main():
-    parser = argparse.ArgumentParser(
-        description="Measure latency through the automotive backend pipeline"
+# ── stats helpers ──────────────────────────────────────────────────────────────
+
+def _pct(vals: list[float], p: float) -> float:
+    s = sorted(vals)
+    return s[min(int(len(s) * p), len(s) - 1)]
+
+
+def _agg(records: list[dict]) -> dict[str, dict]:
+    buckets: dict[str, list[float]] = {
+        "client_ditto_ms": [],
+        "ditto_proc_ms":   [],
+        "proc_client_ms":  [],
+        "e2e_ms":          [],
+    }
+    for r in records:
+        for k in buckets:
+            v = r.get(k)
+            if v is not None:
+                buckets[k].append(v)
+    out = {}
+    for k, vals in buckets.items():
+        if not vals:
+            out[k] = {}
+            continue
+        import statistics
+        out[k] = {
+            "n":   len(vals),
+            "avg": round(sum(vals) / len(vals), 1),
+            "std": round(statistics.stdev(vals), 1) if len(vals) > 1 else 0.0,
+            "p50": round(_pct(vals, 0.50), 1),
+            "p95": round(_pct(vals, 0.95), 1),
+            "max": round(max(vals), 1),
+        }
+    return out
+
+
+# ── plotting ───────────────────────────────────────────────────────────────────
+
+_STAGE_LABELS = {
+    "client_ditto_ms": "Client→Ditto\n(HTTP PUT)",
+    "ditto_proc_ms":   "Ditto→Processor\n(WS propagation)",
+    "proc_client_ms":  "Processor→Client\n(Overpass + MQTT)",
+    "e2e_ms":          "E2E\n(total)",
+}
+
+_STAGE_COLORS = {
+    "client_ditto_ms": "#4e79a7",
+    "ditto_proc_ms":   "#f28e2b",
+    "proc_client_ms":  "#59a14f",
+    "e2e_ms":          "#e15759",
+}
+
+
+def _plot(records: list[dict], agg: dict, out_dir: Path, n_cars: int) -> None:
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import matplotlib.ticker as mticker
+        import numpy as np
+    except ImportError:
+        print("  matplotlib not installed - skipping plots  (pip install matplotlib)")
+        return
+
+    plt.rcParams.update({
+        "font.family":       "sans-serif",
+        "axes.spines.top":   False,
+        "axes.spines.right": False,
+        "axes.grid":         True,
+        "grid.color":        "#e0e0e0",
+        "grid.linewidth":    0.8,
+        "figure.dpi":        150,
+        "axes.labelsize":    10,
+        "axes.titlesize":    11,
+    })
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    stages   = list(_STAGE_LABELS.keys())
+    labels   = [_STAGE_LABELS[s] for s in stages]
+    colors   = [_STAGE_COLORS[s] for s in stages]
+    avgs     = [agg[s].get("avg", 0) or 0 for s in stages]
+    stds     = [agg[s].get("std", 0) or 0 for s in stages]
+    p95s     = [agg[s].get("p95", 0) or 0 for s in stages]
+
+    # ── 1. Bar chart: avg ± std and p95 ──────────────────────────────────────
+    fig, ax = plt.subplots(figsize=(10, 5))
+    fig.suptitle(
+        f"Pipeline Stage Latency  -  {n_cars} simulated cars",
+        fontsize=13, fontweight="bold",
     )
-    parser.add_argument("car_name", help="Car name from create_car.py")
-    parser.add_argument(
-        "--positions",
-        type=int,
-        default=5,
-        help="Number of positions to send (default: 5)"
+    x      = np.arange(len(stages))
+    width  = 0.38
+
+    bars_avg = ax.bar(x - width / 2, avgs, width, color=colors, alpha=0.85,
+                      label="avg", zorder=3)
+    bars_p95 = ax.bar(x + width / 2, p95s, width, color=colors, alpha=0.45,
+                      label="p95", zorder=3, hatch="///", edgecolor="white")
+
+    # error bars on avg
+    ax.errorbar(x - width / 2, avgs, yerr=stds,
+                fmt="none", color="#333333", capsize=5, linewidth=1.5, zorder=4)
+
+    # value labels on bars
+    for bar in bars_avg:
+        h = bar.get_height()
+        if h > 0:
+            ax.text(bar.get_x() + bar.get_width() / 2, h + max(avgs) * 0.015,
+                    f"{h:.0f}", ha="center", va="bottom", fontsize=8, fontweight="bold")
+    for bar in bars_p95:
+        h = bar.get_height()
+        if h > 0:
+            ax.text(bar.get_x() + bar.get_width() / 2, h + max(p95s) * 0.015,
+                    f"{h:.0f}", ha="center", va="bottom", fontsize=8, color="#555555")
+
+    ax.set_xticks(x)
+    ax.set_xticklabels(labels, fontsize=9)
+    ax.set_ylabel("Latency (ms)")
+    ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%g ms"))
+    ax.legend(loc="upper left", fontsize=9, framealpha=0.7)
+    ax.set_ylim(0, max(max(avgs + p95s), 1) * 1.25)
+
+    # sample count subtitle
+    n_e2e = agg["e2e_ms"].get("n", 0)
+    ax.set_title(f"n = {n_e2e} complete measurements  |  error bars = ±1 std",
+                 fontsize=9, color="#666666", pad=4)
+
+    fig.tight_layout()
+    dest = out_dir / "latency_stages.png"
+    fig.savefig(dest, bbox_inches="tight")
+    plt.close(fig)
+    print(f"    → {dest.name}")
+
+    # ── 2. Box plots ──────────────────────────────────────────────────────────
+    data = []
+    box_labels = []
+    box_colors = []
+    for s in stages:
+        vals = [r[s] for r in records if r.get(s) is not None]
+        if vals:
+            data.append(vals)
+            box_labels.append(_STAGE_LABELS[s])
+            box_colors.append(_STAGE_COLORS[s])
+
+    if data:
+        fig, ax = plt.subplots(figsize=(10, 5))
+        fig.suptitle(
+            f"Pipeline Stage Latency Distribution  -  {n_cars} simulated cars",
+            fontsize=13, fontweight="bold",
+        )
+        bp = ax.boxplot(
+            data,
+            patch_artist=True,
+            medianprops=dict(color="#111111", linewidth=2),
+            whiskerprops=dict(linewidth=1.2),
+            capprops=dict(linewidth=1.2),
+            flierprops=dict(marker="o", markersize=3, alpha=0.35, linestyle="none"),
+            widths=0.55,
+        )
+        for patch, col in zip(bp["boxes"], box_colors):
+            r, g, b, _ = matplotlib.colors.to_rgba(col)
+            patch.set_facecolor((r, g, b, 0.65))
+            patch.set_edgecolor(col)
+
+        ax.set_xticks(range(1, len(box_labels) + 1))
+        ax.set_xticklabels(box_labels, fontsize=9)
+        ax.set_ylabel("Latency (ms)")
+        ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%g ms"))
+        fig.tight_layout()
+        dest = out_dir / "latency_boxplot.png"
+        fig.savefig(dest, bbox_inches="tight")
+        plt.close(fig)
+        print(f"    → {dest.name}")
+
+    # ── 3. Time series: e2e over time ─────────────────────────────────────────
+    e2e_recs = [(r["t_send"], r["e2e_ms"]) for r in records if r.get("e2e_ms") is not None]
+    if e2e_recs:
+        t_origin = min(t for t, _ in e2e_recs)
+        xs = [t - t_origin for t, _ in e2e_recs]
+        ys = [ms for _, ms in e2e_recs]
+
+        fig, ax = plt.subplots(figsize=(13, 4))
+        fig.suptitle(
+            f"E2E Latency over Time  -  {n_cars} simulated cars",
+            fontsize=13, fontweight="bold",
+        )
+        ax.scatter(xs, ys, s=10, alpha=0.45, color=_STAGE_COLORS["e2e_ms"], zorder=3)
+
+        # rolling average
+        if len(ys) > 20:
+            w = max(5, len(ys) // 30)
+            smooth_y = [sum(ys[max(0, j - w): j + 1]) / len(ys[max(0, j - w): j + 1])
+                        for j in range(len(ys))]
+            ax.plot(xs, smooth_y, color=_STAGE_COLORS["e2e_ms"], linewidth=2, alpha=0.7,
+                    label=f"rolling avg (w={w})")
+            ax.legend(fontsize=8)
+
+        ax.set_xlabel("Elapsed (s)")
+        ax.set_ylabel("Latency (ms)")
+        ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%g ms"))
+        ax.axhline(
+            agg["e2e_ms"].get("avg", 0),
+            color="#333333", linestyle="--", linewidth=1, alpha=0.5,
+            label=f"avg {agg['e2e_ms'].get('avg', 0):.0f} ms",
+        )
+        fig.tight_layout()
+        dest = out_dir / "latency_timeseries.png"
+        fig.savefig(dest, bbox_inches="tight")
+        plt.close(fig)
+        print(f"    → {dest.name}")
+
+
+# ── console summary ────────────────────────────────────────────────────────────
+
+def _print_summary(agg: dict) -> None:
+    W = 70
+    print()
+    print("-" * W)
+    print(f"  {'Stage':<32} {'avg':>8} {'p50':>8} {'p95':>8} {'max':>8}  n")
+    print("-" * W)
+    for key, label in _STAGE_LABELS.items():
+        s = agg.get(key, {})
+        if not s:
+            print(f"  {label.replace(chr(10), ' '):<32}  {'n/a':>8}")
+            continue
+        print(
+            f"  {label.replace(chr(10), ' '):<32}"
+            f"  {s['avg']:>6.0f} ms"
+            f"  {s['p50']:>6.0f} ms"
+            f"  {s['p95']:>6.0f} ms"
+            f"  {s['max']:>6.0f} ms"
+            f"  {s['n']}"
+        )
+    print("-" * W)
+    print()
+
+
+# ── CLI ────────────────────────────────────────────────────────────────────────
+
+def _parse_args() -> argparse.Namespace:
+    p = argparse.ArgumentParser(
+        description="Pipeline load test - N simulated cars via Ditto REST"
     )
-    parser.add_argument(
-        "--delay",
-        type=float,
-        default=2.0,
-        help="Delay between positions in seconds (default: 2.0)"
-    )
+    p.add_argument("--cars",     type=int,   default=20,   help="Simulated cars (default: 20)")
+    p.add_argument("--duration", type=int,   default=60,   help="Test duration in seconds (default: 60)")
+    p.add_argument("--rate",     type=float, default=1.0,  help="Injections/sec per car (default: 1.0)")
+    return p.parse_args()
 
-    args = parser.parse_args()
 
-    # Setup logging
-    setup_logging("timing-measurer")
+def main() -> None:
+    args = _parse_args()
 
-    measurer = TimingMeasurer(args.car_name)
-    measurer.run(num_positions=args.positions, delay=args.delay)
+    if not DITTO_API:
+        sys.exit("DITTO_API_URL not set - add it to .env before running")
+
+    n    = args.cars
+    rate = args.rate
+
+    print()
+    print("  pei-automotive / pipeline load test")
+    print(f"  cars: {n}  duration: {args.duration} s  rate: {rate} req/s per car")
+    print(f"  ditto: {DITTO_API}")
+    print()
+
+    session = requests.Session()
+    session.auth = DITTO_AUTH
+
+    # create Ditto things (idempotent)
+    print(f"  [1/4] creating {n} Ditto things ...")
+    _create_things(n, session)
+    print("        done\n")
+
+    # subscriber
+    car_ids = {_car_id(i) for i in range(n)}
+    sub = _E2ESubscriber(MQTT_HOST, MQTT_PORT, car_ids)
+    time.sleep(0.5)
+
+    # warmup - prime position_processor state and Overpass cache
+    print("  [2/4] warming up (5 rounds, all cars) ...")
+    warmup_session = requests.Session()
+    warmup_session.auth = DITTO_AUTH
+    for w in range(5):
+        lat = _BASE_LAT - (w + 1) * _DELTA
+        lon = _BASE_LON - (w + 1) * _DELTA
+        wthreads = []
+        for i in range(n):
+            tid = _thing_id(i)
+            cid = _car_id(i)
+            def _warm(tid=tid, cid=cid):
+                try:
+                    warmup_session.put(
+                        f"{DITTO_API}/api/2/things/{tid}/features",
+                        json={"gps": {"properties": {"latitude": lat, "longitude": lon}},
+                              "info": {"properties": {"emergency": False}}},
+                        timeout=15,
+                    )
+                    sub.next_after(cid, time.time() - 5, timeout=10.0)
+                except Exception:
+                    pass
+            t = threading.Thread(target=_warm, daemon=True)
+            t.start()
+            wthreads.append(t)
+        for t in wthreads:
+            t.join(timeout=15)
+        time.sleep(0.5)
+    time.sleep(2.0)
+    print("        done\n")
+
+    # run load test
+    print(f"  [3/4] running ({args.duration} s, {n} cars at {rate} req/s each) ...")
+    records: list[dict] = []
+    lock    = threading.Lock()
+    stop    = threading.Event()
+
+    sessions = [requests.Session() for _ in range(n)]
+    for s in sessions:
+        s.auth = DITTO_AUTH
+
+    workers = [
+        threading.Thread(
+            target=_worker,
+            args=(i, rate, stop, sub, records, lock, sessions[i]),
+            daemon=True,
+        )
+        for i in range(n)
+    ]
+    for w in workers:
+        w.start()
+
+    t_start = time.time()
+    while True:
+        elapsed = time.time() - t_start
+        if elapsed >= args.duration:
+            break
+        with lock:
+            n_rec = len(records)
+        print(f"    {elapsed:>5.0f}s  {n_rec} measurements", end="\r", flush=True)
+        time.sleep(2.0)
+
+    stop.set()
+    for w in workers:
+        w.join(timeout=35)
+    sub.stop()
+    print(f"\n        collected {len(records)} measurements\n")
+
+    # results
+    print("  [4/4] results")
+    agg = _agg(records)
+    _print_summary(agg)
+
+    # save JSON
+    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
+    import datetime
+    ts       = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
+    json_out = PLOTS_DIR / f"latency_{ts}.json"
+    json_out.write_text(json.dumps(records, indent=2))
+    print(f"  raw data → {json_out}")
+
+    # plots
+    print("  generating plots ...")
+    _plot(records, agg, PLOTS_DIR, n)
+    print(f"\n  done - plots in {PLOTS_DIR}\n")
 
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print("\n\nInterrupted by user")
-        sys.exit(0)
-    except Exception as e:
-        print(f"\n\nError: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    main()

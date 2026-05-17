@@ -9,6 +9,7 @@
 | k6   | >= 0.50  | `winget install k6` / [grafana.com/docs/k6](https://grafana.com/docs/k6/latest/set-up/install-k6/) |
 | python 3.10+ | any | project requirement |
 | paho-mqtt | any | already in `requirements.txt` |
+| matplotlib | any | `pip install matplotlib` (required for `measure_latency.py` plots) |
 
 The full Docker Compose stack must be running before any test:
 
@@ -225,44 +226,39 @@ python3 tests/performance/mqtt_load.py `
 
 ---
 
-### Hono vs Ditto injection comparison
+### Pipeline load test with stage breakdown
 
-Compares two GPS injection paths. All latency is measured by the pipeline monitor - there is no self-measured wall-clock timing in the script. Requires a provisioned car (`create_car.py`) and a running stack.
+Simulates N cars concurrently injecting GPS via Ditto REST API (no Hono device registration required - car IDs are generated automatically). Measures per-stage latency and generates plots.
 
-Start the pipeline monitor first in a separate terminal:
+The four stages measured per injection:
+- **Client→Ditto** - HTTP PUT round-trip (network + Ditto processing)
+- **Ditto→Processor** - Ditto WS event propagation to position_processor
+- **Processor→Client** - Overpass lookup + MQTT publish + broker delivery
+- **E2E** - full pipeline (injection to subscriber receiving `cars/updates`)
 
+Install matplotlib once if not already installed:
 ```bash
-# from pei-automotive-pipeline/
-python3 server.py --mqtt-host localhost --ditto-ws wss://automotive-app.ddns.net/ws/2
+pip install matplotlib
 ```
-
-Then run the comparison (`--pipeline-url` is required):
 
 **Linux:**
 ```bash
-python3 tests/performance/hono_vs_ditto.py \
-  --car perf-car \
-  --iterations 50 \
-  --pipeline-url http://localhost:8765
+python3 tests/performance/measure_latency.py --cars 50 --duration 60
+python3 tests/performance/measure_latency.py --cars 200 --duration 120 --rate 0.5
 ```
 
 **Windows:**
 ```bash
-python3 tests/performance/hono_vs_ditto.py `
-  --car perf-car `
-  --iterations 50 `
-  --pipeline-url http://localhost:8765
+python3 tests/performance/measure_latency.py --cars 50 --duration 60
+python3 tests/performance/measure_latency.py --cars 200 --duration 120 --rate 0.5
 ```
 
-The script will exit immediately if the pipeline is unreachable or Ditto is not connected.
+Plots are saved to `tests/performance/plots/`:
+- `latency_stages.png` - bar chart: avg ± std and p95 per stage
+- `latency_boxplot.png` - box plots per stage
+- `latency_timeseries.png` - e2e scatter over time with rolling average
 
-#### What the output shows
-
-The single metric shown is **pipeline d2p** - time from when the Ditto WebSocket event fires to when position_processor publishes to `cars/updates`. This is measured by the pipeline monitor independently for each injection phase (it resets its stats between phases).
-
-The **Hono overhead** at the bottom is the difference in d2p avg between the two phases. Because d2p starts from the Ditto WebSocket event (after Hono has already propagated the update into Ditto), this overhead reflects how much slower Hono makes the downstream pipeline respond - not the TLS transmission or AMQP ingestion time, which happen before Ditto fires the event.
-
-A high d2p p95 (> 100 ms) on the first run is expected - it means position_processor had a cache miss on the Overpass API for speed limit resolution. Re-run on the same area to warm the cache.
+Raw data is also saved as `plots/latency_<timestamp>.json`.
 
 ---
 
