@@ -128,10 +128,10 @@ class StationAssigner:
         
         # Subscribe to both meteo updates and car updates
         self.mqtt.subscribe(self.config.meteo_updates_topic, self._on_meteo_update)
-        self.mqtt.subscribe(self.config.car_updates_topic, self._on_car_update)
-        
+        self.mqtt.subscribe(f"{self.config.car_updates_topic}/+", self._on_car_update)
+
         logger.info(f"Subscribed to {self.config.meteo_updates_topic}")
-        logger.info(f"Subscribed to {self.config.car_updates_topic}")
+        logger.info(f"Subscribed to {self.config.car_updates_topic}/+")
         logger.info(f"Will publish to {self.config.station_assignment_topic_base}/{{car_id}}")
         
         self.mqtt.loop_forever()

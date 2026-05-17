@@ -192,6 +192,8 @@ class CarUpdate:
     heading_deg: Optional[float] = None
     speed_limit_kmh: Optional[float] = None
     emergency: bool = False
+    tile_quadkey: Optional[int] = None
+    tile_zoom: Optional[int] = None
     timestamp: float = field(default_factory=time.time)
 
     def to_dict(self) -> Dict:
@@ -203,6 +205,8 @@ class CarUpdate:
             "heading_deg": self.heading_deg,
             "speed_limit_kmh": self.speed_limit_kmh,
             "emergency": self.emergency,
+            "tile_quadkey": self.tile_quadkey,
+            "tile_zoom": self.tile_zoom,
             "timestamp": self.timestamp,
         }
 
@@ -219,5 +223,7 @@ class CarUpdate:
             heading_deg=data.get("heading_deg"),
             speed_limit_kmh=data.get("speed_limit_kmh"),
             emergency=data.get("emergency", False),
+            tile_quadkey=data.get("tile_quadkey"),
+            tile_zoom=data.get("tile_zoom"),
             timestamp=data.get("timestamp", time.time()),
         )

@@ -10,3 +10,5 @@ cloud2edge*
 venv/
 
 simulations/barraSUMOfinal/output/*.xml
+
+CLAUDE.md
