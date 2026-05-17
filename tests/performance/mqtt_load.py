@@ -7,7 +7,7 @@ import time
 from dataclasses import dataclass, field
 import paho.mqtt.client as mqtt
 
-TOPIC = "cars/updates"
+_TOPIC_BASE = "cars/updates"
 
 
 # Metrics
@@ -71,7 +71,7 @@ def _run_subscriber(host: str, port: int, metrics: Metrics, stop: threading.Even
 
     def on_connect(c, _u, _f, rc):
         if rc == 0:
-            c.subscribe(TOPIC, qos=0)
+            c.subscribe(f"{_TOPIC_BASE}/+", qos=0)
 
     def on_message(_c, _u, msg):
         try:
@@ -104,7 +104,7 @@ def _run_publisher(
 
     interval = 1.0 / rate if rate > 0 else 0.05
     while not stop.is_set():
-        result = client.publish(TOPIC, _build_payload(car_id, time.time()), qos=0)
+        result = client.publish(f"{_TOPIC_BASE}/{car_id}", _build_payload(car_id, time.time()), qos=0)
         if result.rc == mqtt.MQTT_ERR_SUCCESS:
             metrics.inc_sent()
         else:
