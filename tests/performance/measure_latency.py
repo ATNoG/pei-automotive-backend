@@ -11,15 +11,6 @@ Measures four per-injection latencies:
   ditto_proc_ms    - PUT returns → processor publishes  (Ditto WS propagation)
   proc_client_ms   - processor timestamp → subscriber receives  (Overpass + MQTT)
   e2e_ms           - full pipeline (client → subscriber)
-
-Generates three plots in tests/performance/plots/:
-  latency_stages.png      - bar chart: avg ± std per stage
-  latency_boxplot.png     - box plots per stage
-  latency_timeseries.png  - e2e scatter over time
-
-Usage:
-    python3 tests/performance/measure_latency.py --cars 20 --duration 60
-    python3 tests/performance/measure_latency.py --cars 100 --duration 120 --rate 0.5
 """
 
 import argparse
@@ -41,19 +32,19 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-DITTO_API  = os.getenv("DITTO_API_URL", "").rstrip("/")
+DITTO_API = os.getenv("DITTO_API_URL", "").rstrip("/")
 DITTO_AUTH = (os.getenv("DITTO_USER", "ditto"), os.getenv("DITTO_PASS", "ditto"))
-MQTT_HOST  = "localhost"
-MQTT_PORT  = 1884
+MQTT_HOST = "localhost"
+MQTT_PORT = 1884
 
 PLOTS_DIR = Path(__file__).parent / "plots"
 
 _BASE_LAT = 40.6405
 _BASE_LON = -8.6538
-_DELTA    = 0.00001
+_DELTA = 0.00001
 
 _NAMESPACE = "org.acme"
-_PREFIX    = "load-car"
+_PREFIX = "load-car"
 
 
 def _car_id(n: int) -> str:
@@ -64,7 +55,7 @@ def _thing_id(n: int) -> str:
     return f"{_NAMESPACE}:{_car_id(n)}"
 
 
-# ── Ditto setup ────────────────────────────────────────────────────────────────
+# ditto setup
 
 def _create_things(n: int, session: requests.Session) -> None:
     """Create N Ditto things in parallel (idempotent - safe to re-run)."""
@@ -92,7 +83,7 @@ def _create_things(n: int, session: requests.Session) -> None:
         sys.exit(f"Failed to create Ditto things:\n" + "\n".join(errors))
 
 
-# ── E2E subscriber ─────────────────────────────────────────────────────────────
+# E2E subscriber
 
 class _E2ESubscriber:
     """
@@ -144,7 +135,7 @@ class _E2ESubscriber:
         self._client.disconnect()
 
 
-# ── injection worker ───────────────────────────────────────────────────────────
+# injection worker
 
 def _worker(
     car_n: int,
@@ -155,9 +146,9 @@ def _worker(
     lock: threading.Lock,
     session: requests.Session,
 ) -> None:
-    tid    = _thing_id(car_n)
-    cid    = _car_id(car_n)
-    seq    = 0
+    tid = _thing_id(car_n)
+    cid = _car_id(car_n)
+    seq = 0
     period = 1.0 / max(rate, 0.001)
 
     while not stop.is_set():
@@ -205,7 +196,7 @@ def _worker(
         seq += 1
 
 
-# ── stats helpers ──────────────────────────────────────────────────────────────
+# stats helpers
 
 def _pct(vals: list[float], p: float) -> float:
     s = sorted(vals)
@@ -241,12 +232,12 @@ def _agg(records: list[dict]) -> dict[str, dict]:
     return out
 
 
-# ── plotting ───────────────────────────────────────────────────────────────────
+# plotting
 
 _STAGE_LABELS = {
-    "client_ditto_ms": "Client→Ditto\n(HTTP PUT)",
-    "ditto_proc_ms":   "Ditto→Processor\n(WS propagation)",
-    "proc_client_ms":  "Processor→Client\n(Overpass + MQTT)",
+    "client_ditto_ms": "Client->Ditto\n(HTTP PUT)",
+    "ditto_proc_ms":   "Ditto->Processor\n(WS propagation)",
+    "proc_client_ms":  "Processor->Client\n(Overpass + MQTT)",
     "e2e_ms":          "E2E\n(total)",
 }
 
@@ -282,21 +273,21 @@ def _plot(records: list[dict], agg: dict, out_dir: Path, n_cars: int) -> None:
     })
 
     out_dir.mkdir(parents=True, exist_ok=True)
-    stages   = list(_STAGE_LABELS.keys())
-    labels   = [_STAGE_LABELS[s] for s in stages]
-    colors   = [_STAGE_COLORS[s] for s in stages]
-    avgs     = [agg[s].get("avg", 0) or 0 for s in stages]
-    stds     = [agg[s].get("std", 0) or 0 for s in stages]
-    p95s     = [agg[s].get("p95", 0) or 0 for s in stages]
+    stages = list(_STAGE_LABELS.keys())
+    labels = [_STAGE_LABELS[s] for s in stages]
+    colors = [_STAGE_COLORS[s] for s in stages]
+    avgs = [agg[s].get("avg", 0) or 0 for s in stages]
+    stds = [agg[s].get("std", 0) or 0 for s in stages]
+    p95s = [agg[s].get("p95", 0) or 0 for s in stages]
 
-    # ── 1. Bar chart: avg ± std and p95 ──────────────────────────────────────
+    # 1. Bar chart: avg ± std and p95
     fig, ax = plt.subplots(figsize=(10, 5))
     fig.suptitle(
-        f"Pipeline Stage Latency  -  {n_cars} simulated cars",
+        f"Pipeline Stage Latency - {n_cars} simulated cars",
         fontsize=13, fontweight="bold",
     )
-    x      = np.arange(len(stages))
-    width  = 0.38
+    x = np.arange(len(stages))
+    width = 0.38
 
     bars_avg = ax.bar(x - width / 2, avgs, width, color=colors, alpha=0.85,
                       label="avg", zorder=3)
@@ -335,9 +326,9 @@ def _plot(records: list[dict], agg: dict, out_dir: Path, n_cars: int) -> None:
     dest = out_dir / "latency_stages.png"
     fig.savefig(dest, bbox_inches="tight")
     plt.close(fig)
-    print(f"    → {dest.name}")
+    print(f"    -> {dest.name}")
 
-    # ── 2. Box plots ──────────────────────────────────────────────────────────
+    # 2. Box plots
     data = []
     box_labels = []
     box_colors = []
@@ -351,7 +342,7 @@ def _plot(records: list[dict], agg: dict, out_dir: Path, n_cars: int) -> None:
     if data:
         fig, ax = plt.subplots(figsize=(10, 5))
         fig.suptitle(
-            f"Pipeline Stage Latency Distribution  -  {n_cars} simulated cars",
+            f"Pipeline Stage Latency Distribution - {n_cars} simulated cars",
             fontsize=13, fontweight="bold",
         )
         bp = ax.boxplot(
@@ -376,9 +367,9 @@ def _plot(records: list[dict], agg: dict, out_dir: Path, n_cars: int) -> None:
         dest = out_dir / "latency_boxplot.png"
         fig.savefig(dest, bbox_inches="tight")
         plt.close(fig)
-        print(f"    → {dest.name}")
+        print(f"    -> {dest.name}")
 
-    # ── 3. Time series: e2e over time ─────────────────────────────────────────
+    # 3. Time series: e2e over time
     e2e_recs = [(r["t_send"], r["e2e_ms"]) for r in records if r.get("e2e_ms") is not None]
     if e2e_recs:
         t_origin = min(t for t, _ in e2e_recs)
@@ -387,7 +378,7 @@ def _plot(records: list[dict], agg: dict, out_dir: Path, n_cars: int) -> None:
 
         fig, ax = plt.subplots(figsize=(13, 4))
         fig.suptitle(
-            f"E2E Latency over Time  -  {n_cars} simulated cars",
+            f"E2E Latency over Time - {n_cars} simulated cars",
             fontsize=13, fontweight="bold",
         )
         ax.scatter(xs, ys, s=10, alpha=0.45, color=_STAGE_COLORS["e2e_ms"], zorder=3)
@@ -413,35 +404,61 @@ def _plot(records: list[dict], agg: dict, out_dir: Path, n_cars: int) -> None:
         dest = out_dir / "latency_timeseries.png"
         fig.savefig(dest, bbox_inches="tight")
         plt.close(fig)
-        print(f"    → {dest.name}")
+        print(f"    -> {dest.name}")
 
+    # 4. Latency vs message count (saturation curve)
+    e2e_sorted = sorted(
+        [(r["t_send"], r["e2e_ms"]) for r in records if r.get("e2e_ms") is not None],
+        key=lambda x: x[0],
+    )
+    if len(e2e_sorted) >= 10:
+        ys_load = [ms for _, ms in e2e_sorted]
+        xs_load = list(range(1, len(ys_load) + 1))
 
-# ── console summary ────────────────────────────────────────────────────────────
-
-def _print_summary(agg: dict) -> None:
-    W = 70
-    print()
-    print("-" * W)
-    print(f"  {'Stage':<32} {'avg':>8} {'p50':>8} {'p95':>8} {'max':>8}  n")
-    print("-" * W)
-    for key, label in _STAGE_LABELS.items():
-        s = agg.get(key, {})
-        if not s:
-            print(f"  {label.replace(chr(10), ' '):<32}  {'n/a':>8}")
-            continue
-        print(
-            f"  {label.replace(chr(10), ' '):<32}"
-            f"  {s['avg']:>6.0f} ms"
-            f"  {s['p50']:>6.0f} ms"
-            f"  {s['p95']:>6.0f} ms"
-            f"  {s['max']:>6.0f} ms"
-            f"  {s['n']}"
+        fig, ax = plt.subplots(figsize=(11, 4.5))
+        fig.suptitle(
+            f"E2E Latency vs Messages Processed - {n_cars} simulated cars",
+            fontsize=13, fontweight="bold",
         )
-    print("-" * W)
-    print()
+
+        # scatter (thin, many points)
+        ax.scatter(xs_load, ys_load, s=8, alpha=0.3,
+                   color=_STAGE_COLORS["e2e_ms"], zorder=2, label="individual")
+
+        # bucket averages (divide into ~20 equal buckets, show as step bars)
+        n_buckets = min(20, len(ys_load) // 5)
+        if n_buckets >= 2:
+            bucket_size = len(ys_load) / n_buckets
+            bucket_x, bucket_y = [], []
+            for b in range(n_buckets):
+                lo = int(b * bucket_size)
+                hi = int((b + 1) * bucket_size)
+                chunk = ys_load[lo:hi]
+                bucket_x.append((xs_load[lo] + xs_load[min(hi, len(xs_load) - 1)]) / 2)
+                bucket_y.append(sum(chunk) / len(chunk))
+            ax.step(bucket_x, bucket_y, where="mid",
+                    color=_STAGE_COLORS["e2e_ms"], linewidth=2.2, alpha=0.85,
+                    label=f"bucket avg (n={len(ys_load)//n_buckets})")
+
+        # linear trend line
+        coeffs = np.polyfit(xs_load, ys_load, 1)
+        trend = np.poly1d(coeffs)
+        ax.plot(xs_load, trend(xs_load), color="#333333", linewidth=1.5,
+                linestyle="--", alpha=0.6,
+                label=f"trend  {coeffs[0]:+.3f} ms/msg")
+
+        ax.set_xlabel("Messages processed (cumulative)")
+        ax.set_ylabel("E2E latency (ms)")
+        ax.yaxis.set_major_formatter(mticker.FormatStrFormatter("%g ms"))
+        ax.legend(fontsize=8, framealpha=0.7)
+        fig.tight_layout()
+        dest = out_dir / "latency_vs_load.png"
+        fig.savefig(dest, bbox_inches="tight")
+        plt.close(fig)
+        print(f"    -> {dest.name}")
 
 
-# ── CLI ────────────────────────────────────────────────────────────────────────
+# CLI
 
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
@@ -459,7 +476,7 @@ def main() -> None:
     if not DITTO_API:
         sys.exit("DITTO_API_URL not set - add it to .env before running")
 
-    n    = args.cars
+    n = args.cars
     rate = args.rate
 
     print()
@@ -515,8 +532,8 @@ def main() -> None:
     # run load test
     print(f"  [3/4] running ({args.duration} s, {n} cars at {rate} req/s each) ...")
     records: list[dict] = []
-    lock    = threading.Lock()
-    stop    = threading.Event()
+    lock = threading.Lock()
+    stop = threading.Event()
 
     sessions = [requests.Session() for _ in range(n)]
     for s in sessions:
@@ -552,15 +569,6 @@ def main() -> None:
     # results
     print("  [4/4] results")
     agg = _agg(records)
-    _print_summary(agg)
-
-    # save JSON
-    PLOTS_DIR.mkdir(parents=True, exist_ok=True)
-    import datetime
-    ts       = datetime.datetime.now().strftime("%Y%m%d_%H%M%S")
-    json_out = PLOTS_DIR / f"latency_{ts}.json"
-    json_out.write_text(json.dumps(records, indent=2))
-    print(f"  raw data → {json_out}")
 
     # plots
     print("  generating plots ...")
