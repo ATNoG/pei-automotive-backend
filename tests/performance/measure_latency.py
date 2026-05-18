@@ -19,6 +19,7 @@ import sys
 import threading
 import time
 
+import matplotlib.pyplot as plt
 import paho.mqtt.client as mqtt
 import requests
 from dotenv import load_dotenv
@@ -166,6 +167,44 @@ def _print_results(records: list[dict]) -> None:
     print()
 
 
+def _plot_results(records: list[dict]) -> None:
+    segments = {
+        "ditto_raw_ms": "Ditto→raw",
+        "raw_proc_ms":  "raw→updates",
+        "e2e_ms":       "E2E",
+    }
+    labels = list(segments.values())
+    metrics = ["avg", "p50", "p95", "max"]
+    stats = {key: _stats([r[key] for r in records if r.get(key) is not None]) for key in segments}
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(13, 5))
+
+    x = range(len(labels))
+    width = 0.2
+    for i, m in enumerate(metrics):
+        vals = [stats[k].get(m, 0) for k in segments]
+        bars = ax1.bar([xi + i * width for xi in x], vals, width, label=m)
+        for bar, v in zip(bars, vals):
+            ax1.text(bar.get_x() + bar.get_width() / 2, bar.get_height() + 1,
+                     f"{v:.0f}", ha="center", va="bottom", fontsize=8)
+    ax1.set_xticks([xi + width * 1.5 for xi in x])
+    ax1.set_xticklabels(labels)
+    ax1.set_ylabel("ms")
+    ax1.set_title("Latency per segment")
+    ax1.legend()
+
+    e2e = [r["e2e_ms"] for r in records if r.get("e2e_ms") is not None]
+    ax2.plot(range(1, len(e2e) + 1), e2e, linewidth=1)
+    ax2.set_xlabel("messages")
+    ax2.set_ylabel("ms")
+    ax2.set_title("E2E latency growth over messages")
+
+    out = os.path.join(os.path.dirname(__file__), "plots")
+    os.makedirs(out, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(os.path.join(out, "latency_measures.png"), dpi=120)
+    plt.close()
+
 def main() -> None:
     p = argparse.ArgumentParser(description="Pipeline latency test")
     p.add_argument("--cars",        type=int,   default=5,         help="simulated cars (default: 5)")
@@ -231,6 +270,7 @@ def main() -> None:
 
     print(f"\n  [3/3] results")
     _print_results(records)
+    _plot_results(records)
 
 
 if __name__ == "__main__":

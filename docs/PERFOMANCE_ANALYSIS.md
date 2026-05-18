@@ -230,11 +230,10 @@ python3 tests/performance/mqtt_load.py `
 
 Simulates N cars concurrently injecting GPS via Ditto REST API (no Hono device registration required - car IDs are generated automatically). Measures per-stage latency and generates plots.
 
-The four stages measured per injection:
-- **Client→Ditto** - HTTP PUT round-trip (network + Ditto processing)
-- **Ditto→Processor** - Ditto WS event propagation to position_processor
-- **Processor→Client** - Overpass lookup + MQTT publish + broker delivery
-- **E2E** - full pipeline (injection to subscriber receiving `cars/updates`)
+The three segments measured per injection:
+- **Ditto→raw_updates** - Ditto WS event to ProximityFilter publish
+- **raw_updates→updates** - ProximityFilter to PositionProcessor publish
+- **E2E** - full pipeline (PUT sent to `cars/updates/<car_id>` received)
 
 Install matplotlib once if not already installed:
 ```bash
@@ -246,10 +245,7 @@ python3 tests/performance/measure_latency.py --cars 50 --duration 60
 python3 tests/performance/measure_latency.py --cars 200 --duration 120 --rate 0.5
 ```
 
-Plots are saved to `tests/performance/plots/`:
-- `latency_stages.png` - bar chart: avg ± std and p95 per stage
-- `latency_boxplot.png` - box plots per stage
-- `latency_timeseries.png` - e2e scatter over time with rolling average
+Plot is saved to `tests/performance/plots/`
 
 ---
 
