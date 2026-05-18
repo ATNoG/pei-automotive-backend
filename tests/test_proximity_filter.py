@@ -256,7 +256,8 @@ def test_proximity_filter_end_to_end(get_car_id):
     pair_a = {a_fast, a_slow}
     pair_b = {b_fast, b_slow}
 
-    cross_tile_alerts = [
+    # Only consider alerts where BOTH cars belong to this test
+    own_alerts = [
         a for a in ALERTS
         if (
             a.get("overtaking_car_id") in test_car_ids
@@ -265,11 +266,11 @@ def test_proximity_filter_end_to_end(get_car_id):
         )
     ]
     a_alerts = [
-        a for a in ALERTS
+        a for a in own_alerts
         if a.get("overtaking_car_id") == a_fast and a.get("overtaken_car_id") == a_slow
     ]
     b_alerts = [
-        a for a in ALERTS
+        a for a in own_alerts
         if a.get("overtaking_car_id") == b_fast and a.get("overtaken_car_id") == b_slow
     ]
 

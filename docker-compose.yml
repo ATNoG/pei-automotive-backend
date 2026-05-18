@@ -39,6 +39,8 @@ services:
         restart: unless-stopped
         env_file:
             - .env
+        volumes:
+            - ./data:/data:ro
         depends_on:
             - mosquitto_broker
             - position_processor
