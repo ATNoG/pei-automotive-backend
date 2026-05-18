@@ -23,7 +23,7 @@ PACK_DIR = Path(__file__).resolve().parent
 
 # What eval.py reads
 SUMOCFG          = PACK_DIR / "network" / "lanemerge.sumocfg"
-ALERT_TOPIC      = "alerts/lane_merge"
+ALERT_TOPIC      = "alerts/lane_merge/+"
 ALERT_TIMEOUT_S  = 20.0
 END_TIME_S       = 120.0
 STEP_LENGTH_S    = 0.5
@@ -68,7 +68,7 @@ SCENARIOS: dict[str, ScenarioSpec] = {
 # publishing _test_cleanup messages. Without this, stale state from a
 # previous scenario causes false alerts.
 _CLEANUP_CAR_IDS  = ["sumo-merging-car", "sumo-main-car", "sumo-main-car-2"]
-_CLEANUP_TOPIC    = "cars/updates"
+_CLEANUP_TOPIC    = "cars/updates/+"
 _CLEANUP_MQTT_HOST = "localhost"
 _CLEANUP_MQTT_PORT = 1884
 
