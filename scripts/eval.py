@@ -29,6 +29,7 @@ import logging
 import queue
 import sys
 import time
+from collections import defaultdict
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
@@ -199,22 +200,42 @@ def compute_metrics(results: list[dict], pack=None) -> dict:
     }
 
 
-def print_report(results: list[dict], metrics: dict, pack_name: str) -> None:
+def print_report(results: list[dict], metrics: dict, pack_name: str, times: int = 1) -> None:
     total  = len(results)
     passed = sum(1 for r in results if r["correct"])
+    positive = metrics.get("positive_class", "unsafe")
 
     print()
     print(f"  {pack_name} - Evaluation Report")
     print(f"  {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M UTC')}")
     print(f"  Positive class: '{metrics.get('positive_class', 'unsafe')}'")
-    print(f"  {'ID':<4} {'Expected':<12} {'Actual':<14} {'':6} Description")
 
-    for r in results:
-        tag  = "PASS" if r["correct"] else "FAIL"
-        desc = r["description"]
-        if len(desc) > 60:
-            desc = desc[:57] + "..."
-        print(f"  {r['scenario_id']:<4} {r['expected']:<12} {r['actual']:<14} [{tag}]  {desc}")
+    if times > 1:
+        by_scenario: dict[str, list[dict]] = defaultdict(list)
+        for r in results:
+            by_scenario[r["scenario_id"]].append(r)
+
+        print(f"  {'ID':<4} {'Expected':<12} {'Pass':<10} {'TP':<4} {'FP':<4} {'TN':<4} {'FN':<4}  Description")
+        for sid in sorted(by_scenario):
+            runs = by_scenario[sid]
+            pass_count = sum(1 for r in runs if r["correct"])
+            expected   = runs[0]["expected"]
+            desc       = runs[0]["description"]
+            if len(desc) > 46:
+                desc = desc[:43] + "..."
+            tp = sum(1 for r in runs if r["expected"] == positive and r["actual"] == positive)
+            fp = sum(1 for r in runs if r["expected"] != positive and r["actual"] == positive)
+            tn = sum(1 for r in runs if r["expected"] != positive and r["actual"] != positive)
+            fn = sum(1 for r in runs if r["expected"] == positive and r["actual"] != positive)
+            print(f"  {sid:<4} {expected:<12} {pass_count}/{times:<8} {tp:<4} {fp:<4} {tn:<4} {fn:<4}  {desc}")
+    else:
+        print(f"  {'ID':<4} {'Expected':<12} {'Actual':<14} {'':6} Description")
+        for r in results:
+            tag  = "PASS" if r["correct"] else "FAIL"
+            desc = r["description"]
+            if len(desc) > 60:
+                desc = desc[:57] + "..."
+            print(f"  {r['scenario_id']:<4} {r['expected']:<12} {r['actual']:<14} [{tag}]  {desc}")
 
     print(f"  Result: {passed}/{total} correct")
     print()
@@ -228,13 +249,42 @@ def print_report(results: list[dict], metrics: dict, pack_name: str) -> None:
     print()
 
 
-def write_json(results, metrics, output_path: Path, pack_name: str) -> None:
+def write_json(results, metrics, output_path: Path, pack_name: str, times: int = 1) -> None:
     output_path.parent.mkdir(parents=True, exist_ok=True)
+    positive = metrics.get("positive_class", "unsafe")
+
+    if times > 1:
+        by_scenario: dict[str, list[dict]] = defaultdict(list)
+        for r in results:
+            by_scenario[r["scenario_id"]].append(r)
+
+        scenarios_out = []
+        for sid in sorted(by_scenario):
+            runs = by_scenario[sid]
+            tp = sum(1 for r in runs if r["expected"] == positive and r["actual"] == positive)
+            fp = sum(1 for r in runs if r["expected"] != positive and r["actual"] == positive)
+            tn = sum(1 for r in runs if r["expected"] != positive and r["actual"] != positive)
+            fn = sum(1 for r in runs if r["expected"] == positive and r["actual"] != positive)
+            scenarios_out.append({
+                "scenario_id":     sid,
+                "description":     runs[0]["description"],
+                "expected":        runs[0]["expected"],
+                "runs":            times,
+                "passed":          sum(1 for r in runs if r["correct"]),
+                "true_positives":  tp,
+                "false_positives": fp,
+                "true_negatives":  tn,
+                "false_negatives": fn,
+            })
+    else:
+        scenarios_out = results
+
     report = {
         "pack":         pack_name,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "times":        times,
         "metrics":      metrics,
-        "scenarios":    results,
+        "scenarios":    scenarios_out,
     }
     with open(output_path, "w", encoding="utf-8") as f:
         json.dump(report, f, indent=2)
@@ -252,6 +302,8 @@ def _build_parser() -> argparse.ArgumentParser:
             "Examples:\n"
             "  python scripts/eval.py --pack lanemerge\n"
             "  python scripts/eval.py --pack lanemerge --scenarios 7 10\n"
+            "  python scripts/eval.py --pack lanemerge --times 30\n"
+            "  python scripts/eval.py --pack lanemerge --scenarios 9 10 --times 10\n"
             "  python scripts/eval.py --pack lanemerge --gui --scenarios 1\n"
             "  python scripts/eval.py --pack lanemerge --output results/eval.json\n"
             "\n"
@@ -268,6 +320,9 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--output", type=Path, default=None, metavar="PATH",
                    help="Where to write the JSON report "
                         "(default: <pack-dir>/results/eval.json).")
+    p.add_argument("--times", type=int, default=1, metavar="N",
+                   help="Number of times to run each scenario (default: 1). "
+                        "Metrics accumulate across all runs.")
     p.add_argument("--gui", action="store_true",
                    help="Open sumo-gui for each scenario (visual inspection; "
                         "best used together with --scenarios on a single ID).")
@@ -295,27 +350,38 @@ def main(argv: list[str] | None = None) -> int:
     else:
         scenario_ids = all_ids
 
+    if args.times < 1:
+        print("ERROR: --times must be >= 1", file=sys.stderr)
+        return 1
+
     output = args.output or (pack.PACK_DIR / "results" / "eval.json")
 
     results: list[dict] = []
     for sid in scenario_ids:
-        try:
-            results.append(evaluate_scenario(pack, pack.SCENARIOS[sid], gui=args.gui))
-        except Exception as exc:
-            logger.error(f"Scenario {sid} raised an exception: {exc}", exc_info=True)
-            spec = pack.SCENARIOS[sid]
-            results.append({
-                "scenario_id":   sid,
-                "description":   spec.description,
-                "expected":      spec.expected_outcome,
-                "actual":        "error",
-                "correct":       False,
-                "alert_payload": None,
-            })
+        for run in range(1, args.times + 1):
+            if args.times > 1:
+                logger.info(f"[{sid}] run {run}/{args.times}")
+            try:
+                result = evaluate_scenario(pack, pack.SCENARIOS[sid], gui=args.gui)
+                if args.times > 1:
+                    result["run"] = run
+                results.append(result)
+            except Exception as exc:
+                logger.error(f"Scenario {sid} run {run} raised an exception: {exc}", exc_info=True)
+                spec = pack.SCENARIOS[sid]
+                results.append({
+                    "scenario_id":   sid,
+                    "description":   spec.description,
+                    "expected":      spec.expected_outcome,
+                    "actual":        "error",
+                    "correct":       False,
+                    "alert_payload": None,
+                    **({"run": run} if args.times > 1 else {}),
+                })
 
     metrics = compute_metrics(results, pack=pack)
-    print_report(results, metrics, args.pack)
-    write_json(results, metrics, output, args.pack)
+    print_report(results, metrics, args.pack, times=args.times)
+    write_json(results, metrics, output, args.pack, times=args.times)
     return 0 if all(r["correct"] for r in results) else 1
 
 
