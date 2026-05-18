@@ -195,6 +195,8 @@ class CarUpdate:
     tile_quadkey: Optional[int] = None
     tile_zoom: Optional[int] = None
     timestamp: float = field(default_factory=time.time)
+    pf_ts: Optional[float] = None
+    pp_rx_ts: Optional[float] = None
 
     def to_dict(self) -> Dict:
         return {
@@ -208,6 +210,8 @@ class CarUpdate:
             "tile_quadkey": self.tile_quadkey,
             "tile_zoom": self.tile_zoom,
             "timestamp": self.timestamp,
+            "pf_ts": self.pf_ts,
+            "pp_rx_ts": self.pp_rx_ts,
         }
 
     def to_json(self) -> str:
@@ -226,4 +230,6 @@ class CarUpdate:
             tile_quadkey=data.get("tile_quadkey"),
             tile_zoom=data.get("tile_zoom"),
             timestamp=data.get("timestamp", time.time()),
+            pf_ts=data.get("pf_ts"),
+            pp_rx_ts=data.get("pp_rx_ts"),
         )

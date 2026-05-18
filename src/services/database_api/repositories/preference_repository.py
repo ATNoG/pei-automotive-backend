@@ -32,16 +32,19 @@ class PreferenceRepository:
         return self._map(row)
 
     async def get_or_create_defaults(self, user_id: UUID) -> PreferencesResponse:
-        """Returns existing prefs or inserts defaults — useful on first login."""
-        existing = await self.get(user_id)
-        if existing:
-            return existing
-
+        """Returns existing prefs or inserts defaults — single round trip via CTE."""
         row = await self._conn.fetchrow(
             """
-            INSERT INTO user_preferences (user_id)
-            VALUES ($1)
-            RETURNING *
+            WITH ins AS (
+                INSERT INTO user_preferences (user_id)
+                VALUES ($1)
+                ON CONFLICT DO NOTHING
+                RETURNING *
+            )
+            SELECT * FROM ins
+            UNION ALL
+            SELECT * FROM user_preferences WHERE user_id = $1
+            LIMIT 1
             """,
             user_id,
         )
