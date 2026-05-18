@@ -17,6 +17,7 @@ class Settings(BaseSettings):
     # Keycloak
     keycloak_url: str
     keycloak_realm: str
+    keycloak_client_id: str = ""
     keycloak_admin: str = ""
     keycloak_admin_password: str = ""
     @property
