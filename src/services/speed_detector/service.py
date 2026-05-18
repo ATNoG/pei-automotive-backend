@@ -39,6 +39,9 @@ class SpeedDetector:
     def _on_car_update(self, payload: str):
         try:
             data = json.loads(payload)
+            if data.get("_test_cleanup"):
+                # nothing to do in this detector for cleanup
+                return
             update = CarUpdate.from_dict(data)
         except Exception as e:
             logger.error(f"Error processing car update: {e}")
