@@ -30,6 +30,7 @@ class AppConfig:
 
     # Topics
     car_updates_topic: str
+    raw_car_updates_topic: str
     meteo_updates_topic: str
     station_assignment_topic_base: str
 
@@ -79,8 +80,12 @@ def load_config() -> AppConfig:
     broker_user = _get_env("MQTT_BROKER_USER", default=None)
     broker_password = _get_env("MQTT_BROKER_PASSWORD", default=None)
 
-    # Core topic: normalized car updates
+    # Core topic: normalized car updates that detectors subscribe to.
     car_updates_topic = _get_env("MQTT_CAR_UPDATES_TOPIC", default="cars/updates")
+    # Private topic where position_processor publishes raw updates;
+    # the proximity_filter consumes this and republishes (enriched with
+    # tile metadata) to car_updates_topic so all detectors stay agnostic.
+    raw_car_updates_topic = _get_env("MQTT_RAW_CAR_UPDATES_TOPIC", default="cars/raw_updates")
     meteo_updates_topic = _get_env("MQTT_METEO_UPDATES_TOPIC", default="meteo/updates")
     station_assignment_topic_base = _get_env("MQTT_STATION_ASSIGNMENT_TOPIC", default="cars/station")
 
@@ -103,6 +108,7 @@ def load_config() -> AppConfig:
 
         # Topics
         car_updates_topic=car_updates_topic,
+        raw_car_updates_topic=raw_car_updates_topic,
         meteo_updates_topic=meteo_updates_topic,
         station_assignment_topic_base=station_assignment_topic_base,
     )

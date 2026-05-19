@@ -6,6 +6,16 @@ services:
         volumes:
             - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
 
+    proximity_filter:
+        build:
+            context: .
+            dockerfile: src/services/proximity_filter/Dockerfile
+        restart: unless-stopped
+        env_file:
+            - .env
+        depends_on:
+            - mosquitto_broker
+
     position_processor:
         build:
             context: .
@@ -13,8 +23,14 @@ services:
         restart: unless-stopped
         env_file:
             - .env
+        volumes:
+            # Snapshot path resolved by overpass_client._SNAPSHOT_PATH
+            # is parent.parent.parent / "data" / "offline_roads" relative
+            # to /app/common/overpass_client.py — i.e. /data/offline_roads.
+            - ./data/offline_roads:/data/offline_roads:ro
         depends_on:
             - mosquitto_broker
+            - proximity_filter
 
     speed_detector:
         build:
@@ -23,6 +39,8 @@ services:
         restart: unless-stopped
         env_file:
             - .env
+        volumes:
+            - ./data:/data:ro
         depends_on:
             - mosquitto_broker
             - position_processor
