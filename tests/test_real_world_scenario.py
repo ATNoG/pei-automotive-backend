@@ -57,14 +57,17 @@ def test_real_world_overtaking(get_car_id):
 
     with open(ROADS_DIR / "real_world_entering.json") as f:
         entering_route = json.load(f)["features"][0]["geometry"]["coordinates"]
+    with open(ROADS_DIR / "real_world_left.json") as f:
+        left_route = json.load(f)["features"][0]["geometry"]["coordinates"]
     with open(ROADS_DIR / "real_world_main_right.json") as f:
         main_right = json.load(f)["features"][0]["geometry"]["coordinates"]
     with open(ROADS_DIR / "real_world_main_left.json") as f:
         main_left = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    # Phase 1: car_entering drives the ramp; car_left is stopped at the start
-    # of the main left lane, yielding to the merging car.
-    left_stopped_lat, left_stopped_lon = main_left[0]
+    # Phase 1: car_entering drives the ramp; car_left is stopped at the far
+    # end of its approach road (~16 m from the merge point), clearly behind
+    # and to the left of the merge zone, yielding to the merging car.
+    left_stopped_lat, left_stopped_lon = left_route[0]
 
     # Establish car_left's initial GPS state (no speed on first update).
     send_position(car_left, left_stopped_lat, left_stopped_lon)

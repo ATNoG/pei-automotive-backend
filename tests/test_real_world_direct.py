@@ -60,6 +60,8 @@ def test_real_world_overtaking_direct(get_car_id):
 
     with open(ROADS_DIR / "real_world_entering.json") as f:
         entering_route = json.load(f)["features"][0]["geometry"]["coordinates"]
+    with open(ROADS_DIR / "real_world_left.json") as f:
+        left_route = json.load(f)["features"][0]["geometry"]["coordinates"]
     with open(ROADS_DIR / "real_world_main_right.json") as f:
         main_right = json.load(f)["features"][0]["geometry"]["coordinates"]
     with open(ROADS_DIR / "real_world_main_left.json") as f:
@@ -71,10 +73,9 @@ def test_real_world_overtaking_direct(get_car_id):
         t1.start(); t2.start(); t1.join(); t2.join()
 
     # Phase 1: car_entering walks every point of the ramp; car_left is stopped
-    # at the start of main_left, yielding to the merging car.
-    # Sending the same position repeatedly gives position_processor speed=0
-    # and heading=None for car_left, which the lane-merge detector skips.
-    left_stopped_lat, left_stopped_lon = main_left[0]
+    # at the far end of its approach road (~16 m from the merge point), clearly
+    # behind and to the left of the merge zone, yielding to the merging car.
+    left_stopped_lat, left_stopped_lon = left_route[0]
 
     send_position_ditto(car_left, left_stopped_lat, left_stopped_lon)
 
