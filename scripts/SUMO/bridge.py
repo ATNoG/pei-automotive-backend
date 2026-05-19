@@ -3,15 +3,15 @@
 
 Drives a SUMO simulation via TraCI and publishes vehicle positions to Eclipse
 Ditto over HTTP. Knows nothing about evaluation or scenario packs - those
-live in scripts/eval.py and simulations/SUMO/scenarios/<pack>/.
+live in scripts/SUMO/eval.py and simulations/SUMO/scenarios/<pack>/.
 
 Examples
 --------
   # Drive the Barra random traffic into Ditto
-  python scripts/bridge.py --cfg simulations/SUMO/osm.sumocfg
+  python scripts/SUMO/bridge.py --cfg simulations/SUMO/osm.sumocfg
 
   # Drive a single lane-merge scenario route file (manual one-off run)
-  python scripts/bridge.py \\
+  python scripts/SUMO/bridge.py \\
       --cfg simulations/SUMO/scenarios/lanemerge/network/lanemerge.sumocfg \\
       --route-files simulations/SUMO/scenarios/lanemerge/scenarios/scenario_07.rou.xml \\
       --step-length 0.5 --end-time 120 --real-time --cleanup
@@ -194,15 +194,15 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog=(
             "Examples:\n"
             "  # Barra random traffic\n"
-            "  python scripts/bridge.py --cfg simulations/SUMO/osm.sumocfg\n"
+            "  python scripts/SUMO/bridge.py --cfg simulations/SUMO/osm.sumocfg\n"
             "\n"
             "  # Single lane-merge scenario route file\n"
-            "  python scripts/bridge.py \\\n"
+            "  python scripts/SUMO/bridge.py \\\n"
             "      --cfg simulations/SUMO/scenarios/lanemerge/network/lanemerge.sumocfg \\\n"
             "      --route-files simulations/SUMO/scenarios/lanemerge/scenarios/scenario_07.rou.xml \\\n"
             "      --step-length 0.5 --end-time 120 --real-time --cleanup\n"
             "\n"
-            "To run a full evaluation across all scenarios of a pack, use scripts/eval.py.\n"
+            "To run a full evaluation across all scenarios of a pack, use scripts/SUMO/eval.py.\n"
         ),
     )
     p.add_argument("--cfg", required=True, type=Path, metavar="PATH")

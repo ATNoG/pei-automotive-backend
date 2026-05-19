@@ -116,7 +116,7 @@ def _collect_alerts_worst_wins(q: queue.Queue, timeout: float) -> Optional[dict]
     return alerts[-1]
 
 
-def evaluate_scenario(pack, spec, gui: bool = False) -> dict:
+def evaluate_scenario(pack, spec, gui: bool = False, real_time: bool | None = None) -> dict:
     logger.info(f"[{spec.scenario_id}] {spec.description}")
 
     before = getattr(pack, "before_scenario", None)
@@ -131,7 +131,7 @@ def evaluate_scenario(pack, spec, gui: bool = False) -> dict:
             end_time=pack.END_TIME_S,
             workers=pack.WORKERS,
             gui=gui,
-            real_time=pack.REAL_TIME,
+            real_time=pack.REAL_TIME if real_time is None else real_time,
             cleanup=True,
             metrics_interval=60.0,
             post_sim_drain=pack.POST_SIM_DRAIN_S,
@@ -224,10 +224,10 @@ def _build_parser() -> argparse.ArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  python scripts/eval.py --pack lanemerge\n"
-            "  python scripts/eval.py --pack lanemerge --scenarios 7 10\n"
-            "  python scripts/eval.py --pack lanemerge --gui --scenarios 1\n"
-            "  python scripts/eval.py --pack lanemerge --output /tmp/eval.json\n"
+            "  python scripts/SUMO/eval.py --pack lanemerge\n"
+            "  python scripts/SUMO/eval.py --pack lanemerge --scenarios 7 10\n"
+            "  python scripts/SUMO/eval.py --pack lanemerge --gui --scenarios 1\n"
+            "  python scripts/SUMO/eval.py --pack lanemerge --no-real-time --scenarios 1\n"
             "\n"
             f"Available packs: {', '.join(packs) if packs else '(none)'}\n"
             "Each pack lives under simulations/SUMO/scenarios/<name>/ and exposes\n"
@@ -245,6 +245,10 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--gui", action="store_true",
                    help="Open sumo-gui for each scenario (visual inspection; "
                         "best used together with --scenarios on a single ID).")
+    p.add_argument("--no-real-time", action="store_true",
+                   help="Override the pack's REAL_TIME setting and run SUMO as fast as "
+                        "possible. Useful for quick smoke-tests; results may differ since "
+                        "detectors rely on wall-clock time for speed calculation.")
     return p
 
 
@@ -274,7 +278,11 @@ def main(argv: list[str] | None = None) -> int:
     results: list[dict] = []
     for sid in scenario_ids:
         try:
-            results.append(evaluate_scenario(pack, pack.SCENARIOS[sid], gui=args.gui))
+            results.append(evaluate_scenario(
+            pack, pack.SCENARIOS[sid],
+            gui=args.gui,
+            real_time=False if args.no_real_time else None,
+        ))
         except Exception as exc:
             logger.error(f"Scenario {sid} raised an exception: {exc}", exc_info=True)
             spec = pack.SCENARIOS[sid]
