@@ -34,19 +34,23 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
-import paho.mqtt.client as mqtt
+import os
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
+import paho.mqtt.client as mqtt
+from dotenv import load_dotenv
+
+_REPO_ROOT = Path(__file__).resolve().parents[2]
 _PACKS_DIR = _REPO_ROOT / "simulations" / "SUMO" / "scenarios"
 
-sys.path.insert(0, str(_REPO_ROOT / "scripts"))
-import bridge  # noqa: E402
+import bridge  # noqa: E402  (same directory)
+
+load_dotenv(_REPO_ROOT / ".env")
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(message)s")
 logger = logging.getLogger("eval")
 
-MQTT_HOST = "localhost"
-MQTT_PORT = 1884
+MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
 
 
 def _available_packs() -> list[str]:
