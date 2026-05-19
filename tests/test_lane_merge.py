@@ -26,7 +26,7 @@ def _find_merge_index(highway_route, merge_lat, merge_lon):
 def _simulate_merge_unsafe(highway_car, entering_car, highway_start_idx, highway_route, entering_route):
     """simulate both cars approaching the merge point over 10 steps - unsafe version"""
     for step in range(7):
-        entering_idx = min((step * len(entering_route) // 8) + 2, len(entering_route) + 1)
+        entering_idx = min((step * len(entering_route) // 8) + 1, len(entering_route) - 1)
         entering_lat, entering_lon = entering_route[entering_idx]
 
         highway_idx = highway_start_idx + step
@@ -67,7 +67,7 @@ def test_merge_unsafe(get_car_id):
     client = make_mqtt_client()
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/lane_merge")
+    client.subscribe("alerts/lane_merge/{car_id}".format(car_id=entering_car))
     client.loop_start()
     time.sleep(0.5)
 
@@ -78,8 +78,8 @@ def test_merge_unsafe(get_car_id):
     
     merge_lat, merge_lon = entering_route[-1]
     merge_idx = _find_merge_index(highway_route, merge_lat, merge_lon)
-    # start close to merge point so predicted distance is well below threshold (~7m vs 15m)
-    highway_start_idx = max(0, merge_idx - 7)
+    # start 6 steps before merge so that even with 2-step-stale highway state
+    highway_start_idx = max(0, merge_idx - 6)
 
     _simulate_merge_unsafe(highway_car, entering_car, highway_start_idx, highway_route, entering_route)
 
@@ -101,7 +101,7 @@ def test_merge_safe(get_car_id):
     client = make_mqtt_client()
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/lane_merge")
+    client.subscribe("alerts/lane_merge/{car_id}".format(car_id=entering_car))
     client.loop_start()
     time.sleep(0.5)
 

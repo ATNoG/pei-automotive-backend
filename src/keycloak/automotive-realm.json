@@ -19,7 +19,7 @@
   "quickLoginCheckMilliSeconds": 1000,
   "minimumQuickLoginWaitSeconds": 60,
   "maxDeltaTimeSeconds": 43200,
-  "failureFactor": 10,
+  "failureFactor": 500,
   "accessTokenLifespan": 300,
   "ssoSessionIdleTimeout": 43200,
   "ssoSessionMaxLifespan": 86400,
@@ -127,6 +127,23 @@
       ]
     }
   ],
+  "users": [
+    {
+      "username": "driver",
+      "enabled": true,
+      "emailVerified": true,
+      "email": "driver@automotive.local",
+      "firstName": "Test",
+      "lastName": "Driver",
+      "credentials": [
+        {
+          "type": "password",
+          "value": "driver123",
+          "temporary": false
+        }
+      ]
+    }
+  ],
   "clients": [
     {
       "clientId": "automotive-app",
@@ -135,7 +152,7 @@
       "publicClient": true,
       "standardFlowEnabled": false,
       "implicitFlowEnabled": false,
-      "directAccessGrantsEnabled": false,
+      "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": false,
       "attributes": {
         "oauth2.device.authorization.grant.enabled": "true",

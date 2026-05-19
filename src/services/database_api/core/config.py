@@ -13,6 +13,8 @@ class Settings(BaseSettings):
     db_name: str = "automotive_os"
     db_user: str
     db_password: str
+    db_pool_min: int = 5
+    db_pool_max: int = 20
 
     # Keycloak
     keycloak_url: str
