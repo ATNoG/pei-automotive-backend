@@ -9,6 +9,7 @@ import logging
 import sys
 import time
 from pathlib import Path
+from collections import defaultdict
 from typing import Dict
 
 # add parent dir
@@ -37,6 +38,11 @@ class EVDetector:
         )
 
         self.cars: Dict[str, CarUpdate] = {}
+        # Bucket cars by tile_quadkey so an EV update only checks regular
+        # cars in the same tile. EV proximity (500m) is small relative to a
+        # zoom-15 tile (~1.2 km), so border misses are rare.
+        self.cars_by_tile: Dict[int, Dict[str, CarUpdate]] = defaultdict(dict)
+        self.car_tile: Dict[str, int] = {}
         self.alert_topic = "alerts/emergency_vehicle"
 
     def _on_car_update(self, payload: str):
@@ -58,12 +64,28 @@ class EVDetector:
         # save updated state
         self.cars[update.car_id] = update
 
+        # Move car into its tile bucket so neighbour scans stay tile-local.
+        tile_qk = data.get("tile_quadkey")
+        if tile_qk is not None:
+            old_tile = self.car_tile.get(update.car_id)
+            if old_tile is not None and old_tile != tile_qk:
+                self.cars_by_tile[old_tile].pop(update.car_id, None)
+                if not self.cars_by_tile[old_tile]:
+                    del self.cars_by_tile[old_tile]
+            self.cars_by_tile[tile_qk][update.car_id] = update
+            self.car_tile[update.car_id] = tile_qk
+
         # only trigger alerts when an emergency vehicle updates its position
         if not update.emergency:
             return
 
-        # check all regular cars in range
-        for other_id, other in self.cars.items():
+        # check regular cars sharing the EV's tile (or all cars if untiled)
+        candidates = (
+            self.cars_by_tile[tile_qk]
+            if tile_qk is not None
+            else self.cars
+        )
+        for other_id, other in candidates.items():
             if other_id == update.car_id:
                 continue
 
@@ -97,7 +119,7 @@ class EVDetector:
                     "priority": int(AlertPriority.HIGH),
                     "expiration_s": 3,  # Alert valid for 3 seconds
                 }
-                self.mqtt.publish(self.alert_topic, json.dumps(alert))
+                self.mqtt.publish(f"{self.alert_topic}/{other_id}", json.dumps(alert))
                 logger.warning(
                     f"[EV] Emergency vehicle {update.car_id} is {dist:.1f}m "
                     f"{direction} {other_id}"
@@ -108,6 +130,12 @@ class EVDetector:
         if car_id in self.cars:
             del self.cars[car_id]
             logger.info(f"[CLEANUP] Removed car state: {car_id}")
+
+        old_tile = self.car_tile.pop(car_id, None)
+        if old_tile is not None:
+            self.cars_by_tile[old_tile].pop(car_id, None)
+            if not self.cars_by_tile[old_tile]:
+                del self.cars_by_tile[old_tile]
 
     def _compute_direction(self, regular_car: CarUpdate, ev: CarUpdate) -> str:
         """Determine if the emergency vehicle is ahead of or behind the regular car.
@@ -132,7 +160,7 @@ class EVDetector:
     def run(self):
         logger.info("Starting Emergency Vehicle Detector...")
         self.mqtt.connect()
-        self.mqtt.subscribe(self.config.car_updates_topic, self._on_car_update)
+        self.mqtt.subscribe(f"{self.config.car_updates_topic}/+", self._on_car_update)
         self.mqtt.loop_forever()
 
 

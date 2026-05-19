@@ -6,26 +6,44 @@ services:
     volumes:
       - ./mosquitto.conf:/mosquitto/config/mosquitto.conf
 
-  # --- Hybrid Services: Local Build + Harbor Image Tag ---
-  
-  position_processor:
-    build:
-      context: .
-      dockerfile: src/services/position_processor/Dockerfile
-    restart: unless-stopped
-    env_file: .env
-    depends_on:
-      - mosquitto_broker
+    proximity_filter:
+        build:
+            context: .
+            dockerfile: src/services/proximity_filter/Dockerfile
+        restart: unless-stopped
+        env_file:
+            - .env
+        depends_on:
+            - mosquitto_broker
 
-  speed_detector:
-    build:
-      context: .
-      dockerfile: src/services/speed_detector/Dockerfile
-    restart: unless-stopped
-    env_file: .env
-    depends_on:
-      - mosquitto_broker
-      - position_processor
+    position_processor:
+        build:
+            context: .
+            dockerfile: src/services/position_processor/Dockerfile
+        restart: unless-stopped
+        env_file:
+            - .env
+        volumes:
+            # Snapshot path resolved by overpass_client._SNAPSHOT_PATH
+            # is parent.parent.parent / "data" / "offline_roads" relative
+            # to /app/common/overpass_client.py — i.e. /data/offline_roads.
+            - ./data/offline_roads:/data/offline_roads:ro
+        depends_on:
+            - mosquitto_broker
+            - proximity_filter
+
+    speed_detector:
+        build:
+            context: .
+            dockerfile: src/services/speed_detector/Dockerfile
+        restart: unless-stopped
+        env_file:
+            - .env
+        volumes:
+            - ./data:/data:ro
+        depends_on:
+            - mosquitto_broker
+            - position_processor
 
   overtaking_detector:
     build:

@@ -11,3 +11,5 @@ venv/
 .venv/
 
 simulations/barraSUMOfinal/output/*.xml
+
+CLAUDE.md

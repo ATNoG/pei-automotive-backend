@@ -14,9 +14,9 @@ CAR_UPDATES = []
 
 def on_message(client, userdata, msg):
     payload = json.loads(msg.payload.decode())
-    if msg.topic == "alerts/speed":
+    if msg.topic.startswith("alerts/speed/"):
         ALERTS.append(payload)
-    elif msg.topic == "cars/updates":
+    elif msg.topic.startswith("cars/updates/"):
         CAR_UPDATES.append(payload)
 
 
@@ -30,8 +30,8 @@ def test_speeding(get_car_id):
     client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/speed")
-    client.subscribe("cars/updates")
+    client.subscribe("alerts/speed/+")
+    client.subscribe("cars/updates/+")
     client.loop_start()
 
     with open(ROADS_DIR / "right_lane_speeding.json") as f:

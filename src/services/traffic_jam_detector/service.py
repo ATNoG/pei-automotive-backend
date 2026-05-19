@@ -10,6 +10,7 @@ import logging
 import sys
 import time
 from pathlib import Path
+from collections import defaultdict
 from typing import Dict, Set, Optional, List, Tuple
 from dataclasses import dataclass, field
 
@@ -95,6 +96,13 @@ class TrafficJamDetector:
         )
 
         self.cars: Dict[str, CarState] = {}
+        # Bucket cars by tile_quadkey so cluster searches only iterate cars
+        # within the reference car's tile rather than the whole fleet.
+        # NOTE: Cars near tile borders may be missed; the proximity radius
+        # (500m) is small relative to a zoom-15 tile (~1.2 km) so this is
+        # acceptable for now.
+        self.cars_by_tile: Dict[int, Dict[str, CarState]] = defaultdict(dict)
+        self.car_tile: Dict[str, int] = {}
         self.active_jams: Dict[str, TrafficJam] = {}
         self.alert_topic = "alerts/traffic_jam"
         self.jam_counter = 0
@@ -146,15 +154,24 @@ class TrafficJamDetector:
     def _find_jam_cluster(self, reference_car: CarState) -> List[CarState]:
         """
         Find all cars that form a jam cluster with the reference car.
-        
+
         Returns a list of CarState objects that are:
         - Within proximity radius
         - Traveling in the same direction (heading tolerance)
         - Traveling slowly (below speed threshold)
+
+        Restricted to cars sharing the reference car's tile_quadkey.
         """
         cluster = []
-        
-        for car_id, car_state in self.cars.items():
+
+        ref_tile = self.car_tile.get(reference_car.car_id)
+        candidates = (
+            self.cars_by_tile[ref_tile]
+            if ref_tile is not None
+            else self.cars
+        )
+
+        for car_id, car_state in candidates.items():
             # Include the car if it meets all criteria
             if not self._is_car_slow(car_state):
                 continue
@@ -364,7 +381,7 @@ class TrafficJamDetector:
                     new_jam.last_alert_time = now
 
     def _publish_jam_alert(self, jam: TrafficJam):
-        """Publish a traffic jam alert to the MQTT broker."""
+        """Publish a traffic jam alert to each car involved in the jam."""
         alert = {
             "alert_type": "traffic_jam",
             "jam_id": jam.jam_id,
@@ -378,16 +395,18 @@ class TrafficJamDetector:
             "priority": int(AlertPriority.MEDIUM),
             "expiration_s": 20,  # Alert valid for 20 seconds
         }
-        
-        self.mqtt.publish(self.alert_topic, json.dumps(alert))
-        
+
+        payload = json.dumps(alert)
+        for car_id in jam.car_ids:
+            self.mqtt.publish(f"{self.alert_topic}/{car_id}", payload)
+
         logger.warning(
             f"[ALERT] Traffic jam at ({jam.center_latitude:.6f}, {jam.center_longitude:.6f}) "
             f"with {len(jam.car_ids)} vehicles"
         )
 
     def _publish_jam_cleared(self, jam: TrafficJam, reason: str):
-        """Publish a jam-cleared event to let consumers clear stale UI alerts."""
+        """Publish a jam-cleared event to each car previously involved in the jam."""
         event = {
             "alert_type": "traffic_jam_cleared",
             "jam_id": jam.jam_id,
@@ -401,7 +420,9 @@ class TrafficJamDetector:
             "priority": int(AlertPriority.LOW),
             "expiration_s": 5,
         }
-        self.mqtt.publish(self.alert_topic, json.dumps(event))
+        payload = json.dumps(event)
+        for car_id in jam.car_ids:
+            self.mqtt.publish(f"{self.alert_topic}/{car_id}", payload)
 
     def _remove_jam_if_dissolved(self, jam_id: str, reason: str):
         """Remove jam if it no longer meets minimum size and publish clear event."""
@@ -443,7 +464,16 @@ class TrafficJamDetector:
         
         for car_id in cars_to_remove:
             del self.cars[car_id]
+            self._evict_from_tile(car_id)
             logger.debug(f"[CLEANUP] Removed stale car state: {car_id}")
+
+    def _evict_from_tile(self, car_id: str) -> None:
+        """Remove a car from its tile bucket (no-op if not bucketed)."""
+        old_tile = self.car_tile.pop(car_id, None)
+        if old_tile is not None:
+            self.cars_by_tile[old_tile].pop(car_id, None)
+            if not self.cars_by_tile[old_tile]:
+                del self.cars_by_tile[old_tile]
 
     def _on_car_update(self, payload: str):
         """
@@ -506,6 +536,17 @@ class TrafficJamDetector:
                 timestamp=now,
             )
 
+        # Bucket the car into its current tile so cluster searches stay local.
+        tile_qk = data.get("tile_quadkey")
+        if tile_qk is not None:
+            old_tile = self.car_tile.get(update.car_id)
+            if old_tile is not None and old_tile != tile_qk:
+                self.cars_by_tile[old_tile].pop(update.car_id, None)
+                if not self.cars_by_tile[old_tile]:
+                    del self.cars_by_tile[old_tile]
+            self.cars_by_tile[tile_qk][update.car_id] = self.cars[update.car_id]
+            self.car_tile[update.car_id] = tile_qk
+
         # Detect traffic jams
         self._detect_traffic_jams()
         
@@ -542,6 +583,7 @@ class TrafficJamDetector:
         # Remove car state
         if car_id in self.cars:
             del self.cars[car_id]
+            self._evict_from_tile(car_id)
             logger.info(f"[CLEANUP] Removed car state: {car_id}")
         
         # Remove car from any active jams
@@ -567,7 +609,7 @@ class TrafficJamDetector:
             self.HEADING_TOLERANCE_DEG
         )
         self.mqtt.connect()
-        self.mqtt.subscribe(self.config.car_updates_topic, self._on_car_update)
+        self.mqtt.subscribe(f"{self.config.car_updates_topic}/+", self._on_car_update)
         self.mqtt.loop_forever()
 
 
