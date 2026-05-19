@@ -24,28 +24,21 @@ def on_message(client, userdata, msg):
 
 def test_real_world_overtaking_direct(get_car_id):
     """
-    Same real-world overtake scenario as test_real_world_overtaking, but
-    positions are sent directly to Ditto (bypassing Hono), making the test
-    ~10x faster and allowing 1-pt step sizes that produce realistic speeds.
+    Two-phase scenario on IT-campus roads (Aveiro). Positions go directly to
+    Ditto (bypassing Hono), making the test ~10x faster than the Hono version
+    and allowing 1-pt step sizes that produce realistic speeds.
 
-    Sending directly to Ditto avoids:
-      - subprocess + Python startup overhead
-      - TLS MQTT handshake to Hono
-      - 0.25 s post-connect sleep in send_position.py
-      - final GET verification round-trip
+    Phase 1 - Safe lane merge:
+      car_left waits stopped at main_left[0] (speed=0, heading=None).
+      car_entering walks every point of the entering ramp toward the merge
+      point. The lane-merge detector skips car_left (speed=0) and fires
+      lane_merge_safe for car_entering.
 
-    With Ditto HTTP latency ~50 ms each step covers ~1 m (main_right) or ~2 m
-    (main_left) in ~70 ms → computed speed ~14-28 m/s (50-100 km/h).
-
-    Sign-flip analysis (why the alert fires):
-      - entering car starts at main_right[5] (~5 m past MAIN_START).
-      - left car starts at main_left[0] (at MAIN_START).
-      - main_right: 34 pts / ~33 m → ~0.97 m/pt.
-      - main_left:  17 pts / ~33 m → ~1.94 m/pt.
-      - Each iteration both cars advance 1 index.  Left covers ~2 m/iter,
-        entering ~1 m/iter.  They are level at i=5 (~10 m each).
-      - At i=5 the actual lat/lon geometry puts left ~0.2 m ahead → sign
-        flips -1 → overtaking_event alert fires.
+    Phase 2 - Overtaking:
+      car_left accelerates onto main_left at ~2 m/iter (1 pt/iter, 2 m/pt).
+      car_entering moves at ~1 m/iter on main_right and starts 5 indices ahead.
+      left covers ~2 m/iter vs entering ~1 m/iter; they are level at i=5
+      (~10 m each) and left pulls ahead → sign flips → overtaking alert fires.
     """
     car_entering = get_car_id("rw-direct-entering")
     car_left = get_car_id("rw-direct-left")
@@ -60,7 +53,6 @@ def test_real_world_overtaking_direct(get_car_id):
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
     client.loop_start()
-    # Give the network loop a moment to start and process the SUBSCRIBE
     time.sleep(0.1)
     client.subscribe("alerts/overtaking/+", qos=1)
     client.subscribe(f"alerts/lane_merge/{car_entering}", qos=1)
@@ -68,8 +60,6 @@ def test_real_world_overtaking_direct(get_car_id):
 
     with open(ROADS_DIR / "real_world_entering.json") as f:
         entering_route = json.load(f)["features"][0]["geometry"]["coordinates"]
-    with open(ROADS_DIR / "real_world_left.json") as f:
-        left_route = json.load(f)["features"][0]["geometry"]["coordinates"]
     with open(ROADS_DIR / "real_world_main_right.json") as f:
         main_right = json.load(f)["features"][0]["geometry"]["coordinates"]
     with open(ROADS_DIR / "real_world_main_left.json") as f:
@@ -80,19 +70,24 @@ def test_real_world_overtaking_direct(get_car_id):
         t2 = Thread(target=send_position_ditto, args=(car_left, l_lat, l_lon))
         t1.start(); t2.start(); t1.join(); t2.join()
 
-    # Phase 1: approach - step 2 on each route to establish heading.
-    # Both routes are short (~18 m / ~15 m) so 9 iterations covers them fully.
-    max_approach = max(len(entering_route), len(left_route))
-    for i in range(0, max_approach, 2):
-        e_lat, e_lon = entering_route[min(i, len(entering_route) - 1)]
-        l_lat, l_lon = left_route[min(i, len(left_route) - 1)]
-        _send_pair(e_lat, e_lon, l_lat, l_lon)
+    # Phase 1: car_entering walks every point of the ramp; car_left is stopped
+    # at the start of main_left, yielding to the merging car.
+    # Sending the same position repeatedly gives position_processor speed=0
+    # and heading=None for car_left, which the lane-merge detector skips.
+    left_stopped_lat, left_stopped_lon = main_left[0]
+
+    send_position_ditto(car_left, left_stopped_lat, left_stopped_lon)
+
+    for e_lat, e_lon in entering_route:
+        _send_pair(e_lat, e_lon, left_stopped_lat, left_stopped_lon)
         time.sleep(0.1)
 
-    # Phase 2+3: entering car on main_right (1 pt ≈ 1 m/iter),
-    # left car on main_left (1 pt ≈ 2 m/iter).
-    # entering starts at index 5 so the detector records sign +1 immediately.
-    # Left overtakes entering at ~i=5 → sign flips to -1 → alert fires.
+    # Wait for the lane_merge_safe alert to propagate before Phase 2.
+    time.sleep(1)
+
+    # Phase 2: car_left accelerates and overtakes car_entering.
+    # entering starts at main_right[5] (~5 m ahead, 1 m/iter).
+    # left starts at main_left[0] and moves at ~2 m/iter → overtakes at ~i=5.
     for i in range(len(main_left)):
         e_idx = min(5 + i, len(main_right) - 1)
         e_lat, e_lon = main_right[e_idx]
@@ -106,8 +101,12 @@ def test_real_world_overtaking_direct(get_car_id):
         time.sleep(0.1)
     client.loop_stop()
 
-    assert len(OVERTAKING_ALERTS) > 0, f"expected at least one overtaking alert, got {len(OVERTAKING_ALERTS)}"
-    assert len(LANE_MERGE_ALERTS) > 0, f"expected at least one lane merge alert, got {len(LANE_MERGE_ALERTS)}"
+    assert len(LANE_MERGE_ALERTS) > 0, \
+        f"expected at least one lane merge alert, got {len(LANE_MERGE_ALERTS)}"
+    assert any(a.get("status") == "safe" for a in LANE_MERGE_ALERTS), \
+        f"expected a safe lane merge; got statuses: {[a.get('status') for a in LANE_MERGE_ALERTS]}"
+    assert len(OVERTAKING_ALERTS) > 0, \
+        f"expected at least one overtaking alert, got {len(OVERTAKING_ALERTS)}"
 
 
 if __name__ == "__main__":
