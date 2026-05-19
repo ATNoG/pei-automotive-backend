@@ -1,0 +1,14 @@
+{
+  "zones": [
+    {
+      "name": "default",
+      "main_route": "highway",
+      "merging_route": "entering"
+    },
+    {
+      "name": "it_campus",
+      "main_route": "real_world_main_right",
+      "merging_route": "real_world_entering"
+    }
+  ]
+}

@@ -28,7 +28,7 @@ def test_emergency_vehicle(get_car_id):
     client = make_mqtt_client()
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
-    client.subscribe("alerts/emergency_vehicle")
+    client.subscribe("alerts/emergency_vehicle/+")
     client.loop_start()
 
     with open(ROADS_DIR / "right_lane.json") as f:
