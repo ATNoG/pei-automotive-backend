@@ -24,7 +24,6 @@
 
     <script type="text/javascript">
         if (window.location.pathname.endsWith('/status')) {
-            // Replaces '/status' with '' to send user back to the verification entry page
             window.location.href = window.location.href.replace('/status', '');
         }
     </script>
