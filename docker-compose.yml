@@ -2,7 +2,8 @@ services:
     mosquitto_broker:
         image: iegomez/mosquitto-go-auth:3.0.0-mosquitto_2.0.18
         ports:
-            - "${MQTT_PORT:-1884}:1883"
+            - "1883:1883"
+            - "8883:1883"
         entrypoint: ["/bin/sh", "-c"]
         command:
             - "HASH=$$(/mosquitto/pw -p \"$$MQTT_BROKER_PASSWORD\") && printf '%s:%s\\n' \"$$MQTT_BROKER_USER\" \"$$HASH\" > /tmp/passwd && chmod 644 /tmp/passwd && exec mosquitto -c /mosquitto/config/mosquitto.conf"
@@ -140,7 +141,7 @@ services:
     keycloak:
         image: quay.io/keycloak/keycloak:24.0
         environment:
-            KC_HOSTNAME_URL: "http://${KEYCLOAK_EXTERNAL_HOST}:${KC_PORT:-8081}"
+            KC_HOSTNAME_URL: "${KEYCLOAK_HOSTNAME_URL}"
             KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
             KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
             KC_DB: postgres
@@ -149,8 +150,10 @@ services:
             KC_DB_PASSWORD: ${KC_DB_PASSWORD}
             KC_HOSTNAME_STRICT: "false"
             KC_HTTP_ENABLED: "true"
+            KC_PROXY: "${KEYCLOAK_PROXY:-none}"
             KC_CACHE: local
             KC_LOG_LEVEL: INFO
+            KC_SPI_THEME_DEFAULT_WELCOME_THEME: automotive_app
         volumes:
             - ./src/keycloak/automotive-realm.json:/opt/keycloak/data/import/automotive-realm.json:ro
             - ./src/keycloak/themes:/opt/keycloak/themes
@@ -193,6 +196,7 @@ services:
             DB_PASSWORD: ${APP_DB_PASSWORD}
             KEYCLOAK_URL: http://keycloak:8080
             KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+            KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
             KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
             KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
         ports:
