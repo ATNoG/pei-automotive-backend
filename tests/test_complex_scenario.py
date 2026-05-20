@@ -36,7 +36,7 @@ ROADS_DIR = SIM_DIR / "roads"
 
 # Configuration
 MQTT_HOST = os.getenv("TEST_MQTT_HOST", "localhost")
-MQTT_PORT = int(os.getenv("TEST_MQTT_PORT", "1884"))
+MQTT_PORT = int(os.getenv("TEST_MQTT_PORT", "1883"))
 POSITION_INTERVAL = 0.08  # Slightly slower for complex scenario
 STEP_SIZE = 3  # Increased from 2 to move cars faster along shorter highway
 ALERT_TIMEOUT = 5.0

@@ -25,7 +25,7 @@ ROADS_DIR = Path(__file__).resolve().parent.parent / "simulations/roads"
 
 # Configuration
 MQTT_HOST = os.getenv("TEST_MQTT_HOST", "localhost")
-MQTT_PORT = int(os.getenv("TEST_MQTT_PORT", "1884"))
+MQTT_PORT = int(os.getenv("TEST_MQTT_PORT", "1883"))
 
 def ensure_car_exists(car_name: str, emergency: bool = False) -> None:
     """Ensure car is registered. Ignores if already exists."""

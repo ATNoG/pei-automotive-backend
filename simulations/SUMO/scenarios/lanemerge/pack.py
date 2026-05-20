@@ -70,7 +70,7 @@ SCENARIOS: dict[str, ScenarioSpec] = {
 _CLEANUP_CAR_IDS  = ["sumo-merging-car", "sumo-main-car", "sumo-main-car-2"]
 _CLEANUP_TOPIC    = "cars/updates"
 _CLEANUP_MQTT_HOST = "localhost"
-_CLEANUP_MQTT_PORT = 1884
+_CLEANUP_MQTT_PORT = 1883
 
 _logger = logging.getLogger(__name__)
 
