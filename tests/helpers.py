@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 load_dotenv()
 
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 MQTT_USER = os.getenv("MQTT_BROKER_USER", "")
 MQTT_PASS = os.getenv("MQTT_BROKER_PASSWORD", "")
 SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
