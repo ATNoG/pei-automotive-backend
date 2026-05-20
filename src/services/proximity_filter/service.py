@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import sys
+import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
@@ -53,6 +54,7 @@ class ProximityFilter:
             "emergency": emergency,
             "tile_quadkey": tile_qk,
             "tile_zoom": self.proximity_zoom,
+            "pf_ts": time.time(),
         })
         self.mqtt.publish(f"{self.config.raw_car_updates_topic}/{car_id}", payload)
 

@@ -62,6 +62,8 @@ class PositionProcessor:
             return float(DEFAULT_SPEED_LIMIT_KMH)
 
     def _handle_raw_update(self, payload: str) -> None:
+        pp_rx_ts = time.time()
+
         try:
             data = json.loads(payload)
         except Exception as e:
@@ -98,6 +100,7 @@ class PositionProcessor:
         emergency = bool(data.get("emergency", False))
         tile_quadkey = data.get("tile_quadkey")
         tile_zoom = data.get("tile_zoom")
+        pf_ts = data.get("pf_ts")
 
         now = time.time()
 
@@ -135,7 +138,9 @@ class PositionProcessor:
             emergency=emergency,
             tile_quadkey=tile_quadkey,
             tile_zoom=tile_zoom,
-            timestamp=now,
+            timestamp=time.time(),
+            pf_ts=pf_ts,
+            pp_rx_ts=pp_rx_ts,
         )
 
         logger.info(
