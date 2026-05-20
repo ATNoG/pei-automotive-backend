@@ -150,6 +150,19 @@
       ],
       "optionalClientScopes": [
         "offline_access"
+      ],
+      "protocolMappers": [
+        {
+          "name": "automotive-app-audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.client.audience": "automotive-app",
+            "id.token.claim": "false",
+            "access.token.claim": "true"
+          }
+        }
       ]
     }
   ]
