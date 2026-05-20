@@ -25,7 +25,7 @@ def _find_merge_index(highway_route, merge_lat, merge_lon):
 
 def _simulate_merge_unsafe(highway_car, entering_car, highway_start_idx, highway_route, entering_route):
     """simulate both cars approaching the merge point over 10 steps - unsafe version"""
-    for step in range(7):
+    for step in range(8):
         entering_idx = min((step * len(entering_route) // 8) + 1, len(entering_route) - 1)
         entering_lat, entering_lon = entering_route[entering_idx]
 
@@ -41,7 +41,7 @@ def _simulate_merge_unsafe(highway_car, entering_car, highway_start_idx, highway
 
 def _simulate_merge_safe(highway_car, entering_car, highway_start_idx, highway_route, entering_route):
     """simulate both cars approaching the merge point over 10 steps - safe version"""
-    for step in range(7):
+    for step in range(9):
         entering_idx = min(step * len(entering_route) // 8, len(entering_route) - 1)
         entering_lat, entering_lon = entering_route[entering_idx]
 
