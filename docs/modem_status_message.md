@@ -161,8 +161,7 @@ curl -X PUT "https://automotive-app.ddns.net/api/2/things/org.acme:car-test/feat
         "pci": 101
       }
     }
-  }' 
-  | jq
+  }' | jq
 ```
 
 Read it back:
