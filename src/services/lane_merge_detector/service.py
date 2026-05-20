@@ -37,6 +37,7 @@ class MergeZone:
     main_lane_coords: List[Tuple[float, float]]
     merging_coords: List[Tuple[float, float]]
     merge_point: Optional[Tuple[float, float]] = None
+    merge_point_detection_m: float = 6
     main_lane_cars: Set[str] = field(default_factory=set)
     merging_cars: Set[str] = field(default_factory=set)
     alerted_pairs: Set[Tuple[str, str]] = field(default_factory=set)
@@ -88,17 +89,17 @@ class LaneMergeDetector:
                 with open(cfg_path) as f:
                     cfg = json.load(f)
                 pair_specs = [
-                    (z["name"], z["main_route"], z["merging_route"])
+                    (z["name"], z["main_route"], z["merging_route"], z.get("merge_point_detection_m", 6))
                     for z in cfg["zones"]
                 ]
             except Exception as e:
                 logger.error(f"Failed to parse {cfg_path}: {e}; falling back to default zone")
-                pair_specs = [("default", "highway", "entering")]
+                pair_specs = [("default", "highway", "entering", 6)]
         else:
-            pair_specs = [("default", "highway", "entering")]
+            pair_specs = [("default", "highway", "entering", 6)]
 
         zones: List[MergeZone] = []
-        for name, main_name, merging_name in pair_specs:
+        for name, main_name, merging_name, detection_m in pair_specs:
             main_coords = self._load_route(main_name)
             merging_coords = self._load_route(merging_name)
             if not main_coords or not merging_coords:
@@ -112,6 +113,7 @@ class LaneMergeDetector:
                 main_lane_coords=main_coords,
                 merging_coords=merging_coords,
                 merge_point=merging_coords[-1],
+                merge_point_detection_m=detection_m,
             ))
         return zones
 
@@ -334,7 +336,7 @@ class LaneMergeDetector:
         dist_to_merge = self._distance_to_merge_point(
             update.latitude, update.longitude, zone
         )
-        if dist_to_merge >= self.MERGE_POINT_DETECTION_M:
+        if dist_to_merge >= zone.merge_point_detection_m:
             return
 
         logger.info(

@@ -3,12 +3,14 @@
     {
       "name": "default",
       "main_route": "highway",
-      "merging_route": "entering"
+      "merging_route": "entering",
+      "merge_point_detection_m": 20
     },
     {
       "name": "it_campus",
       "main_route": "real_world_main_right",
-      "merging_route": "real_world_entering"
+      "merging_route": "real_world_entering",
+      "merge_point_detection_m": 6
     }
   ]
 }
