@@ -45,7 +45,7 @@ class MergeZone:
 class LaneMergeDetector:
     # Detection parameters
     ENTRY_ZONE_M = 100  # distance to consider entry zone (meters)
-    MERGE_POINT_DETECTION_M = 20  # distance to merge point to trigger analysis
+    MERGE_POINT_DETECTION_M = 6   # distance to merge point to trigger analysis
     COLLISION_THRESHOLD_M = 20  # minimum safe distance (meters)
     PREDICTION_TIME_S = 5  # time window for prediction (seconds)
 

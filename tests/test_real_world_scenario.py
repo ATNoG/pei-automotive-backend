@@ -83,24 +83,34 @@ def test_real_world_overtaking(get_car_id):
         t1.start(); t2.start(); t1.join(); t2.join()
         time.sleep(0.05)
 
-    # Wait for the lane_merge_safe alert to propagate before starting Phase 2.
+    # Wait for the lane_merge_safe alert to propagate
     time.sleep(2)
 
-    # Phase 2: car_left accelerates and overtakes car_entering.
-    # car_entering starts at main_right[5] (~5 m ahead) and advances 5 pts/step.
-    # car_left starts at main_left[0] and advances 3 pts/step (~6 m/update).
-    # Gap closes by ~1 m/update; sign flips around step 5.
-    ENTER_STEP = 5
+    # Transition: car_left walks left_route toward main_left while car_entering
+    # moves slowly along main_right (1 pt/step ≈ 1 m/update). enter_idx is
+    # carried into Phase 2 so car_entering never jumps position.
+    enter_idx = 0
+    for l_lat, l_lon in left_route[2::2]:
+        e_lat, e_lon = main_right[min(enter_idx, len(main_right) - 1)]
+        t1 = Thread(target=send_position, args=(car_entering, e_lat, e_lon))
+        t2 = Thread(target=send_position, args=(car_left, l_lat, l_lon))
+        t1.start(); t2.start(); t1.join(); t2.join()
+        time.sleep(0.05)
+        enter_idx += 1
+
+    # Phase 2: car_left accelerates onto main_left at step=3 (~6 m/update).
+    # car_entering continues at ~1 m/update and is ~7 m ahead at phase start;
+    # car_left closes the gap in ~2 steps and overtakes.
     LEFT_STEP = 3
     for i in range(8):
-        e_idx = min(5 + i * ENTER_STEP, len(main_right) - 1)
         l_idx = min(i * LEFT_STEP, len(main_left) - 1)
-        e_lat, e_lon = main_right[e_idx]
+        e_lat, e_lon = main_right[min(enter_idx, len(main_right) - 1)]
         l_lat, l_lon = main_left[l_idx]
         t1 = Thread(target=send_position, args=(car_entering, e_lat, e_lon))
         t2 = Thread(target=send_position, args=(car_left, l_lat, l_lon))
         t1.start(); t2.start(); t1.join(); t2.join()
         time.sleep(0.05)
+        enter_idx += 1
 
     time.sleep(2)
     client.loop_stop()
