@@ -4,6 +4,7 @@ import json
 import os
 import sys
 import time
+from datetime import datetime, timezone
 from pathlib import Path
 
 import paho.mqtt.client as mqtt
@@ -49,26 +50,48 @@ def main() -> None:
     parser.add_argument("car_name", help="Slug created with create_car.py")
     parser.add_argument("latitude", type=float)
     parser.add_argument("longitude", type=float)
+    parser.add_argument("--altitude", type=float, default=0.0, help="Altitude in metres")
+    parser.add_argument("--mcc", type=int, default=268, help="Mobile country code")
+    parser.add_argument("--mnc", type=int, default=1, help="Mobile network code")
+    parser.add_argument("--ratmode", type=str, default="NR", help="RAT mode (NR, LTE, …)")
     args = parser.parse_args()
 
     validate_coordinates(args.latitude, args.longitude)
     meta = load_metadata(args.car_name)
     cert_hint = meta.get("ca_cert")
     cert_file = get_cert_path(cert_hint)
-    emergency = meta.get("emergency", False)
 
-    # Build the feature value
-    feature_value = {
-        "gps": {"properties": {"latitude": args.latitude, "longitude": args.longitude}},
-        "info": {"properties": {"emergency": emergency}},
+    timestamp = datetime.now(timezone.utc).isoformat()
+
+    properties = {
+        "referenceTime": timestamp,
+        "referencePosition": {
+            "latitude": args.latitude,
+            "longitude": args.longitude,
+            "positionConfidenceEllipse": {
+                "semiMajorConfidence": 4095,
+                "semiMinorConfidence": 4095,
+                "semiMajorOrientation": 900,
+            },
+            "altitude": {
+                "altitudeValue": args.altitude,
+                "altitudeConfidence": "unavailable",
+            },
+        },
+        "modemStatus": {
+            "mcc": args.mcc,
+            "mnc": args.mnc,
+            "ratMode": args.ratmode,
+            "nr": {"rsrq": 0, "rsrp": 0, "snr": 0, "pci": 0},
+            "lte": {"rsrq": 0, "rsrp": 0, "rssi": 0, "snr": 0, "pci": 0},
+        },
     }
 
-    # Create Ditto command payload for twin update
     payload = {
         "topic": f"{meta['thing_id'].replace(':', '/')}/things/twin/commands/modify",
         "headers": {},
-        "path": "/features/",
-        "value": feature_value,
+        "path": "/features/ModemStatus/properties",
+        "value": properties,
     }
 
     client = mqtt.Client(protocol=mqtt.MQTTv311)
@@ -118,11 +141,17 @@ def main() -> None:
     )
     if resp.status_code != 200:
         sys.exit(f"Ditto readback failed: {resp.status_code} {resp.text}")
-    gps = resp.json().get("features", {}).get("gps", {}).get("properties", {})
-    if gps.get("latitude") == args.latitude and gps.get("longitude") == args.longitude:
+    stored = (
+        resp.json()
+        .get("features", {})
+        .get("ModemStatus", {})
+        .get("properties", {})
+        .get("referencePosition", {})
+    )
+    if stored.get("latitude") == args.latitude and stored.get("longitude") == args.longitude:
         print("Twin updated successfully.")
     else:
-        print(f"Twin mismatch: {gps}")
+        print(f"Twin mismatch: {stored}")
 
 
 if __name__ == "__main__":
