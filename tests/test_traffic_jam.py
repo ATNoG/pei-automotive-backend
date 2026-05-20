@@ -105,7 +105,6 @@ def test_traffic_jam(get_car_id):
         ensure_car_exists(car)
     
     alert_topics = [
-        "alerts/traffic_jam",
         "alerts/traffic_jam/+",
     ]
     
@@ -158,8 +157,13 @@ def test_traffic_jam(get_car_id):
             send_positions_parallel(positions)
             time.sleep(0.5)
     
-    # Verify traffic jam was detected
-    jam_alerts = [a for t, a in all_alerts if t == "alerts/traffic_jam"]
+    # Verify traffic jam was detected. Each jam now publishes once per
+    # involved car under alerts/traffic_jam/{car_id}; deduplicate by jam_id.
+    jam_alerts_dedup = {}
+    for t, a in all_alerts:
+        if a.get("alert_type") == "traffic_jam":
+            jam_alerts_dedup[a.get("jam_id")] = a
+    jam_alerts = list(jam_alerts_dedup.values())
     assert len(jam_alerts) > 0, (
         "Expected traffic jam detection with 5 slow/stopped cars. "
         f"Got {len(jam_alerts)} traffic jam alerts."

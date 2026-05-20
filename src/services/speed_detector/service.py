@@ -39,6 +39,9 @@ class SpeedDetector:
     def _on_car_update(self, payload: str):
         try:
             data = json.loads(payload)
+            if data.get("_test_cleanup"):
+                # nothing to do in this detector for cleanup
+                return
             update = CarUpdate.from_dict(data)
         except Exception as e:
             logger.error(f"Error processing car update: {e}")
@@ -66,7 +69,7 @@ class SpeedDetector:
                 "expiration_s": 2,  # Alert valid for 2 seconds
             }
 
-            self.mqtt.publish(self.alert_topic, json.dumps(alert))
+            self.mqtt.publish(f"{self.alert_topic}/{update.car_id}", json.dumps(alert))
             logger.warning(
                 f"[SPEED] {update.car_id} speeding: {update.speed_kmh:.1f} km/h > {speed_limit}"
             )
@@ -74,7 +77,7 @@ class SpeedDetector:
     def run(self):
         logger.info("Starting Speed Detector...")
         self.mqtt.connect()
-        self.mqtt.subscribe(self.config.car_updates_topic, self._on_car_update)
+        self.mqtt.subscribe(f"{self.config.car_updates_topic}/+", self._on_car_update)
         self.mqtt.loop_forever()
 
 def main():

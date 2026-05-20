@@ -32,7 +32,6 @@ class MQTTClient:
         self.client.on_disconnect = self._on_disconnect
         self.client.on_message = self._on_message
 
-        self._message_callbacks = {}
         self.connected = False
 
     def _on_connect(self, client, userdata, flags, rc):
@@ -48,14 +47,11 @@ class MQTTClient:
             logger.warning(f"Unexpected disconnection from MQTT broker: {rc}")
 
     def _on_message(self, client, userdata, msg):
-        topic = msg.topic
-        payload = msg.payload.decode('utf-8')
-
-        if topic in self._message_callbacks:
-            try:
-                self._message_callbacks[topic](payload)
-            except Exception as e:
-                logger.error(f"Error processing message on {topic}: {e}")
+        # Default catch-all: only used when no per-topic callback was
+        # registered via message_callback_add. With message_callback_add
+        # paho dispatches wildcard subscriptions (e.g. "cars/updates/+")
+        # correctly without us reimplementing the matching rules.
+        logger.debug(f"Unhandled message on {msg.topic}")
 
     def connect(self):
         try:
@@ -89,7 +85,16 @@ class MQTTClient:
             logger.error(f"Error publishing to {topic}: {e}")
 
     def subscribe(self, topic: str, callback: Callable[[str], None], qos: int = 1):
-        self._message_callbacks[topic] = callback
+        # message_callback_add registers a topic-pattern callback that paho
+        # invokes only for messages matching the pattern (with full + / #
+        # wildcard support).
+        def _wrapper(client, userdata, msg, _cb=callback):
+            try:
+                _cb(msg.payload.decode("utf-8"))
+            except Exception as e:
+                logger.error(f"Error processing message on {msg.topic}: {e}")
+
+        self.client.message_callback_add(topic, _wrapper)
         self.client.subscribe(topic, qos=qos)
         logger.info(f"Subscribed to {topic}")
 
