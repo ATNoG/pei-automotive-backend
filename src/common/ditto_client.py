@@ -31,9 +31,8 @@ class DittoWSClient:
 
     def _on_open(self, ws):
         logger.info("Connected to Ditto WebSocket")
-        # only receive updates where a GPS feature exists
-        ws.send("START-SEND-EVENTS?filter=exists(features/gps)")
-        logger.info("Subscribed to GPS feature updates")
+        ws.send("START-SEND-EVENTS?filter=exists(features/ModemStatus)")
+        logger.info("Subscribed to ModemStatus feature updates")
 
     def _on_message(self, ws, message):
         # ignore pings / empty
@@ -64,23 +63,20 @@ class DittoWSClient:
         if not isinstance(value, dict):
             return
 
-        gps_feature = value.get("gps", {})
-        props = gps_feature.get("properties", {}) if isinstance(gps_feature, dict) else {}
+        # value is the properties dict (path=/features/ModemStatus/properties)
+        ref_pos = value.get("referencePosition", {})
+        if not isinstance(ref_pos, dict):
+            return
 
-        lat = props.get("latitude")
-        lon = props.get("longitude")
+        lat = ref_pos.get("latitude")
+        lon = ref_pos.get("longitude")
 
         if lat is None or lon is None:
             return
 
-        # extract emergency flag from info feature
-        info_feature = value.get("info", {})
-        info_props = info_feature.get("properties", {}) if isinstance(info_feature, dict) else {}
-        emergency = bool(info_props.get("emergency", False))
-
-        # callback with raw GPS
+        # callback with raw GPS; emergency not present in ModemStatus messages
         try:
-            self.on_gps_update(car_id, float(lat), float(lon), emergency)
+            self.on_gps_update(car_id, float(lat), float(lon), False)
         except Exception as e:
             logger.error("Error in on_gps_update callback: %s", e)
 
