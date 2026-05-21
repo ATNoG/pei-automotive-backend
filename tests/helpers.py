@@ -4,6 +4,7 @@ import subprocess
 import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from pathlib import Path
 import requests as _requests
 import paho.mqtt.client as mqtt
@@ -84,8 +85,8 @@ def _get_ditto_session() -> "_requests.Session":
     return _ditto_session
 
 
-def send_position_ditto(car_name: str, lat: float, lon: float) -> None:
-    """Send a GPS position update directly to Ditto REST API, bypassing Hono.
+def send_position_ditto(car_name: str, lat: float, lon: float, altitude: float = 0.0) -> None:
+    """Send a position update directly to Ditto REST API, bypassing Hono.
 
     Much faster than send_position() because it skips the Hono MQTT adapter,
     TLS handshake, 0.25 s post-connect sleep, and final GET verification.
@@ -95,11 +96,30 @@ def send_position_ditto(car_name: str, lat: float, lon: float) -> None:
     meta = _load_device_meta(car_name)
     api_url = os.getenv("DITTO_API_URL", "").rstrip("/")
     body = {
-        "gps": {"properties": {"latitude": lat, "longitude": lon}},
-        "info": {"properties": {"emergency": meta.get("emergency", False)}},
+        "referenceTime": datetime.now(timezone.utc).isoformat(),
+        "referencePosition": {
+            "latitude": lat,
+            "longitude": lon,
+            "positionConfidenceEllipse": {
+                "semiMajorConfidence": 4095,
+                "semiMinorConfidence": 4095,
+                "semiMajorOrientation": 900,
+            },
+            "altitude": {
+                "altitudeValue": altitude,
+                "altitudeConfidence": "unavailable",
+            },
+        },
+        "modemStatus": {
+            "mcc": 0,
+            "mnc": 0,
+            "ratMode": "NR",
+            "nr": {"rsrq": 0, "rsrp": 0, "snr": 0, "pci": 0},
+            "lte": {"rsrq": 0, "rsrp": 0, "rssi": 0, "snr": 0, "pci": 0},
+        },
     }
     r = _get_ditto_session().put(
-        f"{api_url}/api/2/things/{meta['thing_id']}/features",
+        f"{api_url}/api/2/things/{meta['thing_id']}/features/ModemStatus/properties",
         json=body,
         timeout=10,
     )
