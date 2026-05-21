@@ -3,7 +3,7 @@ user backend
 topic readwrite #
 
 # Android clients authenticate with their Keycloak JWT
-pattern read cars/updates
+pattern read cars/updates/#
 pattern read cars/station/#
 pattern read alerts/#
 pattern read meteo/updates
