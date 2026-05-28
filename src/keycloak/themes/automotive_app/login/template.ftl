@@ -1,4 +1,4 @@
-<#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false>
+<#macro registrationLayout bodyClass="" displayInfo=false displayMessage=true displayRequiredFields=false pageTitle="">
 <!DOCTYPE html>
 <html class="${properties.kcHtmlClass!}"<#if realm.internationalizationEnabled> lang="${locale.currentLanguageTag}"</#if>>
 
@@ -12,7 +12,22 @@
             <meta name="${meta?split('==')[0]}" content="${meta?split('==')[1]}"/>
         </#list>
     </#if>
-    <title>${msg("loginTitle",(realm.displayName!''))}</title>
+
+    <title>
+        <#-- Check if the parameter was passed, otherwise use default -->
+        <#if pageTitle?has_content>
+            ${pageTitle}
+        <#else>
+            ${msg("loginTitle", (realm.displayName!''))}
+        </#if>
+    </title>
+
+    <script type="text/javascript">
+        if (window.location.pathname.endsWith('/status')) {
+            window.location.href = window.location.href.replace('/status', '');
+        }
+    </script>
+
     <link rel="icon" href="img/logo.png" />
     <#if properties.stylesCommon?has_content>
         <#list properties.stylesCommon?split(' ') as style>
