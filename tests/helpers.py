@@ -4,6 +4,7 @@ import subprocess
 import sys
 import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from datetime import datetime, timezone
 from pathlib import Path
 
 import requests
@@ -61,8 +62,31 @@ def standalone_get_car_id(base_name: str) -> str:
     return f"{base_name}-{uuid.uuid4().hex[:8]}"
 
 
-def send_position_ditto(car_name: str, lat: float, lon: float) -> None:
-    """Send a GPS position update directly to Ditto REST API, bypassing Hono.
+# Direct Ditto helpers (bypass Hono for speed-sensitive tests)
+_DEVICE_META_CACHE: dict[str, dict] = {}
+_ditto_session: "_requests.Session | None" = None
+
+
+def _load_device_meta(car_name: str) -> dict:
+    if car_name not in _DEVICE_META_CACHE:
+        meta_file = SIM_DIR / "devices" / f"{car_name}.json"
+        _DEVICE_META_CACHE[car_name] = _json.loads(meta_file.read_text())
+    return _DEVICE_META_CACHE[car_name]
+
+
+def _get_ditto_session() -> "_requests.Session":
+    global _ditto_session
+    if _ditto_session is None:
+        _ditto_session = _requests.Session()
+        _ditto_session.auth = (
+            os.getenv("DITTO_USER", ""),
+            os.getenv("DITTO_PASS", ""),
+        )
+    return _ditto_session
+
+
+def send_position_ditto(car_name: str, lat: float, lon: float, altitude: float = 0.0) -> None:
+    """Send a position update directly to Ditto REST API, bypassing Hono.
 
     Uses an in-process session (no subprocess) so wall-clock time between calls
     stays ~50 ms — required for position_processor to compute realistic speeds.
@@ -70,4 +94,35 @@ def send_position_ditto(car_name: str, lat: float, lon: float) -> None:
     meta_file = SIM_DIR / "devices" / f"{car_name}.json"
     meta = json.loads(meta_file.read_text())
     api_url = os.getenv("DITTO_API_URL", "").rstrip("/")
-    put_features(_get_ditto_session(), api_url, meta["thing_id"], lat, lon, meta.get("emergency", False))
+    body = {
+        "referenceTime": datetime.now(timezone.utc).isoformat(),
+        "referencePosition": {
+            "latitude": lat,
+            "longitude": lon,
+            "positionConfidenceEllipse": {
+                "semiMajorConfidence": 4095,
+                "semiMinorConfidence": 4095,
+                "semiMajorOrientation": 900,
+            },
+            "altitude": {
+                "altitudeValue": altitude,
+                "altitudeConfidence": "unavailable",
+            },
+        },
+        "modemStatus": {
+            "mcc": 0,
+            "mnc": 0,
+            "ratMode": "NR",
+            "nr": {"rsrq": 0, "rsrp": 0, "snr": 0, "pci": 0},
+            "lte": {"rsrq": 0, "rsrp": 0, "rssi": 0, "snr": 0, "pci": 0},
+        },
+    }
+    r = _get_ditto_session().put(
+        f"{api_url}/api/2/things/{meta['thing_id']}/features/ModemStatus/properties",
+        json=body,
+        timeout=10,
+    )
+    if r.status_code not in (200, 204):
+        raise RuntimeError(
+            f"Ditto PUT failed for {car_name}: {r.status_code} {r.text[:120]}"
+        )
