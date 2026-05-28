@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import time
 from dataclasses import dataclass
 from pathlib import Path
@@ -69,8 +70,8 @@ SCENARIOS: dict[str, ScenarioSpec] = {
 # previous scenario causes false alerts.
 _CLEANUP_CAR_IDS  = ["sumo-merging-car", "sumo-main-car", "sumo-main-car-2"]
 _CLEANUP_TOPIC    = "cars/updates"
-_CLEANUP_MQTT_HOST = "localhost"
-_CLEANUP_MQTT_PORT = 1884
+_CLEANUP_MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
+_CLEANUP_MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
 
 _logger = logging.getLogger(__name__)
 

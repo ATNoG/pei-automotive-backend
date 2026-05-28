@@ -1,4 +1,4 @@
-import json as _json
+import json
 import os
 import subprocess
 import sys
@@ -7,7 +7,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from pathlib import Path
 
-import requests as _requests
+import requests
 
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
 MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
@@ -51,20 +51,20 @@ def standalone_get_car_id(base_name: str) -> str:
 
 # Direct Ditto helpers (bypass Hono for speed-sensitive tests)
 _DEVICE_META_CACHE: dict[str, dict] = {}
-_ditto_session: "_requests.Session | None" = None
+_ditto_session: requests.Session | None = None
 
 
 def _load_device_meta(car_name: str) -> dict:
     if car_name not in _DEVICE_META_CACHE:
         meta_file = SIM_DIR / "devices" / f"{car_name}.json"
-        _DEVICE_META_CACHE[car_name] = _json.loads(meta_file.read_text())
+        _DEVICE_META_CACHE[car_name] = json.loads(meta_file.read_text())
     return _DEVICE_META_CACHE[car_name]
 
 
-def _get_ditto_session() -> "_requests.Session":
+def _get_ditto_session() -> requests.Session:
     global _ditto_session
     if _ditto_session is None:
-        _ditto_session = _requests.Session()
+        _ditto_session = requests.Session()
         _ditto_session.auth = (
             os.getenv("DITTO_USER", ""),
             os.getenv("DITTO_PASS", ""),
@@ -75,10 +75,8 @@ def _get_ditto_session() -> "_requests.Session":
 def send_position_ditto(car_name: str, lat: float, lon: float, altitude: float = 0.0) -> None:
     """Send a position update directly to Ditto REST API, bypassing Hono.
 
-    Much faster than send_position() because it skips the Hono MQTT adapter,
-    TLS handshake, 0.25 s post-connect sleep, and final GET verification.
-    Use this when test correctness requires realistic computed speeds
-    (position_processor derives speed from wall-clock time between updates).
+    Uses an in-process session (no subprocess) so wall-clock time between calls
+    stays ~50 ms — required for position_processor to compute realistic speeds.
     """
     meta = _load_device_meta(car_name)
     api_url = os.getenv("DITTO_API_URL", "").rstrip("/")
