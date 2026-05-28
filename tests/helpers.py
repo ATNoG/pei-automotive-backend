@@ -14,19 +14,6 @@ MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
 SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
 ROADS_DIR = SIM_DIR / "roads"
 
-sys.path.insert(0, str(SIM_DIR))
-from send_position_ditto import put_features  # noqa: E402
-
-_ditto_session: requests.Session | None = None
-
-
-def _get_ditto_session() -> requests.Session:
-    global _ditto_session
-    if _ditto_session is None:
-        _ditto_session = requests.Session()
-        _ditto_session.auth = (os.getenv("DITTO_USER", ""), os.getenv("DITTO_PASS", ""))
-    return _ditto_session
-
 
 def ensure_car_exists(car_name: str, emergency: bool = False) -> None:
     """create car in simulation if it doesn't exist."""
@@ -64,20 +51,20 @@ def standalone_get_car_id(base_name: str) -> str:
 
 # Direct Ditto helpers (bypass Hono for speed-sensitive tests)
 _DEVICE_META_CACHE: dict[str, dict] = {}
-_ditto_session: "_requests.Session | None" = None
+_ditto_session: requests.Session | None = None
 
 
 def _load_device_meta(car_name: str) -> dict:
     if car_name not in _DEVICE_META_CACHE:
         meta_file = SIM_DIR / "devices" / f"{car_name}.json"
-        _DEVICE_META_CACHE[car_name] = _json.loads(meta_file.read_text())
+        _DEVICE_META_CACHE[car_name] = json.loads(meta_file.read_text())
     return _DEVICE_META_CACHE[car_name]
 
 
-def _get_ditto_session() -> "_requests.Session":
+def _get_ditto_session() -> requests.Session:
     global _ditto_session
     if _ditto_session is None:
-        _ditto_session = _requests.Session()
+        _ditto_session = requests.Session()
         _ditto_session.auth = (
             os.getenv("DITTO_USER", ""),
             os.getenv("DITTO_PASS", ""),
@@ -91,8 +78,7 @@ def send_position_ditto(car_name: str, lat: float, lon: float, altitude: float =
     Uses an in-process session (no subprocess) so wall-clock time between calls
     stays ~50 ms — required for position_processor to compute realistic speeds.
     """
-    meta_file = SIM_DIR / "devices" / f"{car_name}.json"
-    meta = json.loads(meta_file.read_text())
+    meta = _load_device_meta(car_name)
     api_url = os.getenv("DITTO_API_URL", "").rstrip("/")
     body = {
         "referenceTime": datetime.now(timezone.utc).isoformat(),
