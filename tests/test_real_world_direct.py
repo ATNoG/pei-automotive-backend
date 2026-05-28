@@ -98,7 +98,7 @@ def test_real_world_overtaking_direct(get_car_id):
 
     # Warm up car_left's heading on main_left before the race
     send_position_ditto(car_left, main_left[0][0], main_left[0][1])
-    time.sleep(0.5)
+    time.sleep(1.0)
 
     # Phase 2: car_left accelerates onto main_left at step=2 (~4 m/update).
     # car_entering continues at ~1 m/update and is ~14 m ahead at phase start;
@@ -108,7 +108,7 @@ def test_real_world_overtaking_direct(get_car_id):
         e_lat, e_lon = main_right[min(enter_idx, len(main_right) - 1)]
         _send_pair(e_lat, e_lon, main_left[l_idx][0], main_left[l_idx][1])
         enter_idx += 1
-        time.sleep(0.5)
+        time.sleep(1.0)
 
     # Ditto WS throttling delays event delivery; poll until both alerts arrive.
     deadline = time.time() + 15
