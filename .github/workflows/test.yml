@@ -8,6 +8,9 @@ on:
         branches: [main]
     pull_request:
 
+env:
+    HONO_TESTS_ENABLED: true
+
 jobs:
     unit-tests:
         name: unit tests
@@ -29,6 +32,80 @@ jobs:
             - name: Run unit tests
               run: |
                   pytest tests/unit -v
+
+    e2e-tests-hono:
+        name: e2e tests via Hono (deprecated)
+        if: ${{ env.HONO_TESTS_ENABLED == 'true' }}
+        runs-on: [self-hosted, test-runner]
+        permissions:
+            contents: read
+        timeout-minutes: 15
+        env:
+            CI: "true"
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Add production Ditto to /etc/hosts
+              run: |
+                  echo "10.255.38.67 tomastest.com" | sudo tee -a /etc/hosts
+                  echo "[INFO] Added tomastest.com to /etc/hosts"
+                  cat /etc/hosts | grep tomastest.com
+
+            - name: Install/Update dependencies
+              run: |
+                  pip install --upgrade pip
+                  pip install -r database_requirements.txt
+                  sleep 2
+
+            - name: Generate .env file
+              env:
+                  HOST_IP: ${{ secrets.HOST_IP }}
+                  WEATHER_API_URL: ${{ secrets.WEATHER_API_URL }}
+                  WEATHER_USER: ${{ secrets.WEATHER_USER }}
+                  WEATHER_PASS: ${{ secrets.WEATHER_PASS }}
+                  KEYCLOAK_ADMIN: ${{ secrets.KEYCLOAK_ADMIN }}
+                  KEYCLOAK_ADMIN_PASSWORD: ${{ secrets.KEYCLOAK_ADMIN_PASSWORD }}
+                  KEYCLOAK_REALM: ${{ secrets.KEYCLOAK_REALM }}
+                  KC_DB_USERNAME: ${{ secrets.KC_DB_USERNAME }}
+                  KC_DB_PASSWORD: ${{ secrets.KC_DB_PASSWORD }}
+                  KC_PORT: ${{ secrets.KC_PORT }}
+                  APP_DB_USER: ${{ secrets.APP_DB_USER }}
+                  APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
+                  DATABASE_API_PORT: ${{ secrets.DATABASE_API_PORT }}
+                  DITTO_PORT: ${{ secrets.DITTO_PORT }}
+                  DITTO_USER: ${{ secrets.DITTO_USER }}
+                  DITTO_PASS: ${{ secrets.DITTO_PASS }}
+                  HONO_REG_PORT: ${{ secrets.HONO_REG_PORT }}
+                  HONO_MQTT_PORT: ${{ secrets.HONO_MQTT_PORT }}
+                  HONO_USER: ${{ secrets.HONO_USER }}
+                  HONO_PASS: ${{ secrets.HONO_PASS }}
+              run: |
+                  chmod +x scripts/ci/make_env_ci.sh
+                  ./scripts/ci/make_env_ci.sh
+
+            - name: Start services
+              run: |
+                  docker compose up --build -d
+                  sleep 10
+
+            - name: Dump postgres logs on failure
+              if: failure()
+              run: |
+                  echo "=== postgres container logs ==="
+                  docker logs pei-automotive-backend-postgres-1 2>&1 || true
+                  echo "=== postgres container inspect ==="
+                  docker inspect pei-automotive-backend-postgres-1 2>&1 || true
+                  echo "=== all container statuses ==="
+                  docker compose ps -a
+
+            - name: Run Hono tests
+              run: |
+                  pytest tests/deprecated/hono -v
+
+            - name: Cleanup
+              if: always()
+              run: docker compose down -v --remove-orphans
 
     e2e-tests-ditto:
         name: e2e tests starting from ditto
