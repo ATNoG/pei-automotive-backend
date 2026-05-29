@@ -46,7 +46,7 @@ jobs:
                   KC_PORT: ${{ secrets.KC_PORT }}
                   APP_DB_USER: ${{ secrets.APP_DB_USER }}
                   APP_DB_PASSWORD: ${{ secrets.APP_DB_PASSWORD }}
-                  DATABASE_API_PORT: ${{ secrets.DATABASE_API_PORT }}
+                  DATABASE_API_PORT: 8082 # ${{ secrets.DATABASE_API_PORT }}
                   DITTO_PORT: ${{ secrets.DITTO_PORT }}
                   DITTO_USER: ${{ secrets.DITTO_USER }}
                   DITTO_PASS: ${{ secrets.DITTO_PASS }}
