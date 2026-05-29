@@ -23,7 +23,7 @@ else
     
     if [[ ${#TESTS[@]} -gt 1 ]]; then
         echo ""
-        echo "Found ${#TESTS[@]} tests in $(basename $TARGET):"
+        echo "Found ${#TESTS[@]} tests in $(basename "$TARGET"):"
         TESTS+=("All")
         
         select TEST_FUNC in "${TESTS[@]}"; do
