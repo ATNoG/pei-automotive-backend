@@ -17,16 +17,20 @@ import json
 import logging
 import math
 import threading
+from collections import defaultdict
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Dict, List, Optional, Set, Tuple
 
 import requests
 
+from common.geotile import get_quadkey
+
 logger = logging.getLogger(__name__)
 
 OVERPASS_API_URL = "https://overpass-api.de/api/interpreter"
 DEFAULT_SPEED_LIMIT_KMH: float = 50.0
+_INDEX_ZOOM: int = 15
 
 ROAD_TYPE_SPEED_LIMITS: Dict[str, float] = {
     "motorway": 120,
@@ -81,6 +85,7 @@ class _RoadSegment:
 
 
 _segments: List[_RoadSegment] = []
+_segments_by_tile: Dict[int, List[_RoadSegment]] = defaultdict(list)
 _snapshot_bboxes: List[Tuple[float, float, float, float]] = []  # (s, w, n, e)
 _live_fetched_keys: Set[Tuple[int, int]] = set()
 _known_way_ids: Set[int] = set()
@@ -142,11 +147,21 @@ def _parse_maxspeed(tags: Dict) -> Optional[float]:
     return None
 
 
+def _segment_tile_quadkeys(seg: _RoadSegment) -> Set[int]:
+    """Return the set of tile quadkeys at _INDEX_ZOOM that this segment spans."""
+    keys: Set[int] = set()
+    for lat, lon in seg.geometry:
+        keys.add(get_quadkey(lat, lon, _INDEX_ZOOM))
+    return keys
+
+
 def _add_segments(new_segments: List[_RoadSegment]) -> None:
     for seg in new_segments:
         if seg.way_id not in _known_way_ids:
             _known_way_ids.add(seg.way_id)
             _segments.append(seg)
+            for qk in _segment_tile_quadkeys(seg):
+                _segments_by_tile[qk].append(seg)
 
 
 # Offline snapshot loader
@@ -259,10 +274,35 @@ def _fetch_live_around(lat: float, lon: float) -> None:
     )
 
 
-# Lookup
+def _tile_neighborhood(lat: float, lon: float) -> Set[int]:
+    """Return the set of tile quadkeys covering (lat, lon) and its 8 neighbours."""
+    nqk = get_quadkey(lat, lon, _INDEX_ZOOM)
+    keys: Set[int] = {nqk}
+    # tile size in degrees at the equator for zoom 15 ≈ 0.01099°
+    half_tile = 0.0055
+    for dlat in (-half_tile, 0, half_tile):
+        for dlon in (-half_tile, 0, half_tile):
+            if dlat == 0 and dlon == 0:
+                continue
+            # clamp to valid range
+            clat = max(-90.0, min(90.0, lat + dlat))
+            clon = (lon + dlon + 180) % 360 - 180
+            keys.add(get_quadkey(clat, clon, _INDEX_ZOOM))
+    return keys
+
+
 def _find_nearest_road(lat: float, lon: float) -> Optional[_RoadSegment]:
+    tile_qk = get_quadkey(lat, lon, _INDEX_ZOOM)
+
     with _lock:
-        candidates = list(_segments)
+        candidates = list(_segments_by_tile.get(tile_qk, []))
+        # also check adjacent tiles
+        for adj_qk in _tile_neighborhood(lat, lon):
+            if adj_qk != tile_qk:
+                candidates.extend(_segments_by_tile.get(adj_qk, []))
+
+    if not candidates:
+        return None
 
     best_seg: Optional[_RoadSegment] = None
     best_dist: float = _MAX_MATCH_DISTANCE_M
