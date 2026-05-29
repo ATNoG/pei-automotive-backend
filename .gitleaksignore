@@ -1,2 +1,2 @@
 85c8a01866acb37b48936623e28c4df66205dca4:deploy.sh:curl-auth-user:289
-bd61220ce92e550b7de32e5e3d05202fdfacab58:docker-compose.yml:generic-api-key:3
+822754c800a8ec5f64c46e21f09d5f764c94b6c5:mosquitto/Dockerfile:generic-api-key:24 
