@@ -1,234 +1,228 @@
 services:
-    mosquitto_broker:
-        image: iegomez/mosquitto-go-auth:3.0.0-mosquitto_2.0.18
-        ports:
-            - "1883:1883"
-            - "8883:1883"
-        entrypoint: ["/bin/sh", "-c"]
-        command:
-            - "HASH=$$(/mosquitto/pw -p \"$$MQTT_BROKER_PASSWORD\") && printf '%s:%s\\n' \"$$MQTT_BROKER_USER\" \"$$HASH\" > /tmp/passwd && chmod 644 /tmp/passwd && exec mosquitto -c /mosquitto/config/mosquitto.conf"
-        environment:
-            MQTT_BROKER_USER: ${MQTT_BROKER_USER}
-            MQTT_BROKER_PASSWORD: ${MQTT_BROKER_PASSWORD}
-        volumes:
-            - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
-            - ./mosquitto/mosquitto_acl:/mosquitto/config/acl
-        networks:
-            - default
-            - keycloak_net
+  mosquitto_broker:
+    image: iegomez/mosquitto-go-auth:3.0.0-mosquitto_2.0.18
+    ports:
+      - "1883:1883"
+      - "8883:1883"
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - "HASH=$$(/mosquitto/pw -p \"$$MQTT_BROKER_PASSWORD\") && printf '%s:%s\\n' \"$$MQTT_BROKER_USER\" \"$$HASH\" > /tmp/passwd && chmod 644 /tmp/passwd && exec mosquitto -c /mosquitto/config/mosquitto.conf"
+    environment:
+      MQTT_BROKER_USER: ${MQTT_BROKER_USER}
+      MQTT_BROKER_PASSWORD: ${MQTT_BROKER_PASSWORD}
+    volumes:
+      - ./mosquitto/mosquitto.conf:/mosquitto/config/mosquitto.conf
+      - ./mosquitto/mosquitto_acl:/mosquitto/config/acl
+    networks:
+      - default
+      - keycloak_net
 
-    proximity_filter:
-        build:
-            context: .
-            dockerfile: src/services/proximity_filter/Dockerfile
-        restart: unless-stopped
-        env_file:
-            - .env
-        depends_on:
-            - mosquitto_broker
+  proximity_filter:
+    build:
+      context: .
+      dockerfile: src/services/proximity_filter/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - mosquitto_broker
 
-    position_processor:
-        build:
-            context: .
-            dockerfile: src/services/position_processor/Dockerfile
-        restart: unless-stopped
-        env_file:
-            - .env
-        volumes:
-            # Snapshot path resolved by overpass_client._SNAPSHOT_PATH
-            # is parent.parent.parent / "data" / "offline_roads" relative
-            # to /app/common/overpass_client.py — i.e. /data/offline_roads.
-            - ./data/offline_roads:/data/offline_roads:ro
-        depends_on:
-            - mosquitto_broker
-            - proximity_filter
+  position_processor:
+    build:
+      context: .
+      dockerfile: src/services/position_processor/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      # Snapshot path resolved by overpass_client._SNAPSHOT_PATH
+      # is parent.parent.parent / "data" / "offline_roads" relative
+      # to /app/common/overpass_client.py — i.e. /data/offline_roads.
+      - ./data/offline_roads:/data/offline_roads:ro
+    depends_on:
+      - mosquitto_broker
+      - proximity_filter
 
-    speed_detector:
-        build:
-            context: .
-            dockerfile: src/services/speed_detector/Dockerfile
-        restart: unless-stopped
-        env_file:
-            - .env
-        volumes:
-            - ./data:/data:ro
-        depends_on:
-            - mosquitto_broker
-            - position_processor
+  speed_detector:
+    build:
+      context: .
+      dockerfile: src/services/speed_detector/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - ./data:/data:ro
+    depends_on:
+      - mosquitto_broker
+      - position_processor
 
-    overtaking_detector:
-        build:
-            context: .
-            dockerfile: src/services/overtaking_detector/Dockerfile
-        restart: unless-stopped
-        env_file:
-            - .env
-        depends_on:
-            - mosquitto_broker
-            - position_processor
+  overtaking_detector:
+    build:
+      context: .
+      dockerfile: src/services/overtaking_detector/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - mosquitto_broker
+      - position_processor
 
-    emergency_vehicle_detector:
-        build:
-            context: .
-            dockerfile: src/services/emergency_vehicle_detector/Dockerfile
-        restart: unless-stopped
-        env_file:
-            - .env
-        depends_on:
-            - mosquitto_broker
-            - position_processor
+  emergency_vehicle_detector:
+    build:
+      context: .
+      dockerfile: src/services/emergency_vehicle_detector/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - mosquitto_broker
+      - position_processor
 
-    lane_merge_detector:
-        build:
-            context: .
-            dockerfile: src/services/lane_merge_detector/Dockerfile
-        restart: unless-stopped
-        env_file:
-            - .env
-        depends_on:
-            - mosquitto_broker
-            - position_processor
+  lane_merge_detector:
+    build:
+      context: .
+      dockerfile: src/services/lane_merge_detector/Dockerfile
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - mosquitto_broker
+      - position_processor
 
-    accident_detector:
-        build:
-            context: .
-            dockerfile: src/services/accident_detector/Dockerfile
-        restart: unless-stopped
-        env_file:
-            - .env
-        depends_on:
-            - mosquitto_broker
-            - position_processor
+  accident_detector:
+    build:
+      context: .
+      dockerfile: src/services/accident_detector/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - mosquitto_broker
+      - position_processor
 
-    traffic_jam_detector:
-        build:
-            context: .
-            dockerfile: src/services/traffic_jam_detector/Dockerfile
-        restart: unless-stopped
-        env_file:
-            - .env
-        depends_on:
-            - mosquitto_broker
-            - position_processor
+  traffic_jam_detector:
+    build:
+      context: .
+      dockerfile: src/services/traffic_jam_detector/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - mosquitto_broker
+      - position_processor
 
-    meteo_consumer:
-        build:
-            context: .
-            dockerfile: src/services/meteo_consumer/Dockerfile
-        restart: unless-stopped
-        env_file:
-            - .env
-        depends_on:
-            - mosquitto_broker
-        extra_hosts:
-            - "tomastest.com:10.255.38.67"
+  meteo_consumer:
+    build:
+      context: .
+      dockerfile: src/services/meteo_consumer/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - mosquitto_broker
+    extra_hosts:
+      - "tomastest.com:10.255.38.67"
 
-    station_assigner:
-        build:
-            context: .
-            dockerfile: src/services/station_assigner/Dockerfile
-        restart: unless-stopped
-        env_file:
-            - .env
-        depends_on:
-            - mosquitto_broker
-            - position_processor
-            - meteo_consumer
+  station_assigner:
+    build:
+      context: .
+      dockerfile: src/services/station_assigner/Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - mosquitto_broker
+      - position_processor
+      - meteo_consumer
 
-    postgres:
-        image: postgres:16
-        environment:
-            POSTGRES_DB: keycloak
-            POSTGRES_USER: ${KC_DB_USERNAME}
-            POSTGRES_PASSWORD: ${KC_DB_PASSWORD}
-            APP_DB_USER: ${APP_DB_USER}
-            APP_DB_PASSWORD: ${APP_DB_PASSWORD}
-        volumes:
-            - keycloak_db_data:/var/lib/postgresql/data
-            - ./db/init:/docker-entrypoint-initdb.d
-        networks:
-            - keycloak_net
-            - database_net
-        restart: unless-stopped
-        healthcheck:
-            test: ["CMD-SHELL", "pg_isready -U keycloak"]
-            interval: 10s
-            timeout: 5s
-            retries: 5
+  database-api:
+    build:
+      context: .
+      dockerfile: src/services/database_api/Dockerfile
+    restart: unless-stopped
+    environment:
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_NAME: automotive_os
+      DB_USER: ${APP_DB_USER}
+      DB_PASSWORD: ${APP_DB_PASSWORD}
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_REALM: ${KEYCLOAK_REALM}
+      KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+    ports:
+      - "${DATABASE_API_PORT:-8082}:8080"
+    networks:
+      - database_net
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
 
-    keycloak:
-        image: quay.io/keycloak/keycloak:24.0
-        environment:
-            KC_HOSTNAME_URL: "${KEYCLOAK_HOSTNAME_URL}"
-            KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
-            KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-            KC_DB: postgres
-            KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
-            KC_DB_USERNAME: ${KC_DB_USERNAME}
-            KC_DB_PASSWORD: ${KC_DB_PASSWORD}
-            KC_HOSTNAME_STRICT: "false"
-            KC_HTTP_ENABLED: "true"
-            KC_PROXY: "${KEYCLOAK_PROXY:-none}"
-            KC_CACHE: local
-            KC_LOG_LEVEL: INFO
-            KC_SPI_THEME_DEFAULT_WELCOME_THEME: automotive_app
-        volumes:
-            - ./src/keycloak/automotive-realm.json:/opt/keycloak/data/import/automotive-realm.json:ro
-            - ./src/keycloak/themes:/opt/keycloak/themes
-        ports:
-            - "${KC_PORT:-8081}:8080"
-        command: start --import-realm
-        depends_on:
-            postgres:
-                condition: service_healthy
-        healthcheck:
-            test:
-                [
-                    "CMD-SHELL",
-                    "curl -sf http://localhost:8080/health/ready || exit 1",
-                ]
-            interval: 30s
-            timeout: 10s
-            retries: 5
-            start_period: 60s
-        networks:
-            - keycloak_net
-            - database_net
-        restart: unless-stopped
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: keycloak
+      POSTGRES_USER: ${KC_DB_USERNAME}
+      POSTGRES_PASSWORD: ${KC_DB_PASSWORD}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+    volumes:
+      - keycloak_db_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    networks:
+      - keycloak_net
+      - database_net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U keycloak"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
-    database-api:
-        build:
-            context: .
-            dockerfile: src/services/database_api/Dockerfile
-        restart: unless-stopped
-        depends_on:
-            postgres:
-                condition: service_healthy
-            keycloak:
-                condition: service_started
-        environment:
-            DB_HOST: postgres
-            DB_PORT: 5432
-            DB_NAME: automotive_os
-            DB_USER: ${APP_DB_USER}
-            DB_PASSWORD: ${APP_DB_PASSWORD}
-            KEYCLOAK_URL: http://keycloak:8080
-            KEYCLOAK_REALM: ${KEYCLOAK_REALM}
-            KEYCLOAK_CLIENT_ID: ${KEYCLOAK_CLIENT_ID}
-            KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
-            KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
-        ports:
-            - "${DATABASE_API_PORT:-8082}:8080"
-        networks:
-            - database_net
+  keycloak:
+    image: quay.io/keycloak/keycloak:24.0
+    environment:
+      KC_HOSTNAME_URL: "${KEYCLOAK_HOSTNAME_URL}"
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KC_DB: postgres
+      KC_DB_URL: jdbc:postgresql://postgres:5432/keycloak
+      KC_DB_USERNAME: ${KC_DB_USERNAME}
+      KC_DB_PASSWORD: ${KC_DB_PASSWORD}
+      KC_HOSTNAME_STRICT: "false"
+      KC_HTTP_ENABLED: "true"
+      KC_PROXY: "${KEYCLOAK_PROXY:-none}"
+      KC_CACHE: local
+      KC_LOG_LEVEL: INFO
+      KC_SPI_THEME_DEFAULT_WELCOME_THEME: automotive_app
+    volumes:
+      - ./src/keycloak/automotive-realm.json:/opt/keycloak/data/import/automotive-realm.json:ro
+      - ./src/keycloak/themes:/opt/keycloak/themes
+    ports:
+      - "${KC_PORT:-8081}:8080"
+    command: start --import-realm
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -sf http://localhost:8080/health/ready || exit 1",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    networks:
+      - keycloak_net
+      - database_net
+    restart: unless-stopped
 
 networks:
-    default:
-        driver: bridge
-    keycloak_net:
-        driver: bridge
-    database_net:
-        driver: bridge
+  default:
+    driver: bridge
+  keycloak_net:
+    driver: bridge
+  database_net:
+    driver: bridge
 
 volumes:
-    keycloak_db_data:
+  keycloak_db_data:

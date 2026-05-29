@@ -33,16 +33,16 @@ def _check_connectivity(host="10.255.38.67", port=80, timeout=2):
         socket.create_connection((host, port), timeout=timeout)
     except (socket.timeout, socket.error):
         return False
-    
+
     # Then verify the actual weather API has meteo things
     try:
         weather_api_url = os.getenv("WEATHER_API_URL", "")
         weather_user = os.getenv("WEATHER_USER", "")
         weather_pass = os.getenv("WEATHER_PASS", "")
-        
+
         if not all([weather_api_url, weather_user, weather_pass]):
             return False
-        
+
         # Try to fetch meteo things from Ditto API
         api_url = weather_api_url.rstrip('/')
         search_url = f"{api_url}/api/2/search/things"
@@ -50,14 +50,14 @@ def _check_connectivity(host="10.255.38.67", port=80, timeout=2):
             'namespaces': 'meteo',
             'option': 'size(1)'
         }
-        
+
         response = requests.get(
             search_url,
             params=params,
             auth=HTTPBasicAuth(weather_user, weather_pass),
             timeout=timeout
         )
-        
+
         if response.status_code == 200:
             data = response.json()
             # Check if we got at least one meteo thing
@@ -66,7 +66,7 @@ def _check_connectivity(host="10.255.38.67", port=80, timeout=2):
                 return len(items) > 0
             elif isinstance(data, list):
                 return len(data) > 0
-        
+
         return False
     except Exception:
         return False
@@ -81,7 +81,7 @@ def tomastest_available():
 def pytest_collection_modifyitems(config, items):
     """skip station_assignment tests if stations not available."""
     tomastest_ok = _check_connectivity()
-    
+
     if not tomastest_ok:
         skip_tomastest = pytest.mark.skip(reason="tomastest.com (10.255.38.67) is not reachable or has no meteo data")
         for item in items:
@@ -141,9 +141,9 @@ def _cleanup_test_cars(car_ids: List[str]) -> None:
             client.publish(f"cars/raw_updates/{car_id}", sentinel, qos=1)
             # Evict detector state (each detector subscribes to cars/updates/+).
             client.publish(f"cars/updates/{car_id}", sentinel, qos=1)
-            
+
         # Give services time to process cleanup messages
-        time.sleep(0.3)
+        time.sleep(2.0)
         client.loop_stop()
         client.disconnect()
     except Exception as e:

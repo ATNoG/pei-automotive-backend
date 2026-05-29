@@ -26,7 +26,7 @@ div[class*="login-pf"] {
 }
 
 html {
-  height: 100%; /* Must be strict height for percentage calculations to work */
+  height: 100%;
 }
 
 body {
@@ -35,7 +35,7 @@ body {
   line-height: 1.5;
   color: #111111;
   background-color: #ffffff !important;
-  min-height: 100vh; /* 100vh guarantees it fills the exact viewport height */
+  min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -109,7 +109,6 @@ body {
   max-width: 420px;
   padding: 36px 32px 28px;
   margin: 0 auto auto;
-  /* Fix overflow so long register forms don't escape the card */
   overflow: visible;
 }
 
@@ -120,11 +119,11 @@ body {
 }
 
 .login-pf-header .col-md-10 {
-  order: 1; /* Forces Title to the top */
+  order: 1;
 }
 
 .login-pf-header .subtitle {
-  order: 2; /* Forces Subtitle below title */
+  order: 2;
   margin-bottom: 20px;
   font-size: 0.85rem;
   color: #666666;
@@ -135,8 +134,8 @@ body {
   font-weight: 700;
   letter-spacing: -0.3px;
   color: #111111;
-  margin-bottom: 4px; /* Reduced margin since subtitle is now below it */
-  text-align: left; /* Changed to left so it aligns with the form */
+  margin-bottom: 4px;
+  text-align: left;
 }
 
 /* ---------- Form groups ---------- */
@@ -161,14 +160,14 @@ label {
   font-size: 0.813rem;
   font-weight: 600;
   color: #444444;
-  margin-bottom: 0 !important; /* Let the wrapper handle the bottom margin */
+  margin-bottom: 0 !important;
   letter-spacing: 0.1px;
 }
 
 .pf-c-form__label-required,
 span.required {
   display: inline-block !important;
-  margin: 0 !important; /* Reset margins so the gap property handles spacing */
+  margin: 0 !important;
   color: #d32f2f !important;
   font-weight: bold;
 }
@@ -401,7 +400,7 @@ input[type="submit"].btn-primary:disabled,
   border-radius: 10px;
   cursor: pointer;
   transition: background 0.18s, border-color 0.18s;
-  margin-top: 12px; /* Adds space between Yes and No */
+  margin-top: 12px;
 }
 
 #kc-cancel:hover {
@@ -603,4 +602,46 @@ input[type="submit"].btn-primary:disabled,
   .login-pf-page {
     padding: 28px 12px 28px;
   }
+}
+
+.code-input-container {
+    display: flex;
+    justify-content: center;
+    margin: 20px 0;
+}
+
+.aaos-device-input {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace !important;
+
+    font-size: 1.6rem !important;
+    line-height: 1 !important;
+
+    letter-spacing: 0 !important;
+    text-indent: 0 !important;
+
+    text-align: center;
+
+    text-transform: uppercase;
+
+    width: 100%;
+    max-width: 260px;
+
+    padding: 10px 12px !important;
+
+    border: 2px solid #005fb8;
+    border-radius: 12px;
+
+    background-color: #f8f9fa;
+
+    overflow: visible !important;
+
+    box-sizing: border-box;
+
+    display: block;
+}
+
+.instruction {
+    text-align: center;
+    color: #555;
+    margin-bottom: 10px;
 }
