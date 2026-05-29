@@ -9,8 +9,29 @@ on:
     pull_request:
 
 jobs:
-    tests-e2e-ditto:
-        name: tests e2e from ditto
+    unit-tests:
+        name: unit tests
+        runs-on: [self-hosted, test-runner]
+        permissions:
+            contents: read
+        timeout-minutes: 5
+        env:
+            CI: "true"
+
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install/Update dependencies
+              run: |
+                  pip install --upgrade pip
+                  pip install -r requirements.txt
+
+            - name: Run unit tests
+              run: |
+                  pytest tests/unit -v
+
+    e2e-tests-ditto:
+        name: e2e tests starting from ditto
         runs-on: [self-hosted, test-runner]
         permissions:
             contents: read
