@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "$0")/.." || exit
+
 REGISTRY="atnog-harbor.av.it.pt/pei-2025-automotive-app"
 TAG="1.0"
 
