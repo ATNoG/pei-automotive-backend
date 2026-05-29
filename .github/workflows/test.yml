@@ -35,7 +35,7 @@ jobs:
             - name: Run security audit on dependencies (pip-audit)
               run: |
                   pip install --user pip-audit
-                  python -m pip_audit -r requirements.txt -r database_requirements.txt
+                  python3 -m pip_audit -r requirements.txt -r database_requirements.txt
 
             - name: Generate .env file
               env:
