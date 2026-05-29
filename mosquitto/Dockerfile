@@ -24,8 +24,10 @@ RUN wget -q "https://mosquitto.org/files/source/mosquitto-${MOSQUITTO_VERSION}.t
 FROM iegomez/mosquitto-go-auth:3.0.0-mosquitto_2.0.18
 
 USER root
-RUN printf 'deb http://deb.debian.org/debian bookworm main\ndeb http://deb.debian.org/debian bookworm-updates main\ndeb http://deb.debian.org/debian-security bookworm-security main\n' > /etc/apt/sources.list \
- && rm -f /etc/apt/sources.list.d/*.list \
+RUN apt-get clean \
+ && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list /etc/apt/sources.list.d \
+ && mkdir -p /etc/apt/sources.list.d \
+ && printf 'deb http://deb.debian.org/debian bookworm main\ndeb http://deb.debian.org/debian bookworm-updates main\ndeb http://deb.debian.org/debian-security bookworm-security main\n' > /etc/apt/sources.list \
  && apt-get update \
  && apt-get install -y --no-install-recommends libwebsockets17 \
  && rm -rf /var/lib/apt/lists/*
