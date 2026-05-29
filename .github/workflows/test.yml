@@ -1,7 +1,7 @@
 ## test workflow
 # must have python, pip, pytest and docker installed for the tests to run
 
-name: Test
+name: CI
 
 on:
     push:
@@ -9,7 +9,8 @@ on:
     pull_request:
 
 jobs:
-    test:
+    tests-e2e-ditto:
+        name: tests e2e from ditto
         runs-on: [self-hosted, test-runner]
         permissions:
             contents: read
