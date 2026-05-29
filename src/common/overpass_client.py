@@ -324,7 +324,7 @@ def _ensure_live_if_outside_snapshot(lat: float, lon: float) -> None:
         if key in _live_fetched_keys:
             return
         _live_fetched_keys.add(key)
-    _fetch_live_around(lat, lon)
+    threading.Thread(target=_fetch_live_around, args=(lat, lon), daemon=True).start()
 
 
 def get_speed_limit(lat: float, lon: float) -> float:
