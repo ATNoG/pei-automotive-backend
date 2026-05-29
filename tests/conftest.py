@@ -113,12 +113,50 @@ def get_car_id(use_fixed_ids, test_car_registry):
     return _get_car_id
 
 
+def _ditto_delete_thing(thing_id: str, dry_run: bool = False) -> bool:
+    """Delete a Ditto Thing and its Policy, plus the Hono device."""
+    ditto_api = os.getenv("DITTO_API_URL", "").rstrip("/")
+    ditto_auth = (os.getenv("DITTO_USER", ""), os.getenv("DITTO_PASS", ""))
+    hono_api = os.getenv("HONO_API_URL", "").rstrip("/")
+    hono_auth = (os.getenv("HONO_USER", ""), os.getenv("HONO_PASS", ""))
+    hono_tenant = os.getenv("HONO_TENANT", "")
+
+    if dry_run:
+        return True
+
+    for url, label, optional in [
+        (f"{ditto_api}/api/2/things/{thing_id}", "Ditto Thing", False),
+        (f"{ditto_api}/api/2/policies/{thing_id}", "Ditto Policy", False),
+        (f"{hono_api}/v1/devices/{hono_tenant}/{thing_id}", "Hono Device", True),
+    ]:
+        try:
+            resp = requests.delete(url, auth=HTTPBasicAuth(*ditto_auth) if "ditto" in label.lower() else HTTPBasicAuth(*hono_auth), timeout=10)
+            if resp.status_code not in (200, 202, 204, 404):
+                print(f"[cleanup] warning: {label} delete returned {resp.status_code}")
+            else:
+                print(f"[cleanup] {label} deleted: {thing_id}")
+        except Exception as e:
+            if not optional:
+                print(f"[cleanup] warning: {label} delete failed for {thing_id}: {e}")
+    return True
+
+
 def _cleanup_test_cars(car_ids: List[str]) -> None:
-    """clean up test cars from services and local device files."""
+    """clean up test cars from Ditto, services, and local device files."""
     if not car_ids:
         return
 
     print(f"\n[cleanup] removing {len(car_ids)} test cars...")
+
+    # Delete Ditto Things first so no stale events reach the WS/proximity_filter.
+    for cid in car_ids:
+        meta_path = SIM_DIR / "devices" / f"{cid}.json"
+        if meta_path.exists():
+            meta = json.loads(meta_path.read_text())
+            thing_id = meta.get("thing_id", f"org.acme:{cid}")
+        else:
+            thing_id = f"org.acme:{cid}"
+        _ditto_delete_thing(thing_id)
 
     try:
         client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
@@ -127,23 +165,19 @@ def _cleanup_test_cars(car_ids: List[str]) -> None:
         time.sleep(0.2)
 
         for car_id in car_ids:
-            # Tell consumers to clear stale per-car traffic jam alerts.
-            clear_msg = json.dumps({
-                "notification_type": "traffic_jam_clear",
-                "target_car_id": car_id,
-                "reason": "test_cleanup",
-                "timestamp": time.time()
-            })
-            client.publish(f"alerts/traffic_jam/{car_id}", clear_msg, qos=1)
-
             sentinel = json.dumps({"car_id": car_id, "_test_cleanup": True})
             # Evict position_processor state (subscribes to cars/raw_updates/+).
             client.publish(f"cars/raw_updates/{car_id}", sentinel, qos=1)
             # Evict detector state (each detector subscribes to cars/updates/+).
             client.publish(f"cars/updates/{car_id}", sentinel, qos=1)
+            # Tell the traffic_jam_detector to evict this car from any jam
+            # (the _test_cleanup sentinel on cars/updates already triggers
+            # traffic_jam_detector._cleanup_car which removes the car from
+            # jams and publishes traffic_jam_cleared with the proper jam_id
+            # if the jam dissolves).
 
         # Give services time to process cleanup messages
-        time.sleep(2.0)
+        time.sleep(1.0)
         client.loop_stop()
         client.disconnect()
     except Exception as e:

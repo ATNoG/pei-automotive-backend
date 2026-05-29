@@ -78,12 +78,9 @@ class PositionProcessor:
         lat = data.get("latitude")
         lon = data.get("longitude")
 
-        # Cleanup sentinel or origin marker: evict state and forward so
+        # Cleanup sentinel: evict state and forward so
         # all detectors on cars/updates can clean up their own state.
-        if data.get("_test_cleanup") or (
-            lat is not None and lon is not None
-            and abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001
-        ):
+        if data.get("_test_cleanup"):
             with self.states_lock:
                 if car_id in self.states:
                     del self.states[car_id]
