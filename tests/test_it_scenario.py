@@ -70,7 +70,10 @@ def test_real_world_overtaking_direct(get_car_id):
     def _send_pair(e_lat, e_lon, l_lat, l_lon):
         t1 = Thread(target=send_position_ditto, args=(car_entering, e_lat, e_lon))
         t2 = Thread(target=send_position_ditto, args=(car_left, l_lat, l_lon))
-        t1.start(); t2.start(); t1.join(); t2.join()
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
 
     # Phase 1: car_entering walks every point of the ramp; car_left is stopped
     # at the far end of its approach road (~16 m from the merge point), clearly

@@ -80,7 +80,10 @@ def test_real_world_overtaking(get_car_id):
         e_lat, e_lon = entering_route[i]
         t1 = Thread(target=send_position, args=(car_entering, e_lat, e_lon))
         t2 = Thread(target=send_position, args=(car_left, left_stopped_lat, left_stopped_lon))
-        t1.start(); t2.start(); t1.join(); t2.join()
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
         time.sleep(0.05)
 
     # Wait for the lane_merge_safe alert to propagate
@@ -94,7 +97,10 @@ def test_real_world_overtaking(get_car_id):
         e_lat, e_lon = main_right[min(enter_idx, len(main_right) - 1)]
         t1 = Thread(target=send_position, args=(car_entering, e_lat, e_lon))
         t2 = Thread(target=send_position, args=(car_left, l_lat, l_lon))
-        t1.start(); t2.start(); t1.join(); t2.join()
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
         time.sleep(0.05)
         enter_idx += 1
 
@@ -108,7 +114,10 @@ def test_real_world_overtaking(get_car_id):
         l_lat, l_lon = main_left[l_idx]
         t1 = Thread(target=send_position, args=(car_entering, e_lat, e_lon))
         t2 = Thread(target=send_position, args=(car_left, l_lat, l_lon))
-        t1.start(); t2.start(); t1.join(); t2.join()
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
         time.sleep(0.05)
         enter_idx += 1
 

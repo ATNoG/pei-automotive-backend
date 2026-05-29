@@ -55,8 +55,10 @@ def _drive_pair(slow_id: str, fast_id: str, lat: float, base_lon: float):
 
         t_slow = Thread(target=send_position, args=(slow_id, lat, slow_lon))
         t_fast = Thread(target=send_position, args=(fast_id, lat, fast_lon))
-        t_slow.start(); t_fast.start()
-        t_slow.join();  t_fast.join()
+        t_slow.start()
+        t_fast.start()
+        t_slow.join()
+        t_fast.join()
         time.sleep(0.05)
 
 
@@ -86,8 +88,10 @@ def test_proximity_filter_end_to_end(get_car_id):
 
     aveiro = Thread(target=_drive_pair, args=(a_slow, a_fast, 40.6405, -8.6538))
     ovar = Thread(target=_drive_pair, args=(b_slow, b_fast, 40.866, -8.627))
-    aveiro.start(); ovar.start()
-    aveiro.join();  ovar.join()
+    aveiro.start()
+    ovar.start()
+    aveiro.join()
+    ovar.join()
 
     time.sleep(2)
     client.loop_stop()
