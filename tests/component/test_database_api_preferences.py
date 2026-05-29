@@ -34,7 +34,6 @@ os.environ.setdefault("DB_PASSWORD", "test_password")
 os.environ.setdefault("KEYCLOAK_URL", "http://localhost:8080")
 os.environ.setdefault("KEYCLOAK_REALM", "automotive-app")
 
-from middleware.auth import ensure_user_exists
 from models.preference import UpdatePreferencesRequest
 from repositories.preference_repository import PreferenceRepository
 from routers import preferences as preferences_router

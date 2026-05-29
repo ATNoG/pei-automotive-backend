@@ -1,6 +1,5 @@
 #!/usr/bin/python3
 
-import ssl
 import json
 import time
 import random

@@ -220,7 +220,7 @@ class MeteoComparison:
         
         # Make OpenWeather API call
         if self.region_filter and self.region_filter.lower() == 'aveiro':
-            logger.info(f"Fetching OpenWeather data for Aveiro (single call)...")
+            logger.info("Fetching OpenWeather data for Aveiro (single call)...")
             openweather_data = self.openweather.get_weather_by_coords(AVEIRO_LAT, AVEIRO_LON)
             if not openweather_data:
                 logger.error("Failed to fetch OpenWeather data")
