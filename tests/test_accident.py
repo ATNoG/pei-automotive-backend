@@ -14,8 +14,8 @@ from helpers import (
     standalone_get_car_id,
 )
 
-POSITION_INTERVAL = 0.15
-STEP_SIZE = 5
+POSITION_INTERVAL = 0.10
+STEP_SIZE = 2
 PHASE1_PERCENTAGE = 0.80
 ALERT_TIMEOUT = 3.0
 THREAD_TIMEOUT = 60.0

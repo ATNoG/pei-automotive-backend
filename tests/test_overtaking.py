@@ -36,7 +36,7 @@ def test_overtaking(get_car_id):
     with open(ROADS_DIR / "left_lane.json") as f:
         left_lane = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    for i in range(0, len(right_lane) - 51, 3):
+    for i in range(0, len(right_lane) - 51, 1):
         slow_idx = i + 4
         fast_idx = round(i * 1.6)
 

@@ -62,17 +62,17 @@ def test_traffic_jam(get_car_id):
         with open(ROADS_DIR / "highway.json") as f:
             highway_coords = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-        phase1_iterations = 6
+        phase1_iterations = 12
         for iteration in range(phase1_iterations):
             positions = []
 
-            lead_idx = iteration * 3 + 20
+            lead_idx = iteration * 2 + 20
             if lead_idx < len(highway_coords):
                 lat, lon = highway_coords[lead_idx]
                 positions.append((lead_car, lat, lon))
 
             for i, car in enumerate(jam_cars):
-                car_idx = lead_idx - (i + 1) * 2
+                car_idx = lead_idx - (i + 1)
                 if 0 <= car_idx < len(highway_coords):
                     lat, lon = highway_coords[car_idx]
                     positions.append((car, lat, lon))
@@ -80,23 +80,23 @@ def test_traffic_jam(get_car_id):
             _send_parallel(positions)
             time.sleep(0.08)
 
-        final_lead_idx = (phase1_iterations - 1) * 3 + 20
+        final_lead_idx = (phase1_iterations - 1) * 2 + 20
         accident_lat, accident_lon = highway_coords[final_lead_idx]
 
-        phase2_iterations = 8
+        phase2_iterations = 16
         for iteration in range(phase2_iterations):
             positions = []
 
             positions.append((lead_car, accident_lat, accident_lon))
 
             for i, car in enumerate(jam_cars):
-                car_idx = final_lead_idx - (i + 1) * 2
+                car_idx = final_lead_idx - (i + 1)
                 if 0 <= car_idx < len(highway_coords):
                     lat, lon = highway_coords[car_idx]
                     positions.append((car, lat, lon))
 
             _send_parallel(positions)
-            time.sleep(0.5)
+            time.sleep(0.25)
 
     jam_alerts_dedup = {}
     for t, a in all_alerts:

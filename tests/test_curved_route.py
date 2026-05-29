@@ -33,7 +33,7 @@ def test_curved_route(get_car_id):
     with open(ROADS_DIR / "route.json") as f:
         coords = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    for i in range(0, len(coords), 3):
+    for i in range(0, len(coords), 1):
         lon, lat = coords[i]
         send_position_ditto(car, lat, lon)
         time.sleep(0.02)

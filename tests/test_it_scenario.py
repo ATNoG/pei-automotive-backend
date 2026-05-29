@@ -78,13 +78,17 @@ def test_real_world_overtaking_direct(get_car_id):
     # Phase 1: car_entering walks every point of the ramp; car_left is stopped
     # at the far end of its approach road (~16 m from the merge point), clearly
     # behind and to the left of the merge zone, yielding to the merging car.
+    # Send car_left's position twice to ensure it's registered before the loop.
     left_stopped_lat, left_stopped_lon = left_route[0]
 
     send_position_ditto(car_left, left_stopped_lat, left_stopped_lon)
+    time.sleep(0.1)
+    send_position_ditto(car_left, left_stopped_lat, left_stopped_lon)
+    time.sleep(0.1)
 
     for e_lat, e_lon in entering_route:
         _send_pair(e_lat, e_lon, left_stopped_lat, left_stopped_lon)
-        time.sleep(0.1)
+        time.sleep(0.08)
 
     # Wait for the lane_merge_safe alert to propagate before Phase 2.
     time.sleep(1)
@@ -92,16 +96,21 @@ def test_real_world_overtaking_direct(get_car_id):
     # Transition: car_left walks left_route toward main_left while car_entering
     # moves slowly along main_right (1 pt/step ≈ 1 m/update). enter_idx is
     # carried into Phase 2 so car_entering never jumps position.
+    # Send each point on left_route (except first, already sent above).
     enter_idx = 0
     for l_lat, l_lon in left_route[1:]:
         e_lat, e_lon = main_right[min(enter_idx, len(main_right) - 1)]
         _send_pair(e_lat, e_lon, l_lat, l_lon)
         enter_idx += 1
-        time.sleep(0.1)
+        time.sleep(0.08)
 
-    # Warm up car_left's heading on main_left before the race
-    send_position_ditto(car_left, main_left[0][0], main_left[0][1])
-    time.sleep(1.0)
+    # Warm up car_left's heading on main_left before the race: send 3 warm-up
+    # points at the start of main_left so the position processor computes a
+    # heading before the overtaking phase begins.
+    for warmup_idx in range(min(3, len(main_left))):
+        send_position_ditto(car_left, main_left[warmup_idx][0], main_left[warmup_idx][1])
+        time.sleep(0.3)
+    time.sleep(0.5)
 
     # Phase 2: car_left accelerates onto main_left at step=2 (~4 m/update).
     # car_entering continues at ~1 m/update and is ~14 m ahead at phase start;
@@ -111,7 +120,7 @@ def test_real_world_overtaking_direct(get_car_id):
         e_lat, e_lon = main_right[min(enter_idx, len(main_right) - 1)]
         _send_pair(e_lat, e_lon, main_left[l_idx][0], main_left[l_idx][1])
         enter_idx += 1
-        time.sleep(1.0)
+        time.sleep(0.5)
 
     # Ditto WS throttling delays event delivery; poll until both alerts arrive.
     deadline = time.time() + 15

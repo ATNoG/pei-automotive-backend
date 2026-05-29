@@ -33,8 +33,8 @@ def _send_pair(c1, lat1, lon1, c2, lat2, lon2):
 
 
 def _simulate_merge_unsafe(highway_car, entering_car, highway_start_idx, highway_route, entering_route):
-    for step in range(7):
-        entering_idx = min((step * len(entering_route) // 8) + 1, len(entering_route) - 1)
+    for step in range(15):
+        entering_idx = min((step * len(entering_route) // 16) + 1, len(entering_route) - 1)
         entering_lat, entering_lon = entering_route[entering_idx]
 
         highway_idx = highway_start_idx + step
@@ -43,12 +43,12 @@ def _simulate_merge_unsafe(highway_car, entering_car, highway_start_idx, highway
 
         _send_pair(entering_car, entering_lat, entering_lon,
                    highway_car, highway_lat, highway_lon)
-        time.sleep(0.1)
+        time.sleep(0.08)
 
 
 def _simulate_merge_safe(highway_car, entering_car, highway_start_idx, highway_route, entering_route):
-    for step in range(7):
-        entering_idx = min(step * len(entering_route) // 6, len(entering_route) - 1)
+    for step in range(15):
+        entering_idx = min(step * len(entering_route) // 14, len(entering_route) - 1)
         entering_lat, entering_lon = entering_route[entering_idx]
 
         highway_idx = highway_start_idx + step
@@ -57,7 +57,7 @@ def _simulate_merge_safe(highway_car, entering_car, highway_start_idx, highway_r
 
         _send_pair(entering_car, entering_lat, entering_lon,
                    highway_car, highway_lat, highway_lon)
-        time.sleep(0.1)
+        time.sleep(0.08)
 
 
 def test_merge_unsafe(get_car_id):
