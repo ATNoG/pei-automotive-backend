@@ -1,6 +1,6 @@
 services:
   mosquitto_broker:
-    image: iegomez/mosquitto-go-auth:3.0.0-mosquitto_2.0.18
+    image: iegomez/mosquitto-go-auth:3.0.0-mosquitto_2.0.18 # gitleaks:allow
     ports:
       - "1883:1883"
       - "8883:9001"
