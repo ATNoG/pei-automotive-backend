@@ -9,14 +9,10 @@ from typing import List
 import paho.mqtt.client as mqtt
 import pytest
 import requests
-import urllib3
 from requests.adapters import HTTPAdapter
 from requests.auth import HTTPBasicAuth
 from urllib3.util.retry import Retry
 from dotenv import load_dotenv
-
-urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
-
 from helpers import MQTT_HOST, MQTT_PORT, SIM_DIR
 
 # Load environment variables
