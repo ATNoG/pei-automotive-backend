@@ -61,6 +61,8 @@ jobs:
                   HONO_MQTT_PORT: ${{ secrets.HONO_MQTT_PORT }}
                   HONO_USER: ${{ secrets.HONO_USER }}
                   HONO_PASS: ${{ secrets.HONO_PASS }}
+                  MQTT_BROKER_USER: backend
+                  MQTT_BROKER_PASSWORD: 0P52J*hB_7Q6
               run: |
                   chmod +x scripts/ci/make_env_ci.sh
                   ./scripts/ci/make_env_ci.sh
