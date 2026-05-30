@@ -40,7 +40,7 @@ class PositionProcessor:
             password=config.broker_password,
             client_id="position-processor",
         )
-        self.states: Dict[str, Tuple[float, float, float]] = {}
+        self.states: Dict[str, Tuple[float, float, float, float | None]] = {}
         self.states_lock = threading.Lock()
 
     def _resolve_speed_limit(self, lat: float, lon: float) -> float:
@@ -107,7 +107,7 @@ class PositionProcessor:
             heading = None
 
             if last is not None:
-                last_lat, last_lon, last_ts = last
+                last_lat, last_lon, last_ts, last_heading = last
                 dt = now - last_ts
 
                 if dt > 0.05:
@@ -120,8 +120,12 @@ class PositionProcessor:
 
                     if dist_m > 1.0:
                         heading = bearing_deg(last_lat, last_lon, lat, lon)
+                    else:
+                        heading = last_heading
+                else:
+                    heading = last_heading
 
-            self.states[car_id] = (lat, lon, now)
+            self.states[car_id] = (lat, lon, now, heading)
 
         speed_limit = self._resolve_speed_limit(lat, lon)
 
