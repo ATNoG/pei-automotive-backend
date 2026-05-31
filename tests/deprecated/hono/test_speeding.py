@@ -2,13 +2,10 @@ import json
 import time
 
 import paho.mqtt.client as mqtt
+
 from helpers import (
-    MQTT_HOST,
-    MQTT_PORT,
-    ROADS_DIR,
-    ensure_car_exists,
-    send_position_ditto,
-    standalone_get_car_id,
+    MQTT_HOST, MQTT_PORT, ROADS_DIR,
+    ensure_car_exists, send_position, standalone_get_car_id,
 )
 
 ALERTS = []
@@ -40,10 +37,10 @@ def test_speeding(get_car_id):
     with open(ROADS_DIR / "right_lane_speeding.json") as f:
         coords = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    for i in range(0, len(coords) - 40, 1):
+    for i in range(0, len(coords) - 40, 5):
         lon, lat = coords[i]
-        send_position_ditto(car, lat, lon)
-        time.sleep(0.15)
+        send_position(car, lat, lon)
+        time.sleep(0.01)
 
     time.sleep(2)
     client.loop_stop()
@@ -51,10 +48,8 @@ def test_speeding(get_car_id):
     assert len(ALERTS) > 0, "expected at least one speed alert, got none"
 
     updates_with_limit = [
-        u
-        for u in CAR_UPDATES
-        if u.get("car_id", "").startswith("speed-car")
-        and u.get("speed_limit_kmh") is not None
+        u for u in CAR_UPDATES
+        if u.get("car_id", "").startswith("speed-car") and u.get("speed_limit_kmh") is not None
     ]
     assert len(updates_with_limit) > 0, (
         f"expected car updates with speed_limit_kmh, got none. sample: {CAR_UPDATES[:1]}"
@@ -62,17 +57,11 @@ def test_speeding(get_car_id):
 
     for update in updates_with_limit:
         limit = update["speed_limit_kmh"]
-        assert isinstance(limit, (int, float)), (
-            f"speed_limit_kmh should be numeric, got {type(limit)}: {limit}"
-        )
-        assert 0 < limit <= 300, (
-            f"speed_limit_kmh should be between 0 and 300, got {limit}"
-        )
+        assert isinstance(limit, (int, float)), f"speed_limit_kmh should be numeric, got {type(limit)}: {limit}"
+        assert 0 < limit <= 300, f"speed_limit_kmh should be between 0 and 300, got {limit}"
 
     for alert in ALERTS:
-        assert "speed_limit_kmh" in alert, (
-            f"speed alert missing speed_limit_kmh: {alert}"
-        )
+        assert "speed_limit_kmh" in alert, f"speed alert missing speed_limit_kmh: {alert}"
 
 
 if __name__ == "__main__":

@@ -1,0 +1,54 @@
+name: lint
+
+on:
+    push:
+        branches: [main]
+    pull_request:
+
+jobs:
+    ruff:
+        name: python
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install ruff
+              run: pip install ruff
+
+            - name: Lint
+              run: ruff check
+
+    shellcheck:
+        name: shell
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Run shellcheck
+              uses: ludeeus/action-shellcheck@master
+              with:
+                  severity: warning
+
+    hadolint:
+        name: dockerfile
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+        timeout-minutes: 5
+        steps:
+            - uses: actions/checkout@v4
+
+            - name: Install hadolint
+              run: |
+                  curl -sL https://github.com/hadolint/hadolint/releases/latest/download/hadolint-Linux-x86_64 -o /tmp/hadolint
+                  chmod +x /tmp/hadolint
+
+            - name: Lint Dockerfiles
+              run: |
+                  find . -name Dockerfile -exec /tmp/hadolint {} +

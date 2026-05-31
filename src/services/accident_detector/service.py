@@ -19,7 +19,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
-from common.models import CarUpdate, AlertPriority, AlertMetadata
+from common.models import CarUpdate, AlertPriority
 from common.utils import haversine_distance_m, bearing_deg
 
 logger = logging.getLogger(__name__)
@@ -213,13 +213,18 @@ class AccidentDetector:
         return notified
 
     def _cleanup_expired_accidents(self):
-        """Mark expired accidents as inactive."""
+        """Mark expired accidents as inactive and notify frontend."""
         now = time.time()
 
-        for event_id, accident in self.active_accidents.items():
-            if accident.active and (now - accident.detected_at > self.ACCIDENT_EXPIRY_S):
-                accident.active = False
-                logger.info(f"[ACCIDENT] Expired: {event_id}")
+        expired_ids = [
+            event_id for event_id, accident in self.active_accidents.items()
+            if accident.active and (now - accident.detected_at > self.ACCIDENT_EXPIRY_S)
+        ]
+        for event_id in expired_ids:
+            accident = self.active_accidents[event_id]
+            accident.active = False
+            self._publish_accident_cleared(event_id)
+            logger.info(f"[ACCIDENT] Expired: {event_id}")
 
     def _detect_sudden_stop(self, update: CarUpdate, state: CarState) -> bool:
         """
@@ -362,6 +367,16 @@ class AccidentDetector:
             if not self.cars_by_tile[old_tile]:
                 del self.cars_by_tile[old_tile]
 
+    def _publish_accident_cleared(self, event_id: str):
+        """Publish an accident-cleared notification so the frontend removes the marker."""
+        cleared_msg = json.dumps({
+            "notification_type": "accident_cleared",
+            "event_id": event_id,
+            "timestamp": time.time(),
+        })
+        self.mqtt.publish("alerts/accident/cleared", cleared_msg, qos=1)
+        logger.info(f"[ACCIDENT CLEARED] Published cleared for {event_id}")
+
     def _cleanup_car(self, car_id: str):
         """Remove all state for a specific car (used for test cleanup)."""
         if car_id in self.cars:
@@ -369,13 +384,14 @@ class AccidentDetector:
             self._evict_from_tile(car_id)
             logger.info(f"[CLEANUP] Removed car state: {car_id}")
 
-        # Remove any accidents caused by this car
+        # Remove any accidents caused by this car and notify the frontend
         accidents_to_remove = [
             event_id for event_id, accident in self.active_accidents.items()
             if accident.source_vehicle_id == car_id
         ]
         for event_id in accidents_to_remove:
             del self.active_accidents[event_id]
+            self._publish_accident_cleared(event_id)
             logger.info(f"[CLEANUP] Removed accident {event_id} caused by {car_id}")
 
     def run(self):

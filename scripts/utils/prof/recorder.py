@@ -1,10 +1,7 @@
 #!/usr/bin/python3
 
 import os
-import ssl
-import json
 import time
-import random
 import csv
 import paho.mqtt.client as mqtt
 from datetime import datetime

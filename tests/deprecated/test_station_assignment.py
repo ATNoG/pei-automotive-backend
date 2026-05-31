@@ -1,10 +1,8 @@
 import json
 import time
-import pytest
 from threading import Event
 
 import paho.mqtt.client as mqtt
-import pytest
 
 from helpers import (
     MQTT_HOST,

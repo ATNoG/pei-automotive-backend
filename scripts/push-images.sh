@@ -1,5 +1,7 @@
 #!/bin/bash
 
+cd "$(dirname "$0")/.." || exit
+
 REGISTRY="atnog-harbor.av.it.pt/pei-2025-automotive-app"
 TAG="1.0"
 
@@ -23,14 +25,14 @@ for service in "${services[@]}"; do
   echo "----------------------------------------"
   echo "Building $service..."
 
-  docker build -t $service:$TAG \
-    -f src/services/$service/Dockerfile . || exit 1
+  docker build -t "$service:$TAG" \
+    -f "src/services/$service/Dockerfile" . || exit 1
 
   echo "Tagging $service..."
-  docker tag $service:$TAG $REGISTRY/$service:$TAG || exit 1
+  docker tag "$service:$TAG" "$REGISTRY/$service:$TAG" || exit 1
 
   echo "Pushing $service..."
-  docker push $REGISTRY/$service:$TAG || exit 1
+  docker push "$REGISTRY/$service:$TAG" || exit 1
 
 done
 

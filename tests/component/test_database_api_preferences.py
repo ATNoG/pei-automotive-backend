@@ -34,11 +34,6 @@ os.environ.setdefault("DB_PASSWORD", "test_password")
 os.environ.setdefault("KEYCLOAK_URL", "http://localhost:8080")
 os.environ.setdefault("KEYCLOAK_REALM", "automotive-app")
 
-from middleware.auth import ensure_user_exists
-from models.preference import UpdatePreferencesRequest
-from repositories.preference_repository import PreferenceRepository
-from routers import preferences as preferences_router
-
 
 async def _ensure_user_exists_for_test(conn, user_id: UUID, username: str):
     await conn.execute(
@@ -207,6 +202,7 @@ async def _real_get_connection(conn: PgConnectionAdapter):
 
 
 def _build_test_app(conn: PgConnectionAdapter, user_id: UUID) -> FastAPI:
+    from routers import preferences as preferences_router
     app = FastAPI()
     app.include_router(preferences_router.router)
 
@@ -225,6 +221,8 @@ def _build_test_app(conn: PgConnectionAdapter, user_id: UUID) -> FastAPI:
 
 
 def test_repository_creates_defaults_and_updates_fields(db_conn: PgConnectionAdapter):
+    from models.preference import UpdatePreferencesRequest
+    from repositories.preference_repository import PreferenceRepository
     conn = db_conn
     repo = PreferenceRepository(conn)
     user_id = uuid4()
@@ -285,6 +283,7 @@ def test_get_preferences_endpoint_creates_user_and_defaults(db_conn: PgConnectio
 
 
 def test_patch_preferences_endpoint_updates_state(db_conn: PgConnectionAdapter):
+    from repositories.preference_repository import PreferenceRepository
     conn = db_conn
     user_id = uuid4()
     app = _build_test_app(conn, user_id)
