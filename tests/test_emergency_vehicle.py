@@ -2,8 +2,6 @@ import json
 import time
 from threading import Thread
 
-import pytest
-
 from helpers import (
     MQTT_HOST, MQTT_PORT, ROADS_DIR,
     ensure_car_exists, send_position_ditto, standalone_get_car_id, make_mqtt_client,
@@ -64,17 +62,17 @@ def test_emergency_vehicle(get_car_id):
         elif gap >= -1:
             t = (1 - gap) / 2
             r = lane_pos(right_lane, ev_idx)
-            l = lane_pos(left_lane, ev_idx)
-            e_lon = r[0] + (l[0] - r[0]) * t
-            e_lat = r[1] + (l[1] - r[1]) * t
+            lft = lane_pos(left_lane, ev_idx)
+            e_lon = r[0] + (lft[0] - r[0]) * t
+            e_lat = r[1] + (lft[1] - r[1]) * t
         elif gap > -9:
             e_lon, e_lat = lane_pos(left_lane, ev_idx)
         elif gap >= -11:
             t = (-9 - gap) / 2
-            l = lane_pos(left_lane, ev_idx)
+            lft = lane_pos(left_lane, ev_idx)
             r = lane_pos(right_lane, ev_idx)
-            e_lon = l[0] + (r[0] - l[0]) * t
-            e_lat = l[1] + (r[1] - l[1]) * t
+            e_lon = lft[0] + (r[0] - lft[0]) * t
+            e_lat = lft[1] + (r[1] - lft[1]) * t
         else:
             e_lon, e_lat = lane_pos(right_lane, ev_idx)
 

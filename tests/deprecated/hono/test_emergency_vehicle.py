@@ -3,8 +3,6 @@ import time
 from threading import Thread
 
 import paho.mqtt.client as mqtt
-import pytest
-
 from helpers import (
     MQTT_HOST, MQTT_PORT, ROADS_DIR,
     ensure_car_exists, send_position, standalone_get_car_id,

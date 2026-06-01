@@ -24,7 +24,7 @@ class MQTTClient:
         self.password = password
         self.client_id = client_id
 
-        self.client = mqtt.Client(client_id=client_id)
+        self.client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2, client_id=client_id)
         if username and password:
             self.client.username_pw_set(username, password)
 
@@ -34,17 +34,17 @@ class MQTTClient:
 
         self.connected = False
 
-    def _on_connect(self, client, userdata, flags, rc):
-        if rc == 0:
+    def _on_connect(self, client, userdata, flags, reason_code, properties):
+        if reason_code.is_failure:
+            logger.error(f"Failed to connect to MQTT broker: {reason_code}")
+        else:
             self.connected = True
             logger.info(f"Connected to MQTT broker at {self.host}:{self.port}")
-        else:
-            logger.error(f"Failed to connect to MQTT broker: {rc}")
 
-    def _on_disconnect(self, client, userdata, rc):
+    def _on_disconnect(self, client, userdata, flags, reason_code, properties):
         self.connected = False
-        if rc != 0:
-            logger.warning(f"Unexpected disconnection from MQTT broker: {rc}")
+        if reason_code.is_failure:
+            logger.warning(f"Unexpected disconnection from MQTT broker: {reason_code}")
 
     def _on_message(self, client, userdata, msg):
         # Default catch-all: only used when no per-topic callback was
