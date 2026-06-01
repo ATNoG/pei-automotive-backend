@@ -1,8 +1,6 @@
 import json
 import time
 
-import paho.mqtt.client as mqtt
-
 from helpers import (
     MQTT_HOST, MQTT_PORT, ROADS_DIR,
     ensure_car_exists, send_position_ditto, standalone_get_car_id, make_mqtt_client,

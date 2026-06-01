@@ -6,7 +6,6 @@ import time
 import uuid
 from typing import List
 
-import paho.mqtt.client as mqtt
 import pytest
 import requests
 from requests.adapters import HTTPAdapter

@@ -4,7 +4,6 @@ import threading
 import time
 from contextlib import contextmanager
 
-import paho.mqtt.client as mqtt
 from helpers import (
     MQTT_HOST,
     MQTT_PORT,

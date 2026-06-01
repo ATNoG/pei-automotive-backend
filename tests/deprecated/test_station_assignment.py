@@ -2,8 +2,6 @@ import json
 import time
 from threading import Event
 
-import paho.mqtt.client as mqtt
-
 from helpers import (
     MQTT_HOST,
     MQTT_PORT,

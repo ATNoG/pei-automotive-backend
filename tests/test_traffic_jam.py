@@ -3,8 +3,6 @@ import time
 from contextlib import contextmanager
 from threading import Thread
 
-import paho.mqtt.client as mqtt
-
 from helpers import (
     MQTT_HOST, MQTT_PORT, ROADS_DIR,
     ensure_car_exists, send_position_ditto, make_mqtt_client,

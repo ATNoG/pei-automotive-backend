@@ -25,7 +25,6 @@ from pathlib import Path
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import paho.mqtt.client as mqtt
 import pytest
 
 from helpers import make_mqtt_client
