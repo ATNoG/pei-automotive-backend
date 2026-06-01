@@ -25,15 +25,16 @@ from pathlib import Path
 from contextlib import contextmanager
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
-import paho.mqtt.client as mqtt
 import pytest
+
+from helpers import make_mqtt_client
 
 SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
 ROADS_DIR = SIM_DIR / "roads"
 
 # Configuration
 MQTT_HOST = os.getenv("TEST_MQTT_HOST", "localhost")
-MQTT_PORT = int(os.getenv("TEST_MQTT_PORT", "1884"))
+MQTT_PORT = int(os.getenv("TEST_MQTT_PORT", "1883"))
 POSITION_INTERVAL = 0.08  # Slightly slower for complex scenario
 STEP_SIZE = 3  # Increased from 2 to move cars faster along shorter highway
 ALERT_TIMEOUT = 5.0
@@ -80,7 +81,7 @@ def mqtt_alert_collector(topics: list[str]):
         alert_queue.put((msg.topic, payload))
         all_alerts.append((msg.topic, payload))
     
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = make_mqtt_client()
     try:
         client.on_message = on_message
         client.connect(MQTT_HOST, MQTT_PORT)

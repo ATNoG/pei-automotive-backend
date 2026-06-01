@@ -19,7 +19,7 @@ async def get_current_user(
             token,
             signing_key.key,
             algorithms=["RS256"],
-            options={"verify_aud": False},
+            audience=settings.keycloak_client_id or None,
         )
 
         username = payload.get("preferred_username") or payload["sub"]

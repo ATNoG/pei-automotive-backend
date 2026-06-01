@@ -2,14 +2,12 @@ import json
 import time
 from threading import Event
 
-import paho.mqtt.client as mqtt
-
 from helpers import (
     MQTT_HOST,
     MQTT_PORT,
     ensure_car_exists,
     send_position,
-    standalone_get_car_id,
+    standalone_get_car_id, make_mqtt_client,
 )
 
 ASSIGNMENTS = []
@@ -35,7 +33,7 @@ def test_station_assignment_basic(get_car_id):
     subscription_ready.clear()
     assignment_received.clear()
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = make_mqtt_client()
     client.on_message = on_station_assignment
     client.on_subscribe = on_subscribe
     client.connect(MQTT_HOST, MQTT_PORT)
@@ -78,7 +76,7 @@ def test_station_assignment_changes(get_car_id):
     subscription_ready.clear()
     assignment_received.clear()
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = make_mqtt_client()
     client.on_message = on_station_assignment
     client.on_subscribe = on_subscribe
     client.connect(MQTT_HOST, MQTT_PORT)
@@ -115,7 +113,7 @@ def test_station_assignment_no_duplicate_on_same_station(get_car_id):
     subscription_ready.clear()
     assignment_received.clear()
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = make_mqtt_client()
     client.on_message = on_station_assignment
     client.on_subscribe = on_subscribe
     client.connect(MQTT_HOST, MQTT_PORT)

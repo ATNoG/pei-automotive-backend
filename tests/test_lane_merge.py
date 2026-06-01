@@ -2,11 +2,9 @@ import json
 import time
 from threading import Thread
 
-import paho.mqtt.client as mqtt
-
 from helpers import (
     MQTT_HOST, MQTT_PORT, ROADS_DIR,
-    ensure_car_exists, send_position_ditto, standalone_get_car_id,
+    ensure_car_exists, send_position_ditto, standalone_get_car_id, make_mqtt_client,
 )
 
 ALERTS = []
@@ -53,7 +51,7 @@ def test_merge_unsafe(get_car_id):
     ensure_car_exists(highway_car)
     ensure_car_exists(entering_car)
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = make_mqtt_client()
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
     client.subscribe(f"alerts/lane_merge/{entering_car}")
@@ -86,7 +84,7 @@ def test_merge_safe(get_car_id):
     ensure_car_exists(highway_car)
     ensure_car_exists(entering_car)
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = make_mqtt_client()
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
     client.subscribe(f"alerts/lane_merge/{entering_car}")

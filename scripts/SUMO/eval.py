@@ -51,7 +51,7 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s  %(name)s  %(messa
 logger = logging.getLogger("eval")
 
 MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
-MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
+MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 
 def _available_packs() -> list[str]:

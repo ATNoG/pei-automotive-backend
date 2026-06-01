@@ -70,7 +70,7 @@ SCENARIOS: dict[str, ScenarioSpec] = {
 # previous scenario causes false alerts.
 _CLEANUP_CAR_IDS  = ["sumo-merging-car", "sumo-main-car", "sumo-main-car-2"]
 _CLEANUP_MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
-_CLEANUP_MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
+_CLEANUP_MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 _logger = logging.getLogger(__name__)
 

@@ -15,7 +15,7 @@ import certifi
 urllib3.disable_warnings()
 
 load_dotenv()
-DITTO_API = os.getenv("DITTO_API_URL")
+DITTO_API = os.getenv("DITTO_API_URL", "").rstrip("/")
 DITTO_AUTH = (os.getenv("DITTO_USER"), os.getenv("DITTO_PASS"))
 HONO_API = os.getenv("HONO_API_URL")
 HONO_AUTH = (os.getenv("HONO_USER"), os.getenv("HONO_PASS"))
