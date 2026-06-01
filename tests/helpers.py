@@ -81,6 +81,7 @@ def send_position_ditto(car_name: str, lat: float, lon: float, altitude: float =
     meta = _load_device_meta(car_name)
     api_url = os.getenv("DITTO_API_URL", "").rstrip("/")
     body = {
+        "emergency": meta.get("emergency", False),
         "referenceTime": datetime.now(timezone.utc).isoformat(),
         "referencePosition": {
             "latitude": lat,

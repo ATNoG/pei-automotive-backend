@@ -16,7 +16,6 @@ ALERTS = []
 def on_message(client, userdata, msg):
     ALERTS.append(json.loads(msg.payload.decode()))
 
-@pytest.mark.skip(reason="For now, no emergency")
 def test_emergency_vehicle(get_car_id):
     car_regular = get_car_id("ev-test-regular")      # regular car
     car_emergency = get_car_id("ev-test-emergency")  # emergency vehicle
