@@ -296,6 +296,15 @@ class LaneMergeDetector:
                     self._cleanup_car(car_id)
                 return
 
+            if data.get("_zone_reset"):
+                self.cars.clear()
+                for zone in self.zones:
+                    zone.main_lane_cars.clear()
+                    zone.merging_cars.clear()
+                    zone.alerted_pairs.clear()
+                logger.info("[ZONE RESET] Cleared all zone and car state")
+                return
+
             update = CarUpdate.from_dict(data)
         except Exception as e:
             logger.error(f"Failed to parse car update: {e}")

@@ -2,11 +2,9 @@ import json
 import time
 from threading import Thread
 
-import paho.mqtt.client as mqtt
-
 from helpers import (
     MQTT_HOST, MQTT_PORT, ROADS_DIR,
-    ensure_car_exists, send_position_ditto, standalone_get_car_id,
+    ensure_car_exists, send_position_ditto, standalone_get_car_id, make_mqtt_client,
 )
 
 OVERTAKING_ALERTS = []
@@ -49,7 +47,7 @@ def test_real_world_overtaking_direct(get_car_id):
     ensure_car_exists(car_entering)
     ensure_car_exists(car_left)
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = make_mqtt_client()
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
     client.loop_start()

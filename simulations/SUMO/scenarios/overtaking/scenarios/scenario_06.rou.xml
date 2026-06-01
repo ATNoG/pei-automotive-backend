@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 06 - TN / FP probe: same lane, car-following blocks the pass
+A 100 km/h car (lane 0) is stuck behind a 40 km/h car (lane 0).
+Lane changes are disabled on the fast car (lcStrategic=0, lcSpeedGain=0,
+lcCooperative=0), so it can never move to the passing lane.
+SUMO's car-following model enforces safe spacing; the fast car decelerates
+to match the slow car - the sign stays +1 and never flips.
+Expected: no_event.
+-->
+<routes>
+    <vType id="car_slow" accel="1.5" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="13.89" minGap="2.5"/>
+    <!-- lcStrategic/lcSpeedGain/lcCooperative=0 prevents any voluntary lane change -->
+    <vType id="car_blocked" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"
+           lcStrategic="0" lcSpeedGain="0" lcCooperative="0"/>
+
+    <vehicle id="sumo-merging-car" type="car_slow" depart="0.0"
+             departLane="0" departPos="30" departSpeed="11.11">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="sumo-main-car" type="car_blocked" depart="0.0"
+             departLane="0" departPos="0" departSpeed="11.11">
+        <route edges="highway"/>
+    </vehicle>
+</routes>

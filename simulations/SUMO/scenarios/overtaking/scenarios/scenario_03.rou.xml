@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 03 - TP: sequential overtake (two cars)
+120 km/h car (lane 1) starts behind two slower cars in lane 0:
+  main-car  : 40 km/h, 20 m ahead  → pass at ~0.9 s
+  main-car-2: 60 km/h, 40 m ahead  → pass at ~2.4 s
+The two lane-0 cars diverge (medium faster than slow) so no car-following issue.
+Expected: two overtaking_event alerts.
+-->
+<routes>
+    <vType id="car_fast" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"/>
+    <vType id="car_slow" accel="1.5" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="13.89" minGap="2.5"/>
+    <vType id="car_med"  accel="2.0" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="19.44" minGap="2.5"/>
+
+    <vehicle id="sumo-merging-car" type="car_slow" depart="0.0"
+             departLane="0" departPos="20" departSpeed="11.11">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="sumo-main-car-2" type="car_med" depart="0.0"
+             departLane="0" departPos="40" departSpeed="16.67">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="sumo-main-car" type="car_fast" depart="0.0"
+             departLane="1" departPos="0" departSpeed="33.33">
+        <route edges="highway"/>
+    </vehicle>
+</routes>

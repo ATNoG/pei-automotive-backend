@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 04 - TN: equal speed, constant gap
+Both cars at 80 km/h, main-car 30 m ahead in lane 0, merging-car in lane 1.
+No speed differential → gap stays constant → sign stays +1 → no flip.
+Expected: no_event.
+-->
+<routes>
+    <vType id="car_same" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="22.22" minGap="2.5"/>
+
+    <vehicle id="sumo-merging-car" type="car_same" depart="0.0"
+             departLane="0" departPos="30" departSpeed="22.22">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="sumo-main-car" type="car_same" depart="0.0"
+             departLane="1" departPos="0" departSpeed="22.22">
+        <route edges="highway"/>
+    </vehicle>
+</routes>

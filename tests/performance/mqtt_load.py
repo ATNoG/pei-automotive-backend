@@ -4,10 +4,14 @@ import json
 import statistics
 import threading
 import time
+from pathlib import Path
 from dataclasses import dataclass, field
 import paho.mqtt.client as mqtt
+import matplotlib.pyplot as plt
 
 _TOPIC_BASE = "cars/updates"
+output_path = Path('tests/performance/results/adaptive_stress_result.png')
+output_path.parent.mkdir(parents=True, exist_ok=True)
 
 
 # Metrics
@@ -31,6 +35,13 @@ class Metrics:
         with self._lock:
             self.received += 1
             self.latencies.append(latency_ms)
+            
+    def reset(self):
+        with self._lock:
+            self.sent = 0
+            self.received = 0
+            self.latencies.clear()
+            self.errors = 0
 
     def snapshot(self) -> dict:
         with self._lock:
@@ -149,6 +160,86 @@ def _run_spike(host: str, port: int, metrics: Metrics) -> None:
     sub_t.join(timeout=5)
 
 
+# Adaptive Stress Runner
+def _run_adaptive_stress(host: str, port: int, metrics: Metrics):
+    stop = threading.Event()
+    sub_t = threading.Thread(target=_run_subscriber, args=(host, port, metrics, stop), daemon=True)
+    sub_t.start()
+
+    current_rate = 100
+    step = 100
+    step_duration = 15
+    
+    rates_history = []
+    p95_history = []
+
+    print("  Starting Breakpoint Discovery (Threshold: P95 > 1000ms or Loss > 2%)...")
+    print("-" * 65)
+    print(f"  {'RATE (msg/s)':<15} | {'P95 LATENCY (ms)':<20} | {'MESSAGE LOSS (%)'}")
+    print("-" * 65)
+
+    while current_rate <= 5000:
+        metrics.reset()
+        
+        num_pubs = max(10, current_rate // 20)
+        pub_stops = [threading.Event() for _ in range(num_pubs)]
+        threads = [
+            threading.Thread(
+                target=_run_publisher,
+                args=(host, port, f"perf-car-{i}", current_rate / num_pubs, metrics, s),
+                daemon=True,
+            )
+            for i, s in enumerate(pub_stops)
+        ]
+        for t in threads:
+            t.start()
+
+        time.sleep(step_duration)
+
+        for s in pub_stops:
+            s.set()
+        for t in threads:
+            t.join(timeout=2)
+        
+        time.sleep(1)
+
+        snap = metrics.snapshot()
+        p95 = snap["latency"]["p95"] if snap["latency"]["p95"] is not None else 0
+        loss = snap["loss_pct"]
+
+        print(f"  {current_rate:<15} | {p95:<20} | {loss}%")
+        
+        rates_history.append(current_rate)
+        p95_history.append(p95)
+
+        if p95 > 1000 or loss > 2.0:
+            print("-" * 65)
+            print(f"  BREAKPOINT REACHED at {current_rate} msg/s")
+            break
+
+        current_rate += step
+
+    stop.set()
+    sub_t.join(timeout=2)
+    
+    if len(rates_history) > 1:
+        plt.figure(figsize=(10, 5))
+        plt.plot(rates_history, p95_history, marker='o', linestyle='-', color='#1c3a63', linewidth=2)
+        plt.axhline(y=1000, color='#F44336', linestyle='--', label='Threshold (1000ms)')
+        plt.plot(rates_history[-1], p95_history[-1], marker='o', markersize=10, color='#F44336')
+        
+        plt.title('Adaptive Stress Test: Breakpoint Discovery', fontweight='bold')
+        plt.xlabel('Load (Messages per Second)', fontweight='bold')
+        plt.ylabel('P95 Latency (ms)', fontweight='bold')
+        plt.grid(True, linestyle='--', alpha=0.6)
+        plt.legend()
+        plt.tight_layout()
+        plt.savefig(str(output_path), dpi=300)
+        print("  Chart generated successfully: 'adaptive_stress_result.png'")
+    else: 
+        print("  Not enough data points to generate chart.")
+
+
 # Reporting
 def _print_report(snap: dict, elapsed: float) -> None:
     throughput = round(snap["received"] / max(elapsed, 1), 1)
@@ -213,17 +304,17 @@ def _parse_args() -> argparse.Namespace:
     p.add_argument("--publishers", type=int,   default=10)
     p.add_argument("--rate",       type=float, default=50)
     p.add_argument("--duration",   type=int,   default=60)
-    p.add_argument("--scenario",   choices=["baseline", "load", "stress", "spike"], default=None)
+    p.add_argument("--scenario",   choices=["baseline", "load", "stress", "spike", "adaptive"], default=None)
     return p.parse_args()
 
 
 def main() -> None:
     args = _parse_args()
 
-    if args.scenario and args.scenario != "spike":
+    if args.scenario and args.scenario not in ["spike", "adaptive"]:
         cfg = SCENARIOS[args.scenario]
         publishers, rate, duration = cfg["publishers"], cfg["rate"], cfg["duration"]
-    elif args.scenario != "spike":
+    elif args.scenario not in ["spike", "adaptive"]:
         publishers, rate, duration = args.publishers, args.rate, args.duration
     else:
         publishers = rate = duration = None
@@ -234,7 +325,12 @@ def main() -> None:
     print("  pei-automotive / MQTT load test")
     print(f"  broker: {args.host}:{args.port}")
 
-    if args.scenario == "spike":
+    if args.scenario == "adaptive":
+        print("  scenario: adaptive stress (breakpoint finding)")
+        print()
+        _run_adaptive_stress(args.host, args.port, metrics)
+        return
+    elif args.scenario == "spike":
         print("  scenario: spike (10 -> 200 -> 10 msg/s)")
         print()
         t0 = time.time()

@@ -1,5 +1,6 @@
-*.env.example
+.env
 *.env
+!.env.example
 
 __pycache__
 devices/

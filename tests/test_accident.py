@@ -4,14 +4,13 @@ import threading
 import time
 from contextlib import contextmanager
 
-import paho.mqtt.client as mqtt
 from helpers import (
     MQTT_HOST,
     MQTT_PORT,
     ROADS_DIR,
     ensure_car_exists,
     send_position_ditto,
-    standalone_get_car_id,
+    standalone_get_car_id, make_mqtt_client,
 )
 
 POSITION_INTERVAL = 0.20
@@ -31,7 +30,7 @@ def mqtt_alert_collector(topics: list[str]):
         if payload.get("notification_type") == "accident_alert":
             alert_queue.put((car_id, payload))
 
-    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
+    client = make_mqtt_client()
     try:
         client.on_message = on_message
         client.connect(MQTT_HOST, MQTT_PORT)

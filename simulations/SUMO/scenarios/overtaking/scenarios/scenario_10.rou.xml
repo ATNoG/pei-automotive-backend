@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 10 - TN / FP probe: parallel lanes, identical speed, side-by-side start
+Both cars depart at pos=0 at 80 km/h - one in lane 0, one in lane 1.
+They travel in parallel with zero longitudinal offset; the projection
+dot-product is 0 (tie-breaks to +1) and never changes.
+Tests: adjacent-lane traffic at equal speed must not produce a false overtaking alert.
+Expected: no_event.
+-->
+<routes>
+    <vType id="car_same" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="22.22" minGap="2.5"/>
+
+    <vehicle id="sumo-merging-car" type="car_same" depart="0.0"
+             departLane="0" departPos="0" departSpeed="22.22">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="sumo-main-car" type="car_same" depart="0.0"
+             departLane="1" departPos="0" departSpeed="22.22">
+        <route edges="highway"/>
+    </vehicle>
+</routes>

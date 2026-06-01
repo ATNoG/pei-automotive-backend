@@ -24,7 +24,7 @@ PACK_DIR = Path(__file__).resolve().parent
 
 # What eval.py reads
 SUMOCFG          = PACK_DIR / "network" / "lanemerge.sumocfg"
-ALERT_TOPIC      = "alerts/lane_merge"
+ALERT_TOPIC      = "alerts/lane_merge/+"
 ALERT_TIMEOUT_S  = 20.0
 END_TIME_S       = 120.0
 STEP_LENGTH_S    = 0.5
@@ -69,9 +69,8 @@ SCENARIOS: dict[str, ScenarioSpec] = {
 # publishing _test_cleanup messages. Without this, stale state from a
 # previous scenario causes false alerts.
 _CLEANUP_CAR_IDS  = ["sumo-merging-car", "sumo-main-car", "sumo-main-car-2"]
-_CLEANUP_TOPIC    = "cars/updates"
 _CLEANUP_MQTT_HOST = os.getenv("MQTT_HOST", "localhost")
-_CLEANUP_MQTT_PORT = int(os.getenv("MQTT_PORT", "1884"))
+_CLEANUP_MQTT_PORT = int(os.getenv("MQTT_PORT", "1883"))
 
 _logger = logging.getLogger(__name__)
 
@@ -81,9 +80,10 @@ def before_scenario(scenario_id: str) -> None:
     try:
         client.connect(_CLEANUP_MQTT_HOST, _CLEANUP_MQTT_PORT)
         client.loop_start()
+        client.publish("cars/updates/__reset__", json.dumps({"_zone_reset": True}), qos=1)
         for car_id in _CLEANUP_CAR_IDS:
             payload = json.dumps({"_test_cleanup": True, "car_id": car_id})
-            client.publish(_CLEANUP_TOPIC, payload, qos=1)
+            client.publish(f"cars/updates/{car_id}", payload, qos=1)
         time.sleep(0.5)
     except Exception as e:
         _logger.warning("Detector cleanup failed for scenario %s: %s", scenario_id, e)
