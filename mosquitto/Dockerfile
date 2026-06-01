@@ -30,9 +30,10 @@ USER root
 RUN apt-get clean \
  && rm -rf /var/lib/apt/lists/* /etc/apt/sources.list /etc/apt/sources.list.d \
  && mkdir -p /etc/apt/sources.list.d \
- && printf 'deb http://deb.debian.org/debian bookworm main\ndeb http://deb.debian.org/debian bookworm-updates main\ndeb http://deb.debian.org/debian-security bookworm-security main\n' > /etc/apt/sources.list \
- && apt-get update \
- # hadolint ignore=DL3008
+ && printf 'deb http://deb.debian.org/debian bookworm main\ndeb http://deb.debian.org/debian bookworm-updates main\ndeb http://deb.debian.org/debian-security bookworm-security main\n' > /etc/apt/sources.list
+
+# hadolint ignore=DL3008
+RUN apt-get update \
  && apt-get install -y --no-install-recommends libwebsockets17 \
  && rm -rf /var/lib/apt/lists/*
 
