@@ -8,6 +8,7 @@ ditto-helm-chart/
 cloud2edge*
 
 venv/
+.venv/
 
 simulations/barraSUMOfinal/output/*.xml
 

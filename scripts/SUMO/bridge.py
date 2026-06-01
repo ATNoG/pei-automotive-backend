@@ -3,15 +3,15 @@
 
 Drives a SUMO simulation via TraCI and publishes vehicle positions to Eclipse
 Ditto over HTTP. Knows nothing about evaluation or scenario packs - those
-live in scripts/eval.py and simulations/SUMO/scenarios/<pack>/.
+live in scripts/SUMO/eval.py and simulations/SUMO/scenarios/<pack>/.
 
 Examples
 --------
   # Drive the Barra random traffic into Ditto
-  python scripts/bridge.py --cfg simulations/SUMO/osm.sumocfg
+  python scripts/SUMO/bridge.py --cfg simulations/SUMO/osm.sumocfg
 
   # Drive a single lane-merge scenario route file (manual one-off run)
-  python scripts/bridge.py \\
+  python scripts/SUMO/bridge.py \\
       --cfg simulations/SUMO/scenarios/lanemerge/network/lanemerge.sumocfg \\
       --route-files simulations/SUMO/scenarios/lanemerge/scenarios/scenario_07.rou.xml \\
       --step-length 0.5 --end-time 120 --real-time --cleanup
@@ -21,22 +21,19 @@ from __future__ import annotations
 import argparse
 import logging
 import os
-import re
 import shutil
 import sys
-import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Set
 
-import requests
 from dotenv import load_dotenv
-
 import traci
 
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(REPO_ROOT / "simulations"))
+from ditto_sumo import DittoPublisher  # noqa: E402
 
 
 def _find_sumo_binary(name: str) -> str:
@@ -44,18 +41,15 @@ def _find_sumo_binary(name: str) -> str:
     if sys.platform == "win32":
         name = name if name.endswith(".exe") else name + ".exe"
 
-    # 1. Same dir as the current Python executable (venv Scripts/)
     candidate = Path(sys.executable).parent / name
     if candidate.exists():
         return str(candidate)
 
-    # 2. pip-installed sumo package: search sys.path for sumo/bin/<name>
     for entry in sys.path:
         candidate = Path(entry) / "sumo" / "bin" / name
         if candidate.exists():
             return str(candidate)
 
-    # 3. System PATH
     found = shutil.which(name)
     if found:
         return found
@@ -246,10 +240,7 @@ def run(
     Returns the DittoPublisher so callers can inspect final metrics.
     Knows nothing about scenarios - callers compose this however they need.
     """
-    logging.basicConfig(
-        level=logging.INFO,
-        format="%(asctime)s %(levelname)s %(message)s",
-    )
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 
     env = load_env()
     pub = DittoPublisher(env["DITTO_API_URL"], env["DITTO_AUTH"], workers)
@@ -257,8 +248,7 @@ def run(
 
     sumo_binary = _find_sumo_binary("sumo-gui" if gui else "sumo")
     sumo_cmd = [
-        sumo_binary,
-        "-c", str(cfg),
+        sumo_binary, "-c", str(cfg),
         "--step-length", str(step_length),
         "--no-warnings",
         "--tripinfo-output", os.devnull,
@@ -277,7 +267,6 @@ def run(
     traci.start(sumo_cmd)
 
     executor = ThreadPoolExecutor(max_workers=workers)
-
     last_metrics_t = time.time()
     step_idx = 0
     seen: Set[str] = set()
@@ -306,16 +295,14 @@ def run(
             for vid in vehicle_ids_pub:
                 x, y = traci.vehicle.getPosition(vid)
                 lon, lat = traci.simulation.convertGeo(x, y)
-                vtype = traci.vehicle.getTypeID(vid)
-                emergency = "emergency" in vtype.lower()
+                emergency = "emergency" in traci.vehicle.getTypeID(vid).lower()
                 seen.add(vid)
                 executor.submit(pub.publish, vid, lat, lon, emergency)
 
             if real_time:
                 elapsed = time.time() - loop_t0
-                remaining = step_length - elapsed
-                if remaining > 0:
-                    time.sleep(remaining)
+                if step_length - elapsed > 0:
+                    time.sleep(step_length - elapsed)
 
             step_idx += 1
             now = time.time()
@@ -362,45 +349,29 @@ def _build_parser() -> argparse.ArgumentParser:
         epilog=(
             "Examples:\n"
             "  # Barra random traffic\n"
-            "  python scripts/bridge.py --cfg simulations/SUMO/osm.sumocfg\n"
+            "  python scripts/SUMO/bridge.py --cfg simulations/SUMO/osm.sumocfg\n"
             "\n"
             "  # Single lane-merge scenario route file\n"
-            "  python scripts/bridge.py \\\n"
+            "  python scripts/SUMO/bridge.py \\\n"
             "      --cfg simulations/SUMO/scenarios/lanemerge/network/lanemerge.sumocfg \\\n"
             "      --route-files simulations/SUMO/scenarios/lanemerge/scenarios/scenario_07.rou.xml \\\n"
             "      --step-length 0.5 --end-time 120 --real-time --cleanup\n"
             "\n"
-            "To run a full evaluation across all scenarios of a pack, use scripts/eval.py.\n"
+            "To run a full evaluation across all scenarios of a pack, use scripts/SUMO/eval.py.\n"
         ),
     )
-    p.add_argument("--cfg", required=True, type=Path, metavar="PATH",
-                   help="Path to a SUMO .sumocfg file (required).")
-    p.add_argument("--route-files", type=Path, nargs="+", metavar="PATH", default=None,
-                   help="Override the route-files declared in the .sumocfg "
-                        "(one or more .rou.xml paths).")
-    p.add_argument("--step-length", type=float, default=1.0, metavar="SECONDS",
-                   help="SUMO step length (default: 1.0).")
-    p.add_argument("--end-time", type=float, default=None, metavar="SECONDS",
-                   help="Stop SUMO at this sim time (default: value from .sumocfg).")
-    p.add_argument("--workers", type=int, default=16, metavar="N",
-                   help="HTTP publisher thread pool size (default: 16).")
-    p.add_argument("--max-steps", type=int, default=None, metavar="N",
-                   help="Wall-clock safety: stop after this many sim steps.")
-    p.add_argument("--max-vehicles", type=int, default=None, metavar="N",
-                   help="Publish at most N vehicles per step (drops the rest).")
-    p.add_argument("--metrics-interval", type=float, default=2.0, metavar="SECONDS",
-                   help="Seconds between throughput/latency log lines (default: 2.0).")
-    p.add_argument("--post-sim-drain", type=float, default=0.0, metavar="SECONDS",
-                   help="Wait N seconds after the sim ends so trailing MQTT messages "
-                        "reach the detector before cleanup (default: 0).")
-    p.add_argument("--real-time", action="store_true",
-                   help="Pace the sim to real time. Needed so the Ditto/Hono/MQTT "
-                        "pipeline can keep up - otherwise SUMO blasts through and "
-                        "the detector misses updates.")
-    p.add_argument("--gui", action="store_true",
-                   help="Run sumo-gui instead of headless (auto-starts and quits on end).")
-    p.add_argument("--cleanup", action="store_true",
-                   help="DELETE all Ditto Things created during this run on exit.")
+    p.add_argument("--cfg", required=True, type=Path, metavar="PATH")
+    p.add_argument("--route-files", type=Path, nargs="+", metavar="PATH", default=None)
+    p.add_argument("--step-length", type=float, default=1.0, metavar="SECONDS")
+    p.add_argument("--end-time", type=float, default=None, metavar="SECONDS")
+    p.add_argument("--workers", type=int, default=16, metavar="N")
+    p.add_argument("--max-steps", type=int, default=None, metavar="N")
+    p.add_argument("--max-vehicles", type=int, default=None, metavar="N")
+    p.add_argument("--metrics-interval", type=float, default=2.0, metavar="SECONDS")
+    p.add_argument("--post-sim-drain", type=float, default=0.0, metavar="SECONDS")
+    p.add_argument("--real-time", action="store_true")
+    p.add_argument("--gui", action="store_true")
+    p.add_argument("--cleanup", action="store_true")
     return p
 
 

@@ -95,8 +95,31 @@ def main() -> None:
     thing_payload = {
         "policyId": thing_id,
         "features": {
-            "gps": {"properties": {"latitude": 0, "longitude": 0}},
-            "info": {"properties": {"emergency": args.emergency}},
+            "ModemStatus": {
+                "properties": {
+                    "referenceTime": None,
+                    "referencePosition": {
+                        "latitude": 0,
+                        "longitude": 0,
+                        "positionConfidenceEllipse": {
+                            "semiMajorConfidence": 4095,
+                            "semiMinorConfidence": 4095,
+                            "semiMajorOrientation": 900,
+                        },
+                        "altitude": {
+                            "altitudeValue": 0,
+                            "altitudeConfidence": "unavailable",
+                        },
+                    },
+                    "modemStatus": {
+                        "mcc": 0,
+                        "mnc": 0,
+                        "ratMode": "NR",
+                        "nr": {"rsrq": 0, "rsrp": 0, "snr": 0, "pci": 0},
+                        "lte": {"rsrq": 0, "rsrp": 0, "rssi": 0, "snr": 0, "pci": 0},
+                    },
+                }
+            },
         },
     }
     ensure(

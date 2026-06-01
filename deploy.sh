@@ -230,9 +230,7 @@ print_step "9/10 - Creating .env file for Docker Compose..."
 print_info "Detecting service ports..."
 
 DITTO_PORT=$(sudo kubectl get svc -n cloud2edge c2e-ditto-nginx -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
-HONO_HTTP_PORT=$(sudo kubectl get svc -n cloud2edge c2e-hono-adapter-http -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
 HONO_MQTT_PORT=$(sudo kubectl get svc -n cloud2edge c2e-hono-adapter-mqtt -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
-HONO_AMQP_PORT=$(sudo kubectl get svc -n cloud2edge c2e-hono-adapter-amqp -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
 HONO_REG_PORT=$(sudo kubectl get svc -n cloud2edge c2e-hono-service-device-registry-ext -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || echo "N/A")
 
 # Get the certificate file path

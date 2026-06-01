@@ -20,7 +20,6 @@ import time
 import subprocess
 import sys
 import queue
-import threading
 import uuid
 from pathlib import Path
 from contextlib import contextmanager

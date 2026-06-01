@@ -5,7 +5,7 @@ import paho.mqtt.client as mqtt
 
 from helpers import (
     MQTT_HOST, MQTT_PORT, ROADS_DIR,
-    ensure_car_exists, send_position, standalone_get_car_id,
+    ensure_car_exists, send_position_ditto, standalone_get_car_id,
 )
 
 POSITION_UPDATES = []
@@ -33,14 +33,13 @@ def test_curved_route(get_car_id):
     with open(ROADS_DIR / "route.json") as f:
         coords = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    for i in range(0, len(coords), 3):
+    for i in range(0, len(coords), 1):
         lon, lat = coords[i]
-        send_position(car, lat, lon)
+        send_position_ditto(car, lat, lon)
         time.sleep(0.02)
 
-    # always send the last coordinate to complete the route
     last_lon, last_lat = coords[-1]
-    send_position(car, last_lat, last_lon)
+    send_position_ditto(car, last_lat, last_lon)
 
     time.sleep(0.2)
     client.loop_stop()
