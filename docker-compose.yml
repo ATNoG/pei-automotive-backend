@@ -5,7 +5,7 @@ services:
       dockerfile: mosquitto/Dockerfile
     ports:
       - "1883:1883"
-      - "8883:9001"
+      - "9003:9001"
     entrypoint: ["/bin/sh", "-c"]
     command:
       - "HASH=$$(/mosquitto/pw -p \"$$MQTT_BROKER_PASSWORD\") && printf '%s:%s\\n' \"$$MQTT_BROKER_USER\" \"$$HASH\" > /tmp/passwd && chmod 644 /tmp/passwd && exec mosquitto -c /mosquitto/config/mosquitto.conf"
