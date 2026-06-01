@@ -191,12 +191,15 @@ def _run_adaptive_stress(host: str, port: int, metrics: Metrics):
             )
             for i, s in enumerate(pub_stops)
         ]
-        for t in threads: t.start()
+        for t in threads:
+            t.start()
 
         time.sleep(step_duration)
 
-        for s in pub_stops: s.set()
-        for t in threads: t.join(timeout=2)
+        for s in pub_stops:
+            s.set()
+        for t in threads:
+            t.join(timeout=2)
         
         time.sleep(1)
 

@@ -21,8 +21,11 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import re
+import requests
 import shutil
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -33,7 +36,6 @@ import traci
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "simulations"))
-from ditto_sumo import DittoPublisher  # noqa: E402
 
 
 def _find_sumo_binary(name: str) -> str:
