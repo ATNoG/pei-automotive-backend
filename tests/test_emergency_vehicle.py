@@ -48,22 +48,34 @@ def test_emergency_vehicle(get_car_id):
         return _lerp(lane[i], lane[i + 1], t)
 
     i = 0.0
-    step = 0.25
+    step = 0.5
     limit = len(right_lane) - 51
     while i < limit:
         regular_idx = i + 4
-        ev_idx = round(i * 1.6)
+        ev_idx = i * 1.6
 
-        if int(regular_idx) >= len(right_lane) or ev_idx >= len(right_lane):
+        if int(regular_idx) >= len(right_lane) or int(ev_idx) >= len(right_lane):
             break
 
         r_lon, r_lat = lane_pos(right_lane, regular_idx)
         gap = regular_idx - ev_idx
 
-        if gap > 0.5:
+        if gap > 1:
             e_lon, e_lat = lane_pos(right_lane, ev_idx)
-        elif gap > -7:
+        elif gap >= -1:
+            t = (1 - gap) / 2
+            r = lane_pos(right_lane, ev_idx)
+            l = lane_pos(left_lane, ev_idx)
+            e_lon = r[0] + (l[0] - r[0]) * t
+            e_lat = r[1] + (l[1] - r[1]) * t
+        elif gap > -9:
             e_lon, e_lat = lane_pos(left_lane, ev_idx)
+        elif gap >= -11:
+            t = (-9 - gap) / 2
+            l = lane_pos(left_lane, ev_idx)
+            r = lane_pos(right_lane, ev_idx)
+            e_lon = l[0] + (r[0] - l[0]) * t
+            e_lat = l[1] + (r[1] - l[1]) * t
         else:
             e_lon, e_lat = lane_pos(right_lane, ev_idx)
 
@@ -74,7 +86,7 @@ def test_emergency_vehicle(get_car_id):
         t_regular.join()
         t_ev.join()
 
-        time.sleep(0.03)
+        time.sleep(0.15)
         i += step
 
     time.sleep(1)
