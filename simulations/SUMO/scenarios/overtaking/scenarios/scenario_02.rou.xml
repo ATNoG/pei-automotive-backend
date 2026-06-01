@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 02 - TP: delayed overtake
+100 km/h car (lane 1) starts 40 m behind a 50 km/h car (lane 0).
+Closing rate 13.89 m/s → pass at ~2.9 s, ~80 m from the start.
+Expected: overtaking_event fires.
+-->
+<routes>
+    <vType id="car_fast" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"/>
+    <vType id="car_slow" accel="1.5" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="16.67" minGap="2.5"/>
+
+    <vehicle id="sumo-merging-car" type="car_slow" depart="0.0"
+             departLane="0" departPos="40" departSpeed="13.89">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="sumo-main-car" type="car_fast" depart="0.0"
+             departLane="1" departPos="0" departSpeed="27.78">
+        <route edges="highway"/>
+    </vehicle>
+</routes>

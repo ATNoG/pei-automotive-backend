@@ -27,21 +27,21 @@ Scenario 10 reproduces this with SUMO: the merging car departs near the end of t
 Make sure the backend is running (Ditto/Hono stack + MQTT broker + `lane_merge_detector` service), then:
 
 ```bash
-python3 scripts/eval.py --pack lanemerge
+python3 scripts/SUMO/eval.py --pack lanemerge
 ```
 
 This runs all 10 scenarios and prints a results table with precision, recall, F1, and accuracy. Scenario 10 is expected to fail until the fix above is applied.
 To run only specific scenarios:
 
 ```bash
-python3 scripts/eval.py --pack lanemerge --scenarios 9 10
+python3 scripts/SUMO/eval.py --pack lanemerge --scenarios 9 10
 ```
 
 If you want to run the scenarios and view the SUMO GUI, do:
 
 ```bash
-python3 scripts/eval.py --pack lanemerge --gui
-python3 scripts/eval.py --pack lanemerge --scenarios 9 10 --gui
+python3 scripts/SUMO/eval.py --pack lanemerge --gui
+python3 scripts/SUMO/eval.py --pack lanemerge --scenarios 9 10 --gui
 ```
 
 The pack lives at `simulations/SUMO/scenarios/lanemerge/` — see `pack.py` there for the scenario list, MQTT topic, timings and the per-scenario detector cleanup hook. New scenario packs can be added as sibling folders with their own `pack.py`.

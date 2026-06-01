@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Node definitions for the overtaking evaluation network.
+Coordinates are geographic (lon, lat) - netconvert reprojects to UTM 29N.
+
+A straight 2-lane highway (~508 m) running east, placed in the same
+geographic area as the lanemerge network.
+-->
+<nodes>
+    <node id="O_START" x="-8.733639" y="40.628417"/>
+    <node id="O_END" x="-8.741917" y="40.631389"/>
+</nodes>

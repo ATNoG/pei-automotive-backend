@@ -21,8 +21,11 @@ from __future__ import annotations
 import argparse
 import logging
 import os
+import re
+import requests
 import shutil
 import sys
+import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
@@ -33,7 +36,6 @@ import traci
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 sys.path.insert(0, str(REPO_ROOT / "simulations"))
-from ditto_sumo import DittoPublisher  # noqa: E402
 
 
 def _find_sumo_binary(name: str) -> str:
@@ -54,6 +56,13 @@ def _find_sumo_binary(name: str) -> str:
     if found:
         return found
 
+    # 4. SUMO_HOME environment variable
+    if "SUMO_HOME" in os.environ:
+        candidate = Path(os.environ["SUMO_HOME"]) / "bin" / name
+        if candidate.exists():
+            return str(candidate)
+
+    # 5. Last resort: let the OS try (will raise if not found)
     return name
 
 
@@ -67,6 +76,148 @@ def load_env() -> dict:
         "DITTO_API_URL": os.environ["DITTO_API_URL"].rstrip("/"),
         "DITTO_AUTH": (os.environ["DITTO_USER"], os.environ["DITTO_PASS"]),
     }
+
+
+def slugify(raw: str) -> str:
+    return re.sub(r"[^a-z0-9\-]", "-", raw.lower()).strip("-") or "veh"
+
+
+class DittoPublisher:
+    """Thread-safe Ditto client. One shared policy for all sim vehicles."""
+
+    THING_PREFIX = "org.acme"
+    SHARED_POLICY_ID = "org.acme:sumo-sim-policy"
+
+    def __init__(self, api_url: str, auth: tuple, pool_size: int):
+        self.api_url = api_url
+        self.auth = auth
+        self.session = requests.Session()
+        self.session.auth = auth
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=pool_size,
+            pool_maxsize=pool_size,
+            max_retries=0,
+        )
+        self.session.mount("http://", adapter)
+        self.session.mount("https://", adapter)
+
+        self.provisioned: Set[str] = set()
+        self.provisioned_lock = threading.Lock()
+
+        self.metrics_lock = threading.Lock()
+        self.updates_sent = 0
+        self.updates_ok = 0
+        self.updates_failed = 0
+        self.latencies_ms: list[float] = []
+
+    def ensure_shared_policy(self) -> None:
+        payload = {
+            "policyId": self.SHARED_POLICY_ID,
+            "entries": {
+                "DEFAULT": {
+                    "subjects": {"nginx:ditto": {"type": "generated"}},
+                    "resources": {
+                        "thing:/": {"grant": ["READ", "WRITE"], "revoke": []},
+                        "policy:/": {"grant": ["READ", "WRITE"], "revoke": []},
+                        "message:/": {"grant": ["READ", "WRITE"], "revoke": []},
+                    },
+                    "importable": "implicit",
+                },
+            },
+        }
+        r = self.session.put(
+            f"{self.api_url}/api/2/policies/{self.SHARED_POLICY_ID}",
+            json=payload,
+            timeout=10,
+        )
+        if r.status_code not in (200, 201, 204):
+            sys.exit(f"Failed to upsert shared policy: {r.status_code} {r.text}")
+
+    def thing_id(self, vid: str) -> str:
+        slug = slugify(vid)
+        if slug.startswith("sumo-"):
+            return f"{self.THING_PREFIX}:{slug}"
+        return f"{self.THING_PREFIX}:sumo-{slug}"
+
+    def _provision(self, vid: str, emergency: bool) -> None:
+        tid = self.thing_id(vid)
+        payload = {
+            "policyId": self.SHARED_POLICY_ID,
+            "features": {
+                "ModemStatus": {"properties": {
+                    "referencePosition": {"latitude": 0, "longitude": 0},
+                }},
+            },
+        }
+        r = self.session.put(
+            f"{self.api_url}/api/2/things/{tid}",
+            json=payload,
+            timeout=10,
+        )
+        if r.status_code not in (200, 201, 204):
+            raise RuntimeError(f"thing create {tid} failed: {r.status_code} {r.text}")
+
+    def publish(self, vid: str, lat: float, lon: float, emergency: bool) -> None:
+        tid = self.thing_id(vid)
+        with self.provisioned_lock:
+            need_provision = vid not in self.provisioned
+
+        t0 = time.perf_counter()
+        try:
+            if need_provision:
+                self._provision(vid, emergency)
+                with self.provisioned_lock:
+                    self.provisioned.add(vid)
+
+            body = {"referencePosition": {"latitude": lat, "longitude": lon}}
+            r = self.session.put(
+                f"{self.api_url}/api/2/things/{tid}/features/ModemStatus/properties",
+                json=body,
+                timeout=10,
+            )
+            ok = r.status_code in (200, 204)
+            with self.metrics_lock:
+                self.updates_sent += 1
+                if ok:
+                    self.updates_ok += 1
+                else:
+                    self.updates_failed += 1
+                self.latencies_ms.append((time.perf_counter() - t0) * 1000.0)
+            if not ok:
+                logging.warning("features PUT %s -> %s %s", tid, r.status_code, r.text[:120])
+        except Exception as e:
+            with self.metrics_lock:
+                self.updates_sent += 1
+                self.updates_failed += 1
+            logging.warning("publish failed for %s: %s", vid, e)
+
+    def delete_all(self) -> None:
+        with self.provisioned_lock:
+            vids = list(self.provisioned)
+        logging.info("Deleting %d simulated things from Ditto...", len(vids))
+        for vid in vids:
+            # Send (0,0) to trigger cleanup in position_processor
+            self.publish(vid, 0.0, 0.0, False)
+            tid = self.thing_id(vid)
+            try:
+                self.session.delete(f"{self.api_url}/api/2/things/{tid}", timeout=10)
+            except Exception as e:
+                logging.warning("delete %s failed: %s", tid, e)
+
+    def metrics_snapshot(self) -> dict:
+        with self.metrics_lock:
+            lat = sorted(self.latencies_ms)
+            n = len(lat)
+            snapshot = {
+                "sent": self.updates_sent,
+                "ok": self.updates_ok,
+                "failed": self.updates_failed,
+                "avg_ms": (sum(lat) / n) if n else 0.0,
+                "p50_ms": lat[n // 2] if n else 0.0,
+                "p95_ms": lat[int(n * 0.95)] if n else 0.0,
+            }
+            self.latencies_ms.clear()
+            return snapshot
 
 
 def run(
@@ -128,6 +279,10 @@ def run(
             traci.simulationStep()
             sim_time = traci.simulation.getTime()
             vehicle_ids = traci.vehicle.getIDList()
+
+            if traci.simulation.getArrivedIDList():
+                logging.info("A vehicle reached its destination. Stopping scenario.")
+                break
 
             if max_vehicles and len(vehicle_ids) > max_vehicles:
                 vehicle_ids_pub = vehicle_ids[:max_vehicles]

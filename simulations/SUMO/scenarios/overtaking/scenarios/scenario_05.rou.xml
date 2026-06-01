@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 05 - TN / FP probe: fast car already ahead at t=0
+The merging-car (100 km/h, lane 1) starts 30 m AHEAD of main-car (40 km/h, lane 0).
+Both within 50 m at t=0, but the first sign stored for (merging, main) is -1
+(main is behind)  the +1 precondition is never met, so no +1→-1 flip occurs.
+The gap only grows.
+Expected: no_event.
+-->
+<routes>
+    <vType id="car_fast" accel="2.6" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"/>
+    <vType id="car_slow" accel="1.5" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="13.89" minGap="2.5"/>
+
+    <vehicle id="sumo-merging-car" type="car_slow" depart="0.0"
+             departLane="0" departPos="0" departSpeed="11.11">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="sumo-main-car" type="car_fast" depart="0.0"
+             departLane="1" departPos="30" departSpeed="27.78">
+        <route edges="highway"/>
+    </vehicle>
+</routes>

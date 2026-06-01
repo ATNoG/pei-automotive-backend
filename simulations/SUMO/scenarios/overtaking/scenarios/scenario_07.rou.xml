@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 07 - TP: extreme speed differential
+120 km/h car (lane 1) starts only 20 m behind a 40 km/h car (lane 0).
+Closing rate 22.22 m/s → pass at ~0.9 s. Very short detection window.
+Expected: overtaking_event fires.
+-->
+<routes>
+    <vType id="car_fast" accel="3.0" decel="5.0" sigma="0.0" length="4.5"
+           maxSpeed="33.33" minGap="2.5"/>
+    <vType id="car_slow" accel="1.5" decel="4.5" sigma="0.0" length="4.5"
+           maxSpeed="13.89" minGap="2.5"/>
+
+    <vehicle id="sumo-merging-car" type="car_slow" depart="0.0"
+             departLane="0" departPos="20" departSpeed="11.11">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="sumo-main-car" type="car_fast" depart="0.0"
+             departLane="1" departPos="0" departSpeed="33.33">
+        <route edges="highway"/>
+    </vehicle>
+</routes>

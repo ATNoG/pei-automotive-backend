@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+Scenario 11 - TN: Oncoming traffic (opposite directions)
+No overtaking occurs. Two cars travel in opposite directions on separate lanes.
+sumo-merging-car goes O_START -> O_END
+sumo-main-car goes O_END -> O_START
+Expected: no_event.
+-->
+<routes>
+    <vType id="car_fast" accel="2.6" decel="4.5" sigma="0.0" length="4.5" maxSpeed="33.33" minGap="2.5"/>
+    <vType id="car_slow" accel="1.5" decel="4.5" sigma="0.0" length="4.5" maxSpeed="13.89" minGap="2.5"/>
+
+    <vehicle id="sumo-merging-car" type="car_slow" depart="0.0" departLane="0" departPos="100" departSpeed="13.89">
+        <route edges="highway"/>
+    </vehicle>
+
+    <vehicle id="sumo-main-car" type="car_fast" depart="0.0" departLane="0" departPos="100" departSpeed="27.78">
+        <route edges="-highway"/>
+    </vehicle>
+</routes>
