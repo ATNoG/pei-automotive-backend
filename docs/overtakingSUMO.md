@@ -61,7 +61,7 @@ Scenario 10 places two vehicles side-by-side at equal speed (96.5 km/h). The det
 Make sure the backend is running (Ditto/Hono stack + MQTT broker + `overtaking_detector` service), then:
 
 ```bash
-python3 scripts/eval.py --pack overtaking
+python3 scripts/SUMO/eval.py --pack overtaking
 ```
 
 This runs all 11 scenarios and prints a results table with precision, recall, F1, and accuracy.
@@ -69,14 +69,14 @@ This runs all 11 scenarios and prints a results table with precision, recall, F1
 To run only specific scenarios:
 
 ```bash
-python3 scripts/eval.py --pack overtaking --scenarios 7 10
+python3 scripts/SUMO/eval.py --pack overtaking --scenarios 7 10
 ```
 
 If you want to run the scenarios and view the SUMO GUI, do:
 
 ```bash
-python3 scripts/eval.py --pack overtaking --gui
-python3 scripts/eval.py --pack overtaking --scenarios 7 10 --gui
+python3 scripts/SUMO/eval.py --pack overtaking --gui
+python3 scripts/SUMO/eval.py --pack overtaking --scenarios 7 10 --gui
 ```
 
 The pack lives at `simulations/SUMO/scenarios/overtaking/` — see `pack.py` there for the scenario list, MQTT topic, timings and the per-scenario detector cleanup hook. New scenario packs can be added as sibling folders with their own `pack.py`.

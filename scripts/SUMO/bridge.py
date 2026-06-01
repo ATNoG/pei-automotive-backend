@@ -144,8 +144,9 @@ class DittoPublisher:
         payload = {
             "policyId": self.SHARED_POLICY_ID,
             "features": {
-                "gps": {"properties": {"latitude": 0, "longitude": 0}},
-                "info": {"properties": {"emergency": emergency}},
+                "ModemStatus": {"properties": {
+                    "referencePosition": {"latitude": 0, "longitude": 0},
+                }},
             },
         }
         r = self.session.put(
@@ -168,12 +169,9 @@ class DittoPublisher:
                 with self.provisioned_lock:
                     self.provisioned.add(vid)
 
-            body = {
-                "gps": {"properties": {"latitude": lat, "longitude": lon}},
-                "info": {"properties": {"emergency": emergency}},
-            }
+            body = {"referencePosition": {"latitude": lat, "longitude": lon}}
             r = self.session.put(
-                f"{self.api_url}/api/2/things/{tid}/features",
+                f"{self.api_url}/api/2/things/{tid}/features/ModemStatus/properties",
                 json=body,
                 timeout=10,
             )

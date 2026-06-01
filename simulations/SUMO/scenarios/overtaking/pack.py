@@ -26,7 +26,7 @@ PACK_DIR = Path(__file__).resolve().parent
 
 # What eval.py reads
 SUMOCFG          = PACK_DIR / "network" / "overtaking.sumocfg"
-ALERT_TOPIC      = "alerts/overtaking"
+ALERT_TOPIC      = "alerts/overtaking/+"
 ALERT_TIMEOUT_S  = 25.0
 END_TIME_S       = 120.0
 STEP_LENGTH_S    = 0.5
@@ -86,7 +86,6 @@ POSITIVE_CLASS = "overtaking"
 
 # Cleanup hook
 _CLEANUP_CAR_IDS   = ["sumo-merging-car", "sumo-main-car", "sumo-main-car-2"]
-_CLEANUP_TOPIC     = "cars/updates"
 _CLEANUP_MQTT_HOST = "localhost"
 _CLEANUP_MQTT_PORT = 1884
 
@@ -101,7 +100,7 @@ def before_scenario(scenario_id: str) -> None:
         client.loop_start()
         for car_id in _CLEANUP_CAR_IDS:
             payload = json.dumps({"_test_cleanup": True, "car_id": car_id})
-            client.publish(_CLEANUP_TOPIC, payload, qos=1)
+            client.publish(f"cars/updates/{car_id}", payload, qos=1)
         time.sleep(0.5)
     except Exception as exc:
         _logger.warning("Detector cleanup failed for scenario %s: %s", scenario_id, exc)
