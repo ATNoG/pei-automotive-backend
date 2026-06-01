@@ -18,6 +18,21 @@ def on_message(client, userdata, msg):
         print(f"error processing message: {e}")
 
 
+def _interpolate(coords, steps_per_segment=5):
+    interpolated = []
+    for i in range(len(coords) - 1):
+        lon1, lat1 = coords[i]
+        lon2, lat2 = coords[i + 1]
+        for j in range(steps_per_segment):
+            t = j / steps_per_segment
+            interpolated.append((
+                lon1 + (lon2 - lon1) * t,
+                lat1 + (lat2 - lat1) * t,
+            ))
+    interpolated.append(coords[-1])
+    return interpolated
+
+
 def test_curved_route(get_car_id):
     car = get_car_id("curved-route-car")
     ensure_car_exists(car)
@@ -33,13 +48,11 @@ def test_curved_route(get_car_id):
     with open(ROADS_DIR / "route.json") as f:
         coords = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    for i in range(0, len(coords), 1):
-        lon, lat = coords[i]
+    fine_coords = _interpolate(coords, steps_per_segment=5)
+
+    for lon, lat in fine_coords:
         send_position_ditto(car, lat, lon)
         time.sleep(0.02)
-
-    last_lon, last_lat = coords[-1]
-    send_position_ditto(car, last_lat, last_lon)
 
     time.sleep(0.2)
     client.loop_stop()
