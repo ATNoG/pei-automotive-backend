@@ -9,7 +9,9 @@ from typing import List
 import paho.mqtt.client as mqtt
 import pytest
 import requests
+from requests.adapters import HTTPAdapter
 from requests.auth import HTTPBasicAuth
+from urllib3.util.retry import Retry
 from dotenv import load_dotenv
 
 from helpers import MQTT_HOST, MQTT_PORT, SIM_DIR, make_mqtt_client
@@ -72,6 +74,26 @@ def _check_connectivity(host="10.255.38.67", port=80, timeout=2):
         return False
 
 
+_session_cars: set[str] = set()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def _session_ditto_cleanup():
+    """After the full test session, delete any cars that were not cleaned up per-test."""
+    yield
+    if not _session_cars:
+        return
+    print(f"\n[cleanup] session sweep: checking {len(_session_cars)} cars...")
+    for car_id in _session_cars:
+        meta_path = SIM_DIR / "devices" / f"{car_id}.json"
+        if meta_path.exists():
+            _ditto_delete_thing(f"org.acme:{car_id}")
+            try:
+                meta_path.unlink()
+            except Exception:
+                pass
+
+
 @pytest.fixture(scope="session")
 def tomastest_available():
     """fixture that indicates if tomastest.com is available."""
@@ -108,17 +130,84 @@ def get_car_id(use_fixed_ids, test_car_registry):
     def _get_car_id(base_name: str) -> str:
         car_id = base_name if use_fixed_ids else f"{base_name}-{uuid.uuid4().hex[:8]}"
         test_car_registry.append(car_id)
+        _session_cars.add(car_id)
         return car_id
 
     return _get_car_id
 
 
+def _make_cleanup_session(auth: tuple) -> requests.Session:
+    session = requests.Session()
+    session.auth = auth
+    session.verify = False
+    retry = Retry(total=5, backoff_factor=2, status_forcelist=[500, 502, 503, 504])
+    adapter = HTTPAdapter(max_retries=retry, pool_connections=10, pool_maxsize=10)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    return session
+
+
+_cleanup_ditto_session: requests.Session | None = None
+_cleanup_hono_session: requests.Session | None = None
+
+
+def _get_cleanup_ditto_session() -> requests.Session:
+    global _cleanup_ditto_session
+    if _cleanup_ditto_session is None:
+        _cleanup_ditto_session = _make_cleanup_session(
+            (os.getenv("DITTO_USER", ""), os.getenv("DITTO_PASS", ""))
+        )
+    return _cleanup_ditto_session
+
+
+def _get_cleanup_hono_session() -> requests.Session:
+    global _cleanup_hono_session
+    if _cleanup_hono_session is None:
+        _cleanup_hono_session = _make_cleanup_session(
+            (os.getenv("HONO_USER", ""), os.getenv("HONO_PASS", ""))
+        )
+    return _cleanup_hono_session
+
+
+def _ditto_delete_thing(thing_id: str) -> bool:
+    """Delete a Ditto Thing and its Policy, plus the Hono device."""
+    ditto_api = os.getenv("DITTO_API_URL", "").rstrip("/")
+    hono_api = os.getenv("HONO_API_URL", "").rstrip("/")
+    hono_tenant = os.getenv("HONO_TENANT", "")
+
+    for session, url, label, optional in [
+        (_get_cleanup_ditto_session(), f"{ditto_api}/api/2/things/{thing_id}", "Ditto Thing", False),
+        (_get_cleanup_ditto_session(), f"{ditto_api}/api/2/policies/{thing_id}", "Ditto Policy", False),
+        (_get_cleanup_hono_session(), f"{hono_api}/v1/devices/{hono_tenant}/{thing_id}", "Hono Device", True),
+    ]:
+        try:
+            resp = session.delete(url, timeout=15)
+            if resp.status_code not in (200, 202, 204, 404):
+                print(f"[cleanup] warning: {label} delete returned {resp.status_code}")
+            else:
+                print(f"[cleanup] {label} deleted: {thing_id}")
+        except Exception as e:
+            if not optional:
+                print(f"[cleanup] warning: {label} delete failed for {thing_id}: {e}")
+    return True
+
+
 def _cleanup_test_cars(car_ids: List[str]) -> None:
-    """clean up test cars from services and local device files."""
+    """clean up test cars from Ditto, services, and local device files."""
     if not car_ids:
         return
 
     print(f"\n[cleanup] removing {len(car_ids)} test cars...")
+
+    # Delete Ditto Things first so no stale events reach the WS/proximity_filter.
+    for cid in car_ids:
+        meta_path = SIM_DIR / "devices" / f"{cid}.json"
+        if meta_path.exists():
+            meta = json.loads(meta_path.read_text())
+            thing_id = meta.get("thing_id", f"org.acme:{cid}")
+        else:
+            thing_id = f"org.acme:{cid}"
+        _ditto_delete_thing(thing_id)
 
     try:
         client = make_mqtt_client()
@@ -127,23 +216,19 @@ def _cleanup_test_cars(car_ids: List[str]) -> None:
         time.sleep(0.2)
 
         for car_id in car_ids:
-            # Tell consumers to clear stale per-car traffic jam alerts.
-            clear_msg = json.dumps({
-                "notification_type": "traffic_jam_clear",
-                "target_car_id": car_id,
-                "reason": "test_cleanup",
-                "timestamp": time.time()
-            })
-            client.publish(f"alerts/traffic_jam/{car_id}", clear_msg, qos=1)
-
             sentinel = json.dumps({"car_id": car_id, "_test_cleanup": True})
             # Evict position_processor state (subscribes to cars/raw_updates/+).
             client.publish(f"cars/raw_updates/{car_id}", sentinel, qos=1)
             # Evict detector state (each detector subscribes to cars/updates/+).
             client.publish(f"cars/updates/{car_id}", sentinel, qos=1)
+            # Tell the traffic_jam_detector to evict this car from any jam
+            # (the _test_cleanup sentinel on cars/updates already triggers
+            # traffic_jam_detector._cleanup_car which removes the car from
+            # jams and publishes traffic_jam_cleared with the proper jam_id
+            # if the jam dissolves).
 
         # Give services time to process cleanup messages
-        time.sleep(2.0)
+        time.sleep(1.0)
         client.loop_stop()
         client.disconnect()
     except Exception as e:

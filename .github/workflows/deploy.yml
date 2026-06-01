@@ -1,4 +1,4 @@
-name: Deploy
+name: deploy
 
 on:
     push:
@@ -9,7 +9,7 @@ on:
 
 jobs:
     deploy:
-        name: Deploy to staging VM
+        name: to prod VM
         runs-on: [self-hosted, prod-runner]
         permissions:
             contents: read

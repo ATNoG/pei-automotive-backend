@@ -6,7 +6,7 @@ import paho.mqtt.client as mqtt
 
 from helpers import (
     MQTT_HOST, MQTT_PORT, ROADS_DIR,
-    ensure_car_exists, send_position_ditto, standalone_get_car_id, make_mqtt_client,
+    ensure_car_exists, send_position, standalone_get_car_id,
 )
 
 ALERTS = []
@@ -17,15 +17,15 @@ def on_message(client, userdata, msg):
 
 
 def test_overtaking(get_car_id):
-    car_slow = get_car_id("overtaking-car-front")
-    car_fast = get_car_id("overtaking-car-behind")
+    car_slow = get_car_id("overtaking-car-front")   # victim
+    car_fast = get_car_id("overtaking-car-behind")  # overtaker
 
     ALERTS.clear()
 
     ensure_car_exists(car_slow)
     ensure_car_exists(car_fast)
 
-    client = make_mqtt_client()
+    client = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
     client.on_message = on_message
     client.connect(MQTT_HOST, MQTT_PORT)
     client.subscribe("alerts/overtaking/+")
@@ -36,7 +36,7 @@ def test_overtaking(get_car_id):
     with open(ROADS_DIR / "left_lane.json") as f:
         left_lane = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    for i in range(0, len(right_lane) - 51, 1):
+    for i in range(0, len(right_lane) - 51, 3):
         slow_idx = i + 4
         fast_idx = round(i * 1.6)
 
@@ -47,20 +47,23 @@ def test_overtaking(get_car_id):
         gap = slow_idx - fast_idx
 
         if gap > 0.5:
+            # fast car is far behind — stay in right lane
             f_lon, f_lat = right_lane[fast_idx]
         elif gap > -7:
+            # fast car is passing — move to left lane
             f_lon, f_lat = left_lane[fast_idx]
         else:
+            # fast car is well ahead — return to right lane
             f_lon, f_lat = right_lane[fast_idx]
 
-        t_slow = Thread(target=send_position_ditto, args=(car_slow, s_lat, s_lon))
-        t_fast = Thread(target=send_position_ditto, args=(car_fast, f_lat, f_lon))
+        t_slow = Thread(target=send_position, args=(car_slow, s_lat, s_lon))
+        t_fast = Thread(target=send_position, args=(car_fast, f_lat, f_lon))
         t_slow.start()
         t_fast.start()
         t_slow.join()
         t_fast.join()
 
-        time.sleep(0.15)
+        time.sleep(0.02)
 
     time.sleep(2)
     client.loop_stop()

@@ -25,7 +25,7 @@ from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
 from common.models import CarUpdate, AlertPriority
-from common.utils import haversine_distance_m, bearing_deg
+from common.utils import haversine_distance_m
 
 
 logger = logging.getLogger(__name__)

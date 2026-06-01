@@ -19,11 +19,11 @@ if [[ "$TARGET" == "All" ]]; then
     TARGET="tests/"
 else
     # Extract individual test functions from the selected file
-    TESTS=($(grep -o "^def test_[a-zA-Z_]*" "$TARGET" | sed 's/def //'))
+    read -ra TESTS <<< "$(grep -o "^def test_[a-zA-Z_]*" "$TARGET" | sed 's/def //' | tr '\n' ' ')"
     
     if [[ ${#TESTS[@]} -gt 1 ]]; then
         echo ""
-        echo "Found ${#TESTS[@]} tests in $(basename $TARGET):"
+        echo "Found ${#TESTS[@]} tests in $(basename "$TARGET"):"
         TESTS+=("All")
         
         select TEST_FUNC in "${TESTS[@]}"; do

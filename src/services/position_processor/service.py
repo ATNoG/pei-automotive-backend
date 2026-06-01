@@ -40,7 +40,7 @@ class PositionProcessor:
             password=config.broker_password,
             client_id="position-processor",
         )
-        self.states: Dict[str, Tuple[float, float, float]] = {}
+        self.states: Dict[str, Tuple[float, float, float, float | None]] = {}
         self.states_lock = threading.Lock()
 
     def _resolve_speed_limit(self, lat: float, lon: float) -> float:
@@ -78,12 +78,9 @@ class PositionProcessor:
         lat = data.get("latitude")
         lon = data.get("longitude")
 
-        # Cleanup sentinel or origin marker: evict state and forward so
+        # Cleanup sentinel: evict state and forward so
         # all detectors on cars/updates can clean up their own state.
-        if data.get("_test_cleanup") or (
-            lat is not None and lon is not None
-            and abs(float(lat)) < 0.0001 and abs(float(lon)) < 0.0001
-        ):
+        if data.get("_test_cleanup"):
             with self.states_lock:
                 if car_id in self.states:
                     del self.states[car_id]
@@ -110,7 +107,7 @@ class PositionProcessor:
             heading = None
 
             if last is not None:
-                last_lat, last_lon, last_ts = last
+                last_lat, last_lon, last_ts, last_heading = last
                 dt = now - last_ts
 
                 if dt > 0.05:
@@ -123,8 +120,12 @@ class PositionProcessor:
 
                     if dist_m > 1.0:
                         heading = bearing_deg(last_lat, last_lon, lat, lon)
+                    else:
+                        heading = last_heading
+                else:
+                    heading = last_heading
 
-            self.states[car_id] = (lat, lon, now)
+            self.states[car_id] = (lat, lon, now, heading)
 
         speed_limit = self._resolve_speed_limit(lat, lon)
 
