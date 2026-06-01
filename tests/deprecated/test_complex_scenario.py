@@ -28,7 +28,7 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 import paho.mqtt.client as mqtt
 import pytest
 
-SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
+SIM_DIR = Path(__file__).resolve().parent.parent.parent / "simulations"
 ROADS_DIR = SIM_DIR / "roads"
 
 # Configuration
