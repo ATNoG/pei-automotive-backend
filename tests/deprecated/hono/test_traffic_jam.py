@@ -18,8 +18,8 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import paho.mqtt.client as mqtt
 
-SIM_DIR = Path(__file__).resolve().parent.parent / "simulations"
-ROADS_DIR = Path(__file__).resolve().parent.parent / "simulations/roads"
+SIM_DIR = Path(__file__).resolve().parent.parent.parent.parent / "simulations"
+ROADS_DIR = SIM_DIR / "roads"
 
 # Configuration
 MQTT_HOST = os.getenv("TEST_MQTT_HOST", "localhost")

@@ -74,9 +74,12 @@ class DittoWSClient:
         if lat is None or lon is None:
             return
 
-        # callback with raw GPS; emergency not present in ModemStatus messages
+        # emergency flag may be present in the ModemStatus properties
+        # (e.g. when send_position_ditto includes it from device metadata)
+        emergency = bool(value.get("emergency", False))
+
         try:
-            self.on_gps_update(car_id, float(lat), float(lon), False)
+            self.on_gps_update(car_id, float(lat), float(lon), emergency)
         except Exception as e:
             logger.error("Error in on_gps_update callback: %s", e)
 

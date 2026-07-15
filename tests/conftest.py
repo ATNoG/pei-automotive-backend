@@ -6,6 +6,7 @@ import time
 import uuid
 from typing import List
 
+import paho.mqtt.client as mqtt
 import pytest
 import requests
 from requests.adapters import HTTPAdapter
@@ -191,22 +192,29 @@ def _ditto_delete_thing(thing_id: str) -> bool:
     return True
 
 
+def _publish_cleanup_sentinels(client: mqtt.Client, car_ids: List[str]):
+    """Publish _test_cleanup sentinels to raw_updates and updates topics."""
+    for car_id in car_ids:
+        sentinel = json.dumps({"car_id": car_id, "_test_cleanup": True})
+        client.publish(f"cars/raw_updates/{car_id}", sentinel, qos=1)
+        client.publish(f"cars/updates/{car_id}", sentinel, qos=1)
+
+
 def _cleanup_test_cars(car_ids: List[str]) -> None:
-    """clean up test cars from Ditto, services, and local device files."""
+    """clean up test cars from Ditto, services, and local device files.
+
+    Uses a two-wave cleanup to handle the race between in-flight position
+    updates arriving at detectors after the first cleanup wave:
+      1. Wave 1: publish MQTT cleanup sentinels (evict current state)
+      2. Delete Ditto Things (stop new events at source)
+      3. Sleep to drain in-flight events already queued in the pipeline
+      4. Wave 2: publish MQTT cleanup sentinels again (catch any state
+         re-created by late-arriving events)
+    """
     if not car_ids:
         return
 
     print(f"\n[cleanup] removing {len(car_ids)} test cars...")
-
-    # Delete Ditto Things first so no stale events reach the WS/proximity_filter.
-    for cid in car_ids:
-        meta_path = SIM_DIR / "devices" / f"{cid}.json"
-        if meta_path.exists():
-            meta = json.loads(meta_path.read_text())
-            thing_id = meta.get("thing_id", f"org.acme:{cid}")
-        else:
-            thing_id = f"org.acme:{cid}"
-        _ditto_delete_thing(thing_id)
 
     try:
         client = make_mqtt_client()
@@ -214,20 +222,28 @@ def _cleanup_test_cars(car_ids: List[str]) -> None:
         client.loop_start()
         time.sleep(0.2)
 
-        for car_id in car_ids:
-            sentinel = json.dumps({"car_id": car_id, "_test_cleanup": True})
-            # Evict position_processor state (subscribes to cars/raw_updates/+).
-            client.publish(f"cars/raw_updates/{car_id}", sentinel, qos=1)
-            # Evict detector state (each detector subscribes to cars/updates/+).
-            client.publish(f"cars/updates/{car_id}", sentinel, qos=1)
-            # Tell the traffic_jam_detector to evict this car from any jam
-            # (the _test_cleanup sentinel on cars/updates already triggers
-            # traffic_jam_detector._cleanup_car which removes the car from
-            # jams and publishes traffic_jam_cleared with the proper jam_id
-            # if the jam dissolves).
+        # Wave 1: immediately signal all services to evict existing state.
+        _publish_cleanup_sentinels(client, car_ids)
+        time.sleep(0.5)
 
-        # Give services time to process cleanup messages
+        # Stop new events at source (Ditto).
+        for cid in car_ids:
+            meta_path = SIM_DIR / "devices" / f"{cid}.json"
+            if meta_path.exists():
+                meta = json.loads(meta_path.read_text())
+                thing_id = meta.get("thing_id", f"org.acme:{cid}")
+            else:
+                thing_id = f"org.acme:{cid}"
+            _ditto_delete_thing(thing_id)
+
+        # Let in-flight events drain through the pipeline.
+        time.sleep(0.5)
+
+        # Wave 2: catch any state re-created by events that arrived between
+        # wave 1 and the Ditto deletion.
+        _publish_cleanup_sentinels(client, car_ids)
         time.sleep(1.0)
+
         client.loop_stop()
         client.disconnect()
     except Exception as e:

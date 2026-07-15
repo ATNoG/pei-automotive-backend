@@ -2,8 +2,6 @@ import json
 import time
 from threading import Thread
 
-import pytest
-
 from helpers import (
     MQTT_HOST, MQTT_PORT, ROADS_DIR,
     ensure_car_exists, send_position_ditto, standalone_get_car_id, make_mqtt_client,
@@ -16,7 +14,6 @@ def on_message(client, userdata, msg):
     ALERTS.append(json.loads(msg.payload.decode()))
 
 
-@pytest.mark.skip(reason="For now, no emergency")
 def test_emergency_vehicle(get_car_id):
     car_regular = get_car_id("ev-test-regular")
     car_emergency = get_car_id("ev-test-emergency")
@@ -37,22 +34,47 @@ def test_emergency_vehicle(get_car_id):
     with open(ROADS_DIR / "left_lane.json") as f:
         left_lane = json.load(f)["features"][0]["geometry"]["coordinates"]
 
-    for i in range(0, len(right_lane) - 51, 1):
-        regular_idx = i + 4
-        ev_idx = round(i * 1.6)
+    def _lerp(a, b, t):
+        return (a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t)
 
-        if regular_idx >= len(right_lane) or ev_idx >= len(right_lane):
+    def lane_pos(lane, idx):
+        i = int(idx)
+        t = idx - i
+        if t < 0.001 or i + 1 >= len(lane):
+            return lane[i]
+        return _lerp(lane[i], lane[i + 1], t)
+
+    i = 0.0
+    step = 0.5
+    limit = len(right_lane) - 51
+    while i < limit:
+        regular_idx = i + 4
+        ev_idx = i * 1.6
+
+        if int(regular_idx) >= len(right_lane) or int(ev_idx) >= len(right_lane):
             break
 
-        r_lon, r_lat = right_lane[regular_idx]
+        r_lon, r_lat = lane_pos(right_lane, regular_idx)
         gap = regular_idx - ev_idx
 
-        if gap > 0.5:
-            e_lon, e_lat = right_lane[ev_idx]
-        elif gap > -7:
-            e_lon, e_lat = left_lane[ev_idx]
+        if gap > 1:
+            e_lon, e_lat = lane_pos(right_lane, ev_idx)
+        elif gap >= -1:
+            t = (1 - gap) / 2
+            r = lane_pos(right_lane, ev_idx)
+            lft = lane_pos(left_lane, ev_idx)
+            e_lon = r[0] + (lft[0] - r[0]) * t
+            e_lat = r[1] + (lft[1] - r[1]) * t
+        elif gap > -9:
+            e_lon, e_lat = lane_pos(left_lane, ev_idx)
+        elif gap >= -11:
+            t = (-9 - gap) / 2
+            lft = lane_pos(left_lane, ev_idx)
+            r = lane_pos(right_lane, ev_idx)
+            e_lon = lft[0] + (r[0] - lft[0]) * t
+            e_lat = lft[1] + (r[1] - lft[1]) * t
         else:
-            e_lon, e_lat = right_lane[ev_idx]
+            e_lon, e_lat = lane_pos(right_lane, ev_idx)
 
         t_regular = Thread(target=send_position_ditto, args=(car_regular, r_lat, r_lon))
         t_ev = Thread(target=send_position_ditto, args=(car_emergency, e_lat, e_lon))
@@ -61,7 +83,8 @@ def test_emergency_vehicle(get_car_id):
         t_regular.join()
         t_ev.join()
 
-        time.sleep(0.01)
+        time.sleep(0.15)
+        i += step
 
     time.sleep(1)
     client.loop_stop()

@@ -64,6 +64,7 @@ def main() -> None:
     timestamp = datetime.now(timezone.utc).isoformat()
 
     properties = {
+        "emergency": meta.get("emergency", False),
         "referenceTime": timestamp,
         "referencePosition": {
             "latitude": args.latitude,

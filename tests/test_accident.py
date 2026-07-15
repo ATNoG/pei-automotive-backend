@@ -13,8 +13,8 @@ from helpers import (
     standalone_get_car_id, make_mqtt_client,
 )
 
-POSITION_INTERVAL = 0.10
-STEP_SIZE = 2
+POSITION_INTERVAL = 0.20
+STEP_SIZE = 1
 PHASE1_PERCENTAGE = 0.80
 ALERT_TIMEOUT = 3.0
 THREAD_TIMEOUT = 60.0
@@ -110,7 +110,7 @@ def test_accident_directional_notification(get_car_id):
         accident_idx = last_idx
         accident_lon, accident_lat = accident_coords[accident_idx]
 
-        num_iterations = 8
+        num_iterations = 16
 
         def accident_thread():
             for _ in range(num_iterations):

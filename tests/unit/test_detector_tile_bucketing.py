@@ -56,13 +56,12 @@ def _load_module(rel_path: str, name: str):
 
 def _make_detector(rel_path: str, module_name: str, class_name: str):
     module = _load_module(rel_path, module_name)
-    cls = getattr(module, class_name)
-    instance = cls.__new__(cls)
-    instance.config = _StubConfig()
-    instance.mqtt = _StubMqtt()
-    # Re-run __init__ logic that sets up state without touching MQTT.
-    cls.__init__(instance, _StubConfig())
-    instance.mqtt = _StubMqtt()  # replace the real client created in __init__
+    original_mqtt_client = module.MQTTClient
+    module.MQTTClient = lambda *a, **kw: _StubMqtt()
+    try:
+        instance = getattr(module, class_name)(_StubConfig())
+    finally:
+        module.MQTTClient = original_mqtt_client
     return instance
 
 
