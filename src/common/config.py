@@ -34,6 +34,18 @@ class AppConfig:
     meteo_updates_topic: str
     station_assignment_topic_base: str
 
+    # Keycloak token endpoint for Ditto behind Keycloak (e.g. tomastest).
+    # When set, Bearer token auth is used instead of HTTP Basic.
+    ditto_auth_url: Optional[str] = None
+    ditto_auth_client_id: str = "ditto"
+    ditto_verify_tls: bool = False
+
+    # Keycloak token endpoint for the weather Ditto behind Keycloak (e.g. tomastest).
+    # When set, Bearer token auth is used instead of HTTP Basic.
+    weather_auth_url: Optional[str] = None
+    weather_auth_client_id: str = "ditto"
+    weather_verify_tls: bool = False
+
 
 def _derive_ws_url_from_http(http_url: str) -> str:
     # convert http to websocket for ditto
@@ -64,10 +76,20 @@ def load_config() -> AppConfig:
     ditto_user = _get_env("DITTO_USER", required=True)
     ditto_pass = _get_env("DITTO_PASS", required=True)
 
+    # Keycloak token endpoint for Ditto behind Keycloak (e.g. tomastest)
+    ditto_auth_url = os.getenv("DITTO_AUTH_URL")
+    ditto_auth_client_id = os.getenv("DITTO_AUTH_CLIENT_ID", "ditto")
+    ditto_verify_tls = os.getenv("DITTO_VERIFY_TLS", "false").lower() == "true"
+
     # Weather API credentials (required)
     weather_api_url = _get_env("WEATHER_API_URL", required=True)
     weather_user = _get_env("WEATHER_USER", required=True)
     weather_pass = _get_env("WEATHER_PASS", required=True)
+
+    # Keycloak token endpoint for the weather Ditto (e.g. tomastest)
+    weather_auth_url = os.getenv("WEATHER_AUTH_URL")
+    weather_auth_client_id = os.getenv("WEATHER_AUTH_CLIENT_ID", "ditto")
+    weather_verify_tls = os.getenv("WEATHER_VERIFY_TLS", "false").lower() == "true"
 
     # MQTT basic config
     broker_host = _get_env("MQTT_BROKER_HOST", required=True)
@@ -94,11 +116,17 @@ def load_config() -> AppConfig:
         ditto_ws_url=ditto_ws,
         ditto_username=ditto_user,
         ditto_password=ditto_pass,
+        ditto_auth_url=ditto_auth_url,
+        ditto_auth_client_id=ditto_auth_client_id,
+        ditto_verify_tls=ditto_verify_tls,
 
         # Weather API (for meteo)
         weather_api_url=weather_api_url,
         weather_username=weather_user,
         weather_password=weather_pass,
+        weather_auth_url=weather_auth_url,
+        weather_auth_client_id=weather_auth_client_id,
+        weather_verify_tls=weather_verify_tls,
 
         # MQTT
         broker_host=broker_host,
