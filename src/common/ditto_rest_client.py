@@ -11,17 +11,35 @@ logger = logging.getLogger(__name__)
 
 
 class DittoRestClient:
-    def __init__(self, api_url: str, username: str, password: str):
+    def __init__(
+        self,
+        api_url: str,
+        username: str = None,
+        password: str = None,
+        token_provider=None,
+        verify_tls: bool = True,
+    ):
         """
         Args:
             api_url: Base URL for Ditto API
-            username: Ditto username
-            password: Ditto password
+            username: Ditto username (used for HTTP Basic when no token_provider)
+            password: Ditto password (used for HTTP Basic when no token_provider)
+            token_provider: optional TokenProvider; when set, requests use a
+                Bearer token instead of HTTP Basic (Ditto behind Keycloak)
+            verify_tls: whether to verify the server TLS certificate
         """
         self.api_url = api_url.rstrip('/')
-        self.auth = HTTPBasicAuth(username, password)
+        self.token_provider = token_provider
+        self.verify_tls = verify_tls
         self.session = requests.Session()
-        self.session.auth = self.auth
+        self.session.verify = verify_tls
+        if token_provider is None:
+            self.session.auth = HTTPBasicAuth(username, password)
+
+    def _auth_headers(self) -> Dict[str, str]:
+        if self.token_provider is not None:
+            return {"Authorization": f"Bearer {self.token_provider.get_token()}"}
+        return {}
 
     def get_thing(self, thing_id: str) -> Optional[Dict]:
         """
@@ -35,7 +53,7 @@ class DittoRestClient:
         """
         url = f"{self.api_url}/api/2/things/{thing_id}"
         try:
-            response = self.session.get(url, timeout=10)
+            response = self.session.get(url, timeout=10, headers=self._auth_headers())
             if response.status_code == 200:
                 return response.json()
             elif response.status_code == 404:
@@ -75,7 +93,12 @@ class DittoRestClient:
                 params['option'] = f'size({limit}),cursor({cursor})'
                 
             try:
-                response = self.session.get(url, params=params, timeout=30)
+                response = self.session.get(
+                    url,
+                    params=params,
+                    timeout=30,
+                    headers=self._auth_headers(),
+                )
                 if response.status_code == 200:
                     data = response.json()
                     # The API returns items in a wrapper

@@ -10,7 +10,7 @@ import logging
 import sys
 import json
 from pathlib import Path
-from typing import List
+from typing import List, Optional
 
 # add parent dir
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
@@ -20,6 +20,7 @@ from common.config import load_config
 from common.models import Station
 from common.mqtt_client import MQTTClient
 from common.ditto_rest_client import DittoRestClient
+from common.auth import TokenProvider
 
 logger = logging.getLogger(__name__)
 
@@ -38,8 +39,22 @@ class MeteoConsumer:
             api_url=config.weather_api_url,
             username=config.weather_username,
             password=config.weather_password,
+            token_provider=self._build_token_provider(),
+            verify_tls=config.weather_verify_tls,
         )
         self.poll_interval = 300  # Poll every 5 minutes (weather data doesn't change frequently)
+
+    def _build_token_provider(self) -> Optional[TokenProvider]:
+        """Build a Keycloak token provider for the weather Ditto, if configured."""
+        if not self.config.weather_auth_url:
+            return None
+        return TokenProvider(
+            token_url=self.config.weather_auth_url,
+            client_id=self.config.weather_auth_client_id,
+            username=self.config.weather_username,
+            password=self.config.weather_password,
+            verify_tls=self.config.weather_verify_tls,
+        )
 
     def fetch_and_publish_meteo_data(self):
         """Fetch all meteo things from Weather API and publish to MQTT"""

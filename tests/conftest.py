@@ -2,19 +2,25 @@
 import json
 import os
 import socket
+import sys
 import time
 import uuid
+from pathlib import Path
 from typing import List
 
 import paho.mqtt.client as mqtt
 import pytest
 import requests
 from requests.adapters import HTTPAdapter
-from requests.auth import HTTPBasicAuth
 from urllib3.util.retry import Retry
 from dotenv import load_dotenv
 
 from helpers import MQTT_HOST, MQTT_PORT, SIM_DIR, make_mqtt_client
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
+
+from common.auth import TokenProvider  # noqa: E402
+from common.ditto_rest_client import DittoRestClient  # noqa: E402
 
 # Load environment variables
 load_dotenv()
@@ -45,31 +51,28 @@ def _check_connectivity(host="10.255.38.67", port=80, timeout=2):
         if not all([weather_api_url, weather_user, weather_pass]):
             return False
 
-        # Try to fetch meteo things from Ditto API
-        api_url = weather_api_url.rstrip('/')
-        search_url = f"{api_url}/api/2/search/things"
-        params = {
-            'namespaces': 'meteo',
-            'option': 'size(1)'
-        }
+        verify_tls = os.getenv("WEATHER_VERIFY_TLS", "false").lower() == "true"
 
-        response = requests.get(
-            search_url,
-            params=params,
-            auth=HTTPBasicAuth(weather_user, weather_pass),
-            timeout=timeout
+        token_provider = None
+        auth_url = os.getenv("WEATHER_AUTH_URL", "")
+        if auth_url:
+            token_provider = TokenProvider(
+                token_url=auth_url,
+                client_id=os.getenv("WEATHER_AUTH_CLIENT_ID", "ditto"),
+                username=weather_user,
+                password=weather_pass,
+                verify_tls=verify_tls,
+            )
+
+        # Try to fetch meteo things from Ditto API using the same client as meteo_consumer
+        client = DittoRestClient(
+            api_url=weather_api_url,
+            username=weather_user,
+            password=weather_pass,
+            token_provider=token_provider,
+            verify_tls=verify_tls,
         )
-
-        if response.status_code == 200:
-            data = response.json()
-            # Check if we got at least one meteo thing
-            if isinstance(data, dict):
-                items = data.get('items', [])
-                return len(items) > 0
-            elif isinstance(data, list):
-                return len(data) > 0
-
-        return False
+        return bool(client.get_all_meteo_things())
     except Exception:
         return False
 
