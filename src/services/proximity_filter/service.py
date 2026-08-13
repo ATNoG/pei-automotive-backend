@@ -15,6 +15,7 @@ import os
 import sys
 import time
 from pathlib import Path
+from typing import Optional
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
@@ -22,6 +23,7 @@ from common.logging_config import setup_logging
 from common.config import load_config
 from common.mqtt_client import MQTTClient
 from common.ditto_client import DittoWSClient
+from common.auth import TokenProvider
 from common.geotile import get_quadkey
 
 logger = logging.getLogger(__name__)
@@ -43,6 +45,20 @@ class ProximityFilter:
             username=config.ditto_username,
             password=config.ditto_password,
             on_gps_update=self._on_gps_update,
+            token_provider=self._build_token_provider(),
+            verify_tls=config.ditto_verify_tls,
+        )
+
+    def _build_token_provider(self) -> Optional[TokenProvider]:
+        """Build a Keycloak token provider for Ditto behind Keycloak, if configured."""
+        if not self.config.ditto_auth_url:
+            return None
+        return TokenProvider(
+            token_url=self.config.ditto_auth_url,
+            client_id=self.config.ditto_auth_client_id,
+            username=self.config.ditto_username,
+            password=self.config.ditto_password,
+            verify_tls=self.config.ditto_verify_tls,
         )
 
     def _on_gps_update(self, car_id: str, lat: float, lon: float, emergency: bool = False) -> None:

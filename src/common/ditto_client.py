@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import json
 import logging
+import ssl
 import time
 from websocket import WebSocketApp
 from typing import Callable, Optional
@@ -18,16 +19,28 @@ class DittoWSClient:
     def __init__(
         self,
         ws_url: str,
-        username: str,
-        password: str,
-        on_gps_update: Callable[[str, float, float, bool], None],
+        username: str = None,
+        password: str = None,
+        on_gps_update: Callable[[str, float, float, bool], None] = None,
+        token_provider=None,
+        verify_tls: bool = True,
     ):
         self.ws_url = ws_url
         self.username = username
         self.password = password
         self.on_gps_update = on_gps_update
+        self.token_provider = token_provider
+        self.verify_tls = verify_tls
         self.ws: Optional[WebSocketApp] = None
         self._should_run = True
+
+    def _auth_headers(self) -> list[str]:
+        if self.token_provider is not None:
+            return [f"Authorization: Bearer {self.token_provider.get_token()}"]
+        auth_header = base64.b64encode(
+            f"{self.username}:{self.password}".encode()
+        ).decode()
+        return [f"Authorization: Basic {auth_header}"]
 
     def _on_open(self, ws):
         logger.info("Connected to Ditto WebSocket")
@@ -90,10 +103,9 @@ class DittoWSClient:
         logger.warning("Ditto WebSocket closed: %s %s", code, msg)
 
     def run_forever(self):
-        auth_header = base64.b64encode(
-            f"{self.username}:{self.password}".encode()
-        ).decode()
-        headers = [f"Authorization: Basic {auth_header}"]
+        sslopt = None
+        if not self.verify_tls:
+            sslopt = {"cert_reqs": ssl.CERT_NONE}
 
         self._should_run = True
 
@@ -102,7 +114,8 @@ class DittoWSClient:
                 logger.info(f"Connecting to Ditto WS at {self.ws_url} ...")
                 self.ws = WebSocketApp(
                     self.ws_url,
-                    header=headers,
+                    header=self._auth_headers(),
+                    sslopt=sslopt,
                     on_open=self._on_open,
                     on_message=self._on_message,
                     on_error=self._on_error,
